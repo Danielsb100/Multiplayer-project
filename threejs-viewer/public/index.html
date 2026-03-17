@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Environment Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Google Fonts for Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- Import map for Three.js without a build tool -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <!-- Login Screen Overlay -->
+    <div id="login-screen" class="login-overlay">
+        <div class="login-box">
+            <h1>Welcome!</h1>
+            <p>Enter your gametag to join the server</p>
+            <input type="text" id="username-input" placeholder="Your Name" maxlength="15" autocomplete="off">
+            <button id="join-btn">Join 3D World</button>
+        </div>
+    </div>
+
+    <!-- The canvas where Three.js will render -->
+    <div id="canvas-container"></div>
+    
+    <!-- Glassmorphism Floating UI Panel -->
+    <div class="ui-panel">
+        <h1>3D Viewer</h1>
+        <p>Import a .glb model to explore</p>
+        
+        <!-- Custom styled file upload button -->
+        <label for="glb-upload" class="upload-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            Import .glb File
+        </label>
+        <input type="file" id="glb-upload" accept=".glb">
+        
+        <!-- Loading State -->
+        <div id="loading-indicator" class="hidden">
+            <div class="spinner"></div>
+            <span>Loading model...</span>
+        </div>
+        
+        <!-- Controls Legend -->
+        <div id="controls-help">
+            <p>Mover <strong>WASD</strong></p>
+            <p>Olhar <strong>Mouse</strong></p>
+            <p>Importar GLB <strong>Botão acima</strong></p>
+        </div>
+    </div>
+
+    <!-- Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <!-- Main Logic -->
+    <script type="module" src="main.js"></script>
+</body>
+</html>
