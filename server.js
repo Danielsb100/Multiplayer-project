@@ -4,9 +4,19 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: {
+        origin: "*", // allow connections from any origin
+        methods: ["GET", "POST"]
+    }
+});
 
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || 3000, 10);
+
+// Basic health check endpoint for Railway ping/status
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
 
 // Serve static files from the 'public' directory
 app.use(express.static('public'));
