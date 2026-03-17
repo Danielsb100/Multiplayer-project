@@ -13,6 +13,12 @@ const io = new Server(server, {
 
 const PORT = parseInt(process.env.PORT || 3000, 10);
 
+// Request logging middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // Basic health check endpoint for Railway ping/status
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
@@ -80,6 +86,16 @@ io.on('connection', (socket) => {
     });
 });
 
+// Fallback to serve index.html for any unknown routes (useful for SPAs)
+app.use((req, res) => {
+    res.sendFile(__dirname + '/public/index.html');
+});
+
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on port ${PORT}`);
+    console.log(`========================================`);
+    console.log(`SERVER STARTING UP`);
+    console.log(`Time: ${new Date().toISOString()}`);
+    console.log(`Port: ${PORT}`);
+    console.log(`Binding: 0.0.0.0`);
+    console.log(`========================================`);
 });
