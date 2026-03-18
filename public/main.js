@@ -24,6 +24,14 @@ const loginGlbUpload = document.getElementById('login-glb-upload');
 const loginFileName = document.getElementById('login-file-name');
 let selectedModelBuffer = null;
 
+// Advanced Cube Placement State
+const PlacementState = { NONE: 0, BASE: 1, HEIGHT: 2 };
+let currentPlacementState = PlacementState.NONE;
+let placementStartPoint = new THREE.Vector3();
+let placementBasePoint = new THREE.Vector3();
+let previewCube = null;
+let lastMouseY = 0;
+
 loginGlbUpload.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -202,7 +210,7 @@ socket.on('playerModelUpdated', (data) => {
 });
 
 socket.on('initialCubes', (cubes) => {
-    cubes.forEach(cube => createCube(cube));
+    if (cubes) cubes.forEach(cube => createCube(cube));
 });
 
 socket.on('cubeAdded', (cube) => {
@@ -320,31 +328,119 @@ const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.4 });
 const plane = new THREE.Mesh(planeGeometry, planeMaterial);
 plane.rotation.x = -Math.PI / 2;
 plane.receiveShadow = true;
-plane.name = "ground"; // Name it for raycasting
+plane.name = "ground";
 scene.add(plane);
 
-// --- Raycasting for Cube Placement ---
+// --- Raycasting & Advanced Cube Placement ---
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-window.addEventListener('click', (event) => {
+window.addEventListener('mousedown', (event) => {
     if (localUsername === '' || document.activeElement === chatInput) return;
+    if (event.button !== 0) return; // Only left click
 
-    // Calculate mouse position in normalized device coordinates (-1 to +1)
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    if (currentPlacementState === PlacementState.NONE) {
+        // Phase 1: Start Base
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObject(plane);
 
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(plane);
-
-    if (intersects.length > 0) {
-        const point = intersects[0].point;
-        socket.emit('placeCube', {
-            position: { x: point.x, y: 0.5, z: point.z },
-            color: '#ef4444'
-        });
+        if (intersects.length > 0) {
+            currentPlacementState = PlacementState.BASE;
+            placementStartPoint.copy(intersects[0].point);
+            
+            // Create preview cube
+            const geo = new THREE.BoxGeometry(1, 1, 1);
+            const mat = new THREE.MeshStandardMaterial({ color: '#ef4444', transparent: true, opacity: 0.5 });
+            previewCube = new THREE.Mesh(geo, mat);
+            previewCube.position.set(placementStartPoint.x, 0.5, placementStartPoint.z);
+            scene.add(previewCube);
+        }
+    } else if (currentPlacementState === PlacementState.HEIGHT) {
+        // Phase 3: Finalize
+        if (checkCubeCollisionWithPlayers(previewCube)) {
+            alert("Cannot place cube here: A player is in the way!");
+            cancelPlacement();
+        } else {
+            const size = {
+                w: Math.abs(previewCube.scale.x),
+                h: Math.abs(previewCube.scale.y),
+                d: Math.abs(previewCube.scale.z)
+            };
+            socket.emit('placeCube', {
+                position: previewCube.position.clone(),
+                size: size,
+                color: '#ef4444'
+            });
+            cancelPlacement();
+        }
     }
 });
+
+window.addEventListener('mouseup', (event) => {
+    if (currentPlacementState === PlacementState.BASE) {
+        // Phase 2: Start Height Definition
+        currentPlacementState = PlacementState.HEIGHT;
+        lastMouseY = event.clientY;
+    }
+});
+
+window.addEventListener('mousemove', (event) => {
+    // Custom Cursor
+    customCursor.style.left = event.clientX + 'px';
+    customCursor.style.top = event.clientY + 'px';
+
+    if (currentPlacementState === PlacementState.BASE) {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObject(plane);
+
+        if (intersects.length > 0) {
+            const currentPoint = intersects[0].point;
+            const width = currentPoint.x - placementStartPoint.x;
+            const depth = currentPoint.z - placementStartPoint.z;
+            
+            previewCube.scale.set(width || 0.1, 1, depth || 0.1);
+            previewCube.position.set(
+                placementStartPoint.x + width / 2,
+                0.5,
+                placementStartPoint.z + depth / 2
+            );
+        }
+    } else if (currentPlacementState === PlacementState.HEIGHT) {
+        const deltaY = lastMouseY - event.clientY; // Upwards move increases height
+        const newHeight = Math.max(0.1, previewCube.scale.y + deltaY * 0.05);
+        previewCube.scale.y = newHeight;
+        previewCube.position.y = newHeight / 2;
+        lastMouseY = event.clientY;
+    }
+});
+
+function cancelPlacement() {
+    if (previewCube) {
+        scene.remove(previewCube);
+        previewCube = null;
+    }
+    currentPlacementState = PlacementState.NONE;
+}
+
+function checkCubeCollisionWithPlayers(cubeMesh) {
+    const cubeBox = new THREE.Box3().setFromObject(cubeMesh);
+    
+    // Check local player
+    const localBox = new THREE.Box3().setFromObject(playerGroup);
+    if (cubeBox.intersectsBox(localBox)) return true;
+    
+    // Check remote players
+    for (const id in remotePlayers) {
+        const remoteBox = new THREE.Box3().setFromObject(remotePlayers[id].group);
+        if (cubeBox.intersectsBox(remoteBox)) return true;
+    }
+    
+    return false;
+}
 
 const wallsGroup = new THREE.Group();
 scene.add(wallsGroup);
@@ -500,20 +596,31 @@ function createCube(data) {
         metalness: 0.3
     });
     const cube = new THREE.Mesh(geometry, material);
+    
+    // Apply dimensions from data
+    const size = data.size || { w: 1, h: 1, d: 1 };
+    cube.scale.set(size.w, size.h, size.d);
+    
     cube.position.set(data.position.x, data.position.y, data.position.z);
     cube.castShadow = true;
     cube.receiveShadow = true;
     scene.add(cube);
 
+    // Add to collision boxes
+    cube.updateMatrixWorld();
+    const cubeBox = new THREE.Box3().setFromObject(cube);
+    wallBoxes.push(cubeBox);
+
     // Minor scale animation when appearing
+    const targetScale = cube.scale.clone();
     cube.scale.set(0, 0, 0);
     new Promise(res => {
-        let sc = 0;
+        let alpha = 0;
         const intr = setInterval(() => {
-            sc += 0.1;
-            cube.scale.set(sc, sc, sc);
-            if (sc >= 1) {
-                cube.scale.set(1, 1, 1);
+            alpha += 0.1;
+            cube.scale.lerpVectors(new THREE.Vector3(0,0,0), targetScale, alpha);
+            if (alpha >= 1) {
+                cube.scale.copy(targetScale);
                 clearInterval(intr);
             }
         }, 16);

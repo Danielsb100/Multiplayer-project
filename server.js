@@ -99,7 +99,8 @@ io.on('connection', (socket) => {
         const newCube = {
             id: 'cube_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
             position: cubeData.position,
-            color: cubeData.color || '#ef4444' // Default red
+            size: cubeData.size || { w: 1, h: 1, d: 1 },
+            color: cubeData.color || '#ef4444'
         };
         placedCubes.push(newCube);
         io.emit('cubeAdded', newCube);
