@@ -236,12 +236,30 @@ socket.on('initialModels', (models) => {
 });
 
 socket.on('cubeAdded', (cube) => {
+    // Remove optimistic ghost if exists
+    removeOptimisticObject(cube.id);
     createCube(cube);
 });
 
 socket.on('modelAdded', (model) => {
+    // Remove optimistic ghost if exists
+    removeOptimisticObject(model.id);
     createPlacedModel(model);
 });
+
+function removeOptimisticObject(id) {
+    // We can find objects with 'isOptimistic' property
+    scene.traverse(obj => {
+        if (obj.userData && obj.userData.isOptimistic) {
+            // Check if it's the right one (roughly same position/ID)
+            scene.remove(obj);
+        }
+    });
+
+    // Clean up collision boxes
+    const boxIndex = wallBoxes.findIndex(box => box.relatedId === 'opt_' + id || box.relatedId === id);
+    if (boxIndex !== -1) wallBoxes.splice(boxIndex, 1);
+}
 
 socket.on('objectDeleted', (id) => {
     const obj = scene.getObjectByProperty('uuid', idToUuid[id]);
@@ -404,11 +422,11 @@ window.addEventListener('contextmenu', (event) => {
 
     if (intersects.length > 0) {
         const hit = intersects[0];
-        contextMenuTarget = hit.object;
         
-        // If part of a group (model), get the root
-        let root = contextMenuTarget;
-        while (root.parent && root.parent !== scene && !root.userData.id) {
+        // Improve search for root object with ID
+        let root = hit.object;
+        while (root && root.parent && root.parent !== scene) {
+            if (root.userData && root.userData.id) break;
             root = root.parent;
         }
         contextMenuTarget = root;
@@ -467,8 +485,18 @@ contextGlbUpload.addEventListener('change', (e) => {
                 const tempBox = new THREE.Box3().setFromObject(model);
                 
                 if (checkGeneralCollision(tempBox)) {
-                    alert("Cannot spawn GLB here: Position occupied by player or object!");
+                    alert("A posição está ocupada!");
                 } else {
+                    const tempId = 'opt_' + Date.now();
+                    // Optimistic creation
+                    createPlacedModel({
+                        id: tempId,
+                        modelBuffer: buffer,
+                        position: contextMenuPoint.clone(),
+                        rotation: { x: 0, y: 0, z: 0 },
+                        isOptimistic: true
+                    });
+
                     socket.emit('placeModel', {
                         modelBuffer: buffer,
                         position: contextMenuPoint.clone()
@@ -592,8 +620,20 @@ window.addEventListener('mousedown', (event) => {
                 h: Math.abs(previewCube.scale.y),
                 d: Math.abs(previewCube.scale.z)
             };
+            const pos = previewCube.position.clone();
+
+            // Optimistic creation
+            const tempId = 'opt_cube_' + Date.now();
+            createCube({
+                id: tempId,
+                position: pos,
+                size: size,
+                color: '#ef4444',
+                isOptimistic: true
+            });
+
             socket.emit('placeCube', {
-                position: previewCube.position.clone(),
+                position: pos,
                 size: size,
                 color: '#ef4444'
             });
@@ -849,6 +889,7 @@ function createCube(data) {
     });
     const cube = new THREE.Mesh(geometry, material);
     cube.userData.id = data.id; // Store ID
+    cube.userData.isOptimistic = data.isOptimistic || false;
     idToUuid[data.id] = cube.uuid;
     
     // Apply dimensions from data
@@ -866,7 +907,7 @@ function createCube(data) {
     cubeBox.relatedId = data.id;
     wallBoxes.push(cubeBox);
 
-    // Minor scale animation when appearing
+    // Minor scale animation when appearing (only if not optimistic or first create)
     const targetScale = cube.scale.clone();
     cube.scale.set(0, 0, 0);
     new Promise(res => {
@@ -895,6 +936,7 @@ function createPlacedModel(data) {
         model.position.set(data.position.x, data.position.y, data.position.z);
         model.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
         model.userData.id = data.id;
+        model.userData.isOptimistic = data.isOptimistic || false;
         idToUuid[data.id] = model.uuid;
         scene.add(model);
 
