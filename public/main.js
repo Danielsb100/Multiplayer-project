@@ -410,44 +410,51 @@ window.addEventListener('contextmenu', (event) => {
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
 
-    // Filter meshes to interact with (ground and objects)
-    const targets = [];
-    scene.traverse(obj => {
-        if (obj.isMesh && (obj.name === "ground" || (obj.userData && obj.userData.id))) {
-            targets.push(obj);
-        }
-    });
-
-    const intersects = raycaster.intersectObjects(targets);
+    // Raycast against the whole scene
+    const intersects = raycaster.intersectObjects(scene.children, true);
 
     if (intersects.length > 0) {
-        const hit = intersects[0];
-        
-        // Improve search for root object with ID
-        let root = hit.object;
-        while (root && root.parent && root.parent !== scene) {
-            if (root.userData && root.userData.id) break;
-            root = root.parent;
+        let hit = null;
+        let groundHit = null;
+
+        // Prioritize interactive objects over ground
+        for (const intersect of intersects) {
+            let root = intersect.object;
+            while (root && root !== scene) {
+                if (root.userData && root.userData.id) {
+                    hit = { object: root, point: intersect.point };
+                    break;
+                }
+                if (root.name === "ground") {
+                    groundHit = { object: root, point: intersect.point };
+                }
+                root = root.parent;
+            }
+            if (hit) break;
         }
-        contextMenuTarget = root;
-        contextMenuPoint.copy(hit.point);
 
-        // Position menu
-        contextMenu.style.left = event.clientX + 'px';
-        contextMenu.style.top = event.clientY + 'px';
-        contextMenu.classList.remove('hidden');
-        isMenuOpen = true;
+        const finalHit = hit || groundHit;
+        if (finalHit) {
+            contextMenuTarget = finalHit.object;
+            contextMenuPoint.copy(finalHit.point);
 
-        menuGroundSection.classList.add('hidden');
-        menuCubeSection.classList.add('hidden');
-        menuModelSection.classList.add('hidden');
+            // Position menu
+            contextMenu.style.left = event.clientX + 'px';
+            contextMenu.style.top = event.clientY + 'px';
+            contextMenu.classList.remove('hidden');
+            isMenuOpen = true;
 
-        if (contextMenuTarget.name === "ground") {
-            menuGroundSection.classList.remove('hidden');
-        } else if (contextMenuTarget.userData && contextMenuTarget.userData.id.startsWith('cube_')) {
-            menuCubeSection.classList.remove('hidden');
-        } else if (contextMenuTarget.userData && contextMenuTarget.userData.id.startsWith('model_')) {
-            menuModelSection.classList.remove('hidden');
+            menuGroundSection.classList.add('hidden');
+            menuCubeSection.classList.add('hidden');
+            menuModelSection.classList.add('hidden');
+
+            if (contextMenuTarget.name === "ground") {
+                menuGroundSection.classList.remove('hidden');
+            } else if (contextMenuTarget.userData && contextMenuTarget.userData.id.startsWith('cube_')) {
+                menuCubeSection.classList.remove('hidden');
+            } else if (contextMenuTarget.userData && contextMenuTarget.userData.id.startsWith('model_')) {
+                menuModelSection.classList.remove('hidden');
+            }
         }
     }
 });
@@ -784,32 +791,40 @@ function updatePlayer() {
 function updateOcclusion() {
     if (!playerGroup) return;
 
-    // Reset all cubes to opaque
+    // 1. Reset all cubes/objects to opaque
     scene.traverse(obj => {
-        if (obj.isMesh && obj.userData && obj.userData.id && obj.userData.id.startsWith('cube_')) {
+        if (obj.isMesh && obj.userData && obj.userData.id) {
             obj.material.transparent = false;
             obj.material.opacity = 1.0;
         }
     });
 
-    // Raycast from camera to player
-    const direction = new THREE.Vector3().subVectors(playerGroup.position, camera.position).normalize();
-    const distance = camera.position.distanceTo(playerGroup.position);
+    // 2. Get player center (local coordinates to global)
+    const playerBox = new THREE.Box3().setFromObject(playerGroup);
+    const targetPoint = playerBox.getCenter(new THREE.Vector3());
+
+    // 3. Raycast from camera to player center
+    const direction = new THREE.Vector3().subVectors(targetPoint, camera.position).normalize();
+    const distanceToPlayer = camera.position.distanceTo(targetPoint);
     
     raycaster.set(camera.position, direction);
+    // Intersection against scene children
     const intersects = raycaster.intersectObjects(scene.children, true);
 
     for (let i = 0; i < intersects.length; i++) {
         const hit = intersects[i];
-        if (hit.distance >= distance) break; // Hits behind player
+        
+        // Only objects between camera and player
+        if (hit.distance >= distanceToPlayer - 0.5) break; 
 
+        // Climb up to find the root of the hit object
         let obj = hit.object;
-        // Find if it's a cube
         while (obj && obj !== scene) {
+            // Is it a cube? (or any object we want transparent)
             if (obj.userData && obj.userData.id && obj.userData.id.startsWith('cube_')) {
                 obj.material.transparent = true;
                 obj.material.opacity = 0.2;
-                break;
+                break; 
             }
             obj = obj.parent;
         }
