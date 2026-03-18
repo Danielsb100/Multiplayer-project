@@ -28,6 +28,16 @@
             <h1>Welcome!</h1>
             <p>Enter your gametag to join the server</p>
             <input type="text" id="username-input" placeholder="Your Name" maxlength="15" autocomplete="off">
+            
+            <div class="login-upload-section">
+                <label for="login-glb-upload" class="upload-btn mini">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    Import .glb (Optional)
+                </label>
+                <input type="file" id="login-glb-upload" accept=".glb">
+                <span id="login-file-name">Default avatar selected</span>
+            </div>
+
             <button id="join-btn">Join 3D World</button>
         </div>
     </div>
@@ -36,29 +46,31 @@
     <div id="canvas-container"></div>
     
     <!-- Glassmorphism Floating UI Panel -->
-    <div class="ui-panel">
+    <div class="ui-panel" id="main-ui">
         <h1>3D Viewer</h1>
-        <p>Import a .glb model to explore</p>
-        
-        <!-- Custom styled file upload button -->
-        <label for="glb-upload" class="upload-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-            Import .glb File
-        </label>
-        <input type="file" id="glb-upload" accept=".glb">
-        
-        <!-- Loading State -->
-        <div id="loading-indicator" class="hidden">
-            <div class="spinner"></div>
-            <span>Loading model...</span>
-        </div>
+        <p>Explore the multiplayer world!</p>
         
         <!-- Controls Legend -->
         <div id="controls-help">
             <p>Mover <strong>WASD</strong></p>
             <p>Olhar <strong>Mouse</strong></p>
-            <p>Importar GLB <strong>Botão acima</strong></p>
+            <p>Chat <strong>Enter</strong></p>
         </div>
+    </div>
+
+    <!-- Global Chat UI -->
+    <div id="chat-history-container">
+        <div id="chat-history"></div>
+    </div>
+
+    <div id="chat-input-container">
+        <input type="text" id="chat-input" placeholder="Tipe your message..." autocomplete="off">
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-indicator" class="hidden">
+        <div class="spinner"></div>
+        <span>Loading model...</span>
     </div>
 
     <!-- Socket.io -->

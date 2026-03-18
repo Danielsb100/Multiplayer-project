@@ -78,6 +78,18 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle chat messages
+    socket.on('chatMessage', (message) => {
+        if (players[socket.id]) {
+            io.emit('chatMessage', {
+                id: socket.id,
+                name: players[socket.id].name,
+                message: message,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+        }
+    });
+
     // Handle disconnection
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);

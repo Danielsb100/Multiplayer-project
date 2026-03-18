@@ -9,13 +9,37 @@ const loginScreen = document.getElementById('login-screen');
 const joinBtn = document.getElementById('join-btn');
 const usernameInput = document.getElementById('username-input');
 
+// New Login GLB Elements
+const loginGlbUpload = document.getElementById('login-glb-upload');
+const loginFileName = document.getElementById('login-file-name');
+let selectedModelBuffer = null;
+
+loginGlbUpload.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        loginFileName.innerText = file.name;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            selectedModelBuffer = event.target.result;
+        };
+        reader.readAsArrayBuffer(file);
+    }
+});
+
 joinBtn.addEventListener('click', () => {
     const name = usernameInput.value.trim();
     if (name) {
         localUsername = name;
         socket.emit('setName', name);
+        
+        if (selectedModelBuffer) {
+            socket.emit('modelUpdate', selectedModelBuffer);
+            loadLocalModel(selectedModelBuffer);
+        }
+
+        playerGroup.visible = true;
         loginScreen.classList.add('hidden');
-        createGametag(socket.id, name, true); // Create local gametag
+        createGametag(socket.id, name, true);
     }
 });
 
@@ -79,6 +103,7 @@ const localAvatar = createDefaultAvatar();
 characterMesh = localAvatar.bodyMesh;
 playerGroup.add(localAvatar.group);
 playerGroup.position.set(0, 0, 0);
+playerGroup.visible = false; // Hidden until join
 
 function createGametag(id, name, isLocal) {
     if (gametags[id]) {
@@ -166,6 +191,10 @@ socket.on('playerModelUpdated', (data) => {
     }
 });
 
+socket.on('chatMessage', (data) => {
+    addMessageToChat(data);
+});
+
 function addOtherPlayer(playerInfo) {
     const avatar = createDefaultAvatar();
     avatar.group.position.copy(playerInfo.position);
@@ -218,14 +247,33 @@ function loadModelFromBuffer(arrayBuffer, targetPlayerObj) {
 
 // --- Input Handling ---
 const keys = { w: false, a: false, s: false, d: false };
+const chatInput = document.getElementById('chat-input');
+const chatHistory = document.getElementById('chat-history');
 
 window.addEventListener('keydown', (e) => {
-    if (document.activeElement === usernameInput) return; // Ignore if typing name
+    if (document.activeElement === usernameInput) return;
+    if (document.activeElement === chatInput) {
+        if (e.key === 'Enter') {
+            const msg = chatInput.value.trim();
+            if (msg) {
+                socket.emit('chatMessage', msg);
+                chatInput.value = '';
+            }
+            chatInput.blur();
+        }
+        return;
+    }
+
+    if (e.key === 'Enter') {
+        chatInput.focus();
+        return;
+    }
+
     if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
 });
 
 window.addEventListener('keyup', (e) => {
-    if (document.activeElement === usernameInput) return;
+    if (document.activeElement === usernameInput || document.activeElement === chatInput) return;
     if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
 });
 
@@ -348,62 +396,56 @@ function animate() {
 }
 animate();
 
-// --- 6. GLB File Upload ---
-const uploadInput = document.getElementById('glb-upload');
+// --- 6. Chat & Model Helpers ---
 const loadingIndicator = document.getElementById('loading-indicator');
 
-uploadInput.addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+function addMessageToChat(data) {
+    const msgElement = document.createElement('div');
+    msgElement.className = 'chat-msg';
+    msgElement.innerHTML = `
+        <span class="time">${data.time}</span>
+        <span class="name">${data.name}:</span>
+        <span class="text">${data.message}</span>
+    `;
+    chatHistory.appendChild(msgElement);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
 
-    if (!file.name.toLowerCase().endsWith('.glb') && !file.name.toLowerCase().endsWith('.gltf')) {
-        alert('Please select a valid .glb or .gltf 3D model file.');
-        return;
+    // Limit history
+    while (chatHistory.children.length > 50) {
+        chatHistory.removeChild(chatHistory.firstChild);
     }
+}
 
+function loadLocalModel(arrayBuffer) {
     loadingIndicator.classList.remove('hidden');
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.parse(arrayBuffer, '', (gltf) => {
+        // Remove old character container contents
+        while(playerGroup.children.length > 0){
+            playerGroup.remove(playerGroup.children[0]);
+        }
 
-    // Read file as ArrayBuffer for sending to server
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const arrayBuffer = e.target.result;
-        
-        // Broadcast to other players
-        socket.emit('modelUpdate', arrayBuffer);
-        
-        // Load locally
-        const gltfLoader = new GLTFLoader();
-        gltfLoader.parse(arrayBuffer, '', (gltf) => {
-            // Remove old character container contents
-            while(playerGroup.children.length > 0){
-                playerGroup.remove(playerGroup.children[0]);
+        characterMesh = gltf.scene;
+        characterMesh.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
             }
-
-            characterMesh = gltf.scene;
-            characterMesh.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
-            });
-
-            playerGroup.add(characterMesh);
-
-            const box = new THREE.Box3().setFromObject(characterMesh);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-
-            characterMesh.position.x -= center.x;
-            characterMesh.position.z -= center.z;
-            characterMesh.position.y -= center.y - (size.y / 2);
-
-            loadingIndicator.classList.add('hidden');
-        }, (error) => {
-            console.error('Error parsing local model', error);
-            loadingIndicator.classList.add('hidden');
         });
-    };
-    reader.readAsArrayBuffer(file);
 
-    uploadInput.value = '';
-});
+        playerGroup.add(characterMesh);
+
+        const box = new THREE.Box3().setFromObject(characterMesh);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+
+        characterMesh.position.x -= center.x;
+        characterMesh.position.z -= center.z;
+        characterMesh.position.y -= center.y - (size.y / 2);
+
+        loadingIndicator.classList.add('hidden');
+    }, (error) => {
+        console.error('Error parsing local model', error);
+        loadingIndicator.classList.add('hidden');
+    });
+}

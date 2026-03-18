@@ -69,6 +69,7 @@ body {
     margin-bottom: 0.25rem;
     background: linear-gradient(135deg, #ffffff, #94a3b8);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -217,6 +218,7 @@ input[type="file"] {
     margin-bottom: 0.5rem;
     background: linear-gradient(135deg, #ffffff, #94a3b8);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -261,6 +263,117 @@ input[type="file"] {
 .login-box button:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+}
+
+.login-upload-section {
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.upload-btn.mini {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+    width: auto;
+}
+
+#login-file-name {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --- Chat UI --- */
+#chat-history-container {
+    position: absolute;
+    top: 2rem;
+    right: 2rem;
+    width: 300px;
+    max-height: 40vh;
+    background: var(--panel-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    pointer-events: none; /* Let clicks pass through if not scrolling */
+}
+
+#chat-history {
+    padding: 1rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    pointer-events: auto;
+}
+
+#chat-history::-webkit-scrollbar {
+    width: 4px;
+}
+
+#chat-history::-webkit-scrollbar-thumb {
+    background: var(--panel-border);
+    border-radius: 10px;
+}
+
+.chat-msg {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    word-break: break-word;
+    animation: fadeIn 0.3s ease;
+}
+
+.chat-msg .name {
+    font-weight: 700;
+    color: var(--accent-color);
+    margin-right: 0.5rem;
+}
+
+.chat-msg .time {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    margin-right: 0.5rem;
+}
+
+#chat-input-container {
+    position: absolute;
+    bottom: 2rem;
+    right: 2rem;
+    width: 300px;
+    z-index: 10;
+}
+
+#chat-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--panel-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.2s;
+}
+
+#chat-input:focus {
+    border-color: var(--accent-color);
+    background: rgba(30, 41, 59, 0.8);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* --- Gametags --- */
