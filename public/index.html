@@ -26,7 +26,7 @@
     <div id="custom-cursor"></div>
 
     <!-- Tela de Carregamento Inicial / Login -->
-    <div id="login-screen" class="login-overlay">
+    <div id="login-screen" class="login-overlay ui-layer">
         <div class="login-box">
             <h1>Welcome!</h1>
             <p>Enter your gametag to join the server</p>
@@ -54,7 +54,7 @@
     <div id="canvas-container"></div>
     
     <!-- Painel de UI Lateral (Painel de Informações) -->
-    <div class="ui-panel" id="main-ui">
+    <div class="ui-panel ui-layer" id="main-ui">
         <h1>3D Viewer</h1>
         <p>Explore the multiplayer world!</p>
         
@@ -67,12 +67,12 @@
     </div>
 
     <!-- Estrutura do Chat Global - Histórico (Canto Superior Direito) -->
-    <div id="chat-history-container">
+    <div id="chat-history-container" class="ui-layer">
         <div id="chat-history"></div>
     </div>
 
     <!-- Estrutura do Chat Global - Entrada de Texto (Canto Inferior Direito) -->
-    <div id="chat-input-container">
+    <div id="chat-input-container" class="ui-layer">
         <input type="text" id="chat-input" placeholder="Tipe your message..." autocomplete="off">
     </div>
 
@@ -94,7 +94,12 @@
                     <div class="color-option" style="background: #000000;" data-color="#000000"></div>
                 </div>
             </div>
-            <div class="menu-item" id="menu-delete-object">🗑️ Deletar Cubo</div>
+            <div class="menu-item" id="menu-delete-cube">🗑️ Deletar Cubo</div>
+        </div>
+        <div id="menu-model-section" class="hidden">
+            <div class="menu-item" id="menu-rotate-right">↪️ Girar 90° Direita</div>
+            <div class="menu-item" id="menu-rotate-left">↩️ Girar 90° Esquerda</div>
+            <div class="menu-item" id="menu-delete-model">🗑️ Deletar Modelo</div>
         </div>
     </div>
 

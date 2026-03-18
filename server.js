@@ -148,6 +148,15 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle model rotation update
+    socket.on('updateObjectRotation', (data) => {
+        const model = placedModels.find(m => m.id === data.id);
+        if (model) {
+            model.rotation = data.rotation;
+            io.emit('objectUpdated', { id: data.id, rotation: data.rotation });
+        }
+    });
+
     // Handle disconnection
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);

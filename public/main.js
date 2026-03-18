@@ -43,7 +43,12 @@ let contextMenuPoint = new THREE.Vector3();
 const contextMenu = document.getElementById('context-menu');
 const menuGroundSection = document.getElementById('menu-ground-section');
 const menuCubeSection = document.getElementById('menu-cube-section');
+const menuModelSection = document.getElementById('menu-model-section');
 const contextGlbUpload = document.getElementById('context-glb-upload');
+
+function isOverUI(event) {
+    return event.target.closest('.ui-layer') || event.target.closest('.context-menu');
+}
 
 loginGlbUpload.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -251,8 +256,9 @@ socket.on('objectDeleted', (id) => {
 
 socket.on('objectUpdated', (data) => {
     const obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
-    if (obj && data.color) {
-        obj.material.color.set(data.color);
+    if (obj) {
+        if (data.color) obj.material.color.set(data.color);
+        if (data.rotation) obj.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
     }
 });
 
@@ -379,14 +385,14 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 window.addEventListener('contextmenu', (event) => {
-    if (localUsername === '' || currentPlacementState !== PlacementState.NONE) return;
+    if (localUsername === '' || currentPlacementState !== PlacementState.NONE || isOverUI(event)) return;
     event.preventDefault();
 
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
 
-    // Filter meshes to interact with (ground and cubes)
+    // Filter meshes to interact with (ground and objects)
     const targets = [];
     scene.traverse(obj => {
         if (obj.isMesh && (obj.name === "ground" || (obj.userData && obj.userData.id))) {
@@ -399,6 +405,13 @@ window.addEventListener('contextmenu', (event) => {
     if (intersects.length > 0) {
         const hit = intersects[0];
         contextMenuTarget = hit.object;
+        
+        // If part of a group (model), get the root
+        let root = contextMenuTarget;
+        while (root.parent && root.parent !== scene && !root.userData.id) {
+            root = root.parent;
+        }
+        contextMenuTarget = root;
         contextMenuPoint.copy(hit.point);
 
         // Position menu
@@ -407,12 +420,16 @@ window.addEventListener('contextmenu', (event) => {
         contextMenu.classList.remove('hidden');
         isMenuOpen = true;
 
+        menuGroundSection.classList.add('hidden');
+        menuCubeSection.classList.add('hidden');
+        menuModelSection.classList.add('hidden');
+
         if (contextMenuTarget.name === "ground") {
             menuGroundSection.classList.remove('hidden');
-            menuCubeSection.classList.add('hidden');
         } else if (contextMenuTarget.userData && contextMenuTarget.userData.id.startsWith('cube_')) {
-            menuGroundSection.classList.add('hidden');
             menuCubeSection.classList.remove('hidden');
+        } else if (contextMenuTarget.userData && contextMenuTarget.userData.id.startsWith('model_')) {
+            menuModelSection.classList.remove('hidden');
         }
     }
 });
@@ -492,9 +509,38 @@ function checkGeneralCollision(box, ignorePreview = false) {
     return false;
 }
 
-document.getElementById('menu-delete-object').addEventListener('click', () => {
+document.getElementById('menu-delete-cube').addEventListener('click', () => {
     if (contextMenuTarget && contextMenuTarget.userData.id) {
         socket.emit('deleteObject', contextMenuTarget.userData.id);
+    }
+    closeContextMenu();
+});
+
+document.getElementById('menu-delete-model').addEventListener('click', () => {
+    if (contextMenuTarget && contextMenuTarget.userData.id) {
+        socket.emit('deleteObject', contextMenuTarget.userData.id);
+    }
+    closeContextMenu();
+});
+
+document.getElementById('menu-rotate-right').addEventListener('click', () => {
+    if (contextMenuTarget && contextMenuTarget.userData.id) {
+        contextMenuTarget.rotation.y -= Math.PI / 2;
+        socket.emit('updateObjectRotation', {
+            id: contextMenuTarget.userData.id,
+            rotation: { x: 0, y: contextMenuTarget.rotation.y, z: 0 }
+        });
+    }
+    closeContextMenu();
+});
+
+document.getElementById('menu-rotate-left').addEventListener('click', () => {
+    if (contextMenuTarget && contextMenuTarget.userData.id) {
+        contextMenuTarget.rotation.y += Math.PI / 2;
+        socket.emit('updateObjectRotation', {
+            id: contextMenuTarget.userData.id,
+            rotation: { x: 0, y: contextMenuTarget.rotation.y, z: 0 }
+        });
     }
     closeContextMenu();
 });
@@ -512,7 +558,7 @@ document.querySelectorAll('.color-option').forEach(opt => {
 });
 
 window.addEventListener('mousedown', (event) => {
-    if (localUsername === '' || document.activeElement === chatInput || isMenuOpen) return;
+    if (localUsername === '' || document.activeElement === chatInput || isMenuOpen || isOverUI(event)) return;
     if (event.button !== 0) return; // Only left click
 
     if (currentPlacementState === PlacementState.NONE) {
@@ -568,6 +614,13 @@ window.addEventListener('mousemove', (event) => {
     // Custom Cursor
     customCursor.style.left = event.clientX + 'px';
     customCursor.style.top = event.clientY + 'px';
+    
+    // UI Detection for cursor
+    if (isOverUI(event)) {
+        customCursor.classList.add('ui-hover');
+    } else {
+        customCursor.classList.remove('ui-hover');
+    }
 
     if (currentPlacementState === PlacementState.BASE) {
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -688,9 +741,45 @@ function updatePlayer() {
     controls.target.set(playerGroup.position.x, playerGroup.position.y, playerGroup.position.z);
 }
 
+function updateOcclusion() {
+    if (!playerGroup) return;
+
+    // Reset all cubes to opaque
+    scene.traverse(obj => {
+        if (obj.isMesh && obj.userData && obj.userData.id && obj.userData.id.startsWith('cube_')) {
+            obj.material.transparent = false;
+            obj.material.opacity = 1.0;
+        }
+    });
+
+    // Raycast from camera to player
+    const direction = new THREE.Vector3().subVectors(playerGroup.position, camera.position).normalize();
+    const distance = camera.position.distanceTo(playerGroup.position);
+    
+    raycaster.set(camera.position, direction);
+    const intersects = raycaster.intersectObjects(scene.children, true);
+
+    for (let i = 0; i < intersects.length; i++) {
+        const hit = intersects[i];
+        if (hit.distance >= distance) break; // Hits behind player
+
+        let obj = hit.object;
+        // Find if it's a cube
+        while (obj && obj !== scene) {
+            if (obj.userData && obj.userData.id && obj.userData.id.startsWith('cube_')) {
+                obj.material.transparent = true;
+                obj.material.opacity = 0.2;
+                break;
+            }
+            obj = obj.parent;
+        }
+    }
+}
+
 function animate() {
     requestAnimationFrame(animate);
     updatePlayer();
+    updateOcclusion(); // Check for blocked view
     updateGametags();
     controls.update();
     renderer.render(scene, camera);
