@@ -1,6 +1,8 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,6 +12,25 @@ const io = new Server(server, {
         methods: ["GET", "POST"]
     }
 });
+
+// Helper: Scan assets catalog
+function getCatalogItems(subDir) {
+    const dirPath = path.join(__dirname, 'public', 'assets', subDir);
+    if (!fs.existsSync(dirPath)) return [];
+    
+    return fs.readdirSync(dirPath)
+        .filter(file => file.endsWith('.glb'))
+        .map(file => {
+            const name = file.replace('.glb', '');
+            const iconRelative = `assets/${subDir}/${name}.png`;
+            const iconFull = path.join(__dirname, 'public', iconRelative);
+            return {
+                name: name,
+                model: `assets/${subDir}/${file}`,
+                icon: fs.existsSync(iconFull) ? iconRelative : 'assets/default.png'
+            };
+        });
+}
 
 const PORT = parseInt(process.env.PORT || 3000, 10);
 
@@ -51,6 +72,12 @@ io.on('connection', (socket) => {
     socket.emit('initialCubes', placedCubes);
     socket.emit('initialModels', placedModels);
     socket.emit('initialChatHistory', chatHistory); // Sync chat history
+
+    // Send Catalog Data
+    socket.emit('catalogData', {
+        characters: getCatalogItems('characters'),
+        models: getCatalogItems('models')
+    });
 
     // Broadcast the new player
     socket.broadcast.emit('newPlayer', players[socket.id]);
@@ -121,7 +148,8 @@ io.on('connection', (socket) => {
             id: 'model_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
             position: modelData.position,
             rotation: modelData.rotation || { x: 0, y: 0, z: 0 },
-            modelBuffer: modelData.modelBuffer
+            modelBuffer: modelData.modelBuffer || null,
+            modelPath: modelData.modelPath || null
         };
         placedModels.push(newModel);
         io.emit('modelAdded', newModel);

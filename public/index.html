@@ -45,8 +45,11 @@
                 <span id="login-file-name">Default avatar selected</span>
             </div>
 
-            <!-- Botão para confirmar e entrar no mundo -->
-            <button id="join-btn">Join 3D World</button>
+            <!-- Botões para confirmar e entrar no mundo -->
+            <div class="login-actions">
+                <button id="catalog-char-btn" class="secondary-btn">Escolher Avatar</button>
+                <button id="join-btn">Entrar no Mundo</button>
+            </div>
         </div>
     </div>
 
@@ -79,7 +82,8 @@
     <!-- Menu de Contexto (Botão Direito) -->
     <div id="context-menu" class="context-menu hidden">
         <div id="menu-ground-section">
-            <div class="menu-item" id="menu-import-glb">📦 Importar Modelo GLB</div>
+            <div class="menu-item" id="menu-catalog-models">📚 Catálogo de Objetos</div>
+            <div class="menu-item" id="menu-import-glb">📦 Importar Local (.glb)</div>
         </div>
         <div id="menu-cube-section" class="hidden">
             <div class="menu-item color-trigger">🎨 Mudar Cor
@@ -94,6 +98,7 @@
                     <div class="color-option" style="background: #000000;" data-color="#000000"></div>
                 </div>
             </div>
+            <div class="menu-item" id="menu-test-transparency">🧪 Testar Transparência</div>
             <div class="menu-item" id="menu-delete-cube">🗑️ Deletar Cubo</div>
         </div>
         <div id="menu-model-section" class="hidden">
@@ -114,6 +119,19 @@
 
     <!-- Biblioteca Socket.io para comunicação em tempo real -->
     <script src="/socket.io/socket.io.js"></script>
+
+    <!-- Catálogo de Assets (Overlay) -->
+    <div id="catalog-overlay" class="hidden ui-layer">
+        <div class="catalog-card">
+            <div class="catalog-header">
+                <h2 id="catalog-title">Catálogo</h2>
+                <button id="close-catalog">×</button>
+            </div>
+            <div id="catalog-grid" class="catalog-grid">
+                <!-- Itens injetados via JS -->
+            </div>
+        </div>
+    </div>
 
     <!-- Lógica principal do Frontend (Three.js, Sockets e Chat) -->
     <script type="module" src="main.js"></script>

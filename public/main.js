@@ -46,9 +46,23 @@ const menuCubeSection = document.getElementById('menu-cube-section');
 const menuModelSection = document.getElementById('menu-model-section');
 const contextGlbUpload = document.getElementById('context-glb-upload');
 
+// Catalog State & UI
+let catalogData = { characters: [], models: [] };
+let selectedCatalogModelUrl = null;
+const catalogOverlay = document.getElementById('catalog-overlay');
+const catalogGrid = document.getElementById('catalog-grid');
+const catalogTitle = document.getElementById('catalog-title');
+const closeCatalogBtn = document.getElementById('close-catalog');
+const catalogCharBtn = document.getElementById('catalog-char-btn');
+const menuCatalogModels = document.getElementById('menu-catalog-models');
+
 function isOverUI(event) {
     return event.target.closest('.ui-layer') || event.target.closest('.context-menu');
 }
+
+socket.on('catalogData', (data) => {
+    catalogData = data;
+});
 
 loginGlbUpload.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -69,8 +83,11 @@ joinBtn.addEventListener('click', () => {
         socket.emit('setName', name);
         
         if (selectedModelBuffer) {
-            socket.emit('modelUpdate', selectedModelBuffer);
+            socket.emit('modelUpdate', { buffer: selectedModelBuffer });
             loadLocalModel(selectedModelBuffer);
+        } else if (selectedCatalogModelUrl) {
+            socket.emit('modelUpdate', { path: selectedCatalogModelUrl });
+            loadModelByUrl(selectedCatalogModelUrl);
         }
 
         playerGroup.visible = true;
@@ -78,6 +95,40 @@ joinBtn.addEventListener('click', () => {
         createGametag(socket.id, name, true);
     }
 });
+
+catalogCharBtn.addEventListener('click', () => {
+    openCatalog('characters', (url) => {
+        selectedCatalogModelUrl = url;
+        selectedModelBuffer = null;
+        loginFileName.innerText = url.split('/').pop();
+    });
+});
+
+closeCatalogBtn.addEventListener('click', () => catalogOverlay.classList.add('hidden'));
+
+function renderCatalog(type, onSelect) {
+    catalogGrid.innerHTML = '';
+    catalogTitle.innerText = type === 'characters' ? 'Escolher Avatar' : 'Catálogo de Objetos';
+    
+    catalogData[type].forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'catalog-item';
+        div.innerHTML = `
+            <img src="${item.icon}" onerror="this.src='assets/default.png'">
+            <span>${item.name}</span>
+        `;
+        div.onclick = () => {
+            onSelect(item.model);
+            catalogOverlay.classList.add('hidden');
+        };
+        catalogGrid.appendChild(div);
+    });
+}
+
+function openCatalog(type, onSelect) {
+    renderCatalog(type, onSelect);
+    catalogOverlay.classList.remove('hidden');
+}
 
 // --- 1. Scene Setup ---
 const container = document.getElementById('canvas-container');
@@ -223,7 +274,14 @@ socket.on('playerDisconnected', (id) => {
 
 socket.on('playerModelUpdated', (data) => {
     if (remotePlayers[data.id]) {
-        loadModelFromBuffer(data.modelData, remotePlayers[data.id]);
+        const mData = data.modelData;
+        if (mData) {
+            if (mData.buffer) {
+                loadModelFromBuffer(mData.buffer, remotePlayers[data.id]);
+            } else if (mData.path) {
+                updateRemotePlayerModelByUrl(data.id, mData.path);
+            }
+        }
     }
 });
 
@@ -303,7 +361,11 @@ function addOtherPlayer(playerInfo) {
     createGametag(playerInfo.id, playerInfo.name, false);
 
     if (playerInfo.modelData) {
-        loadModelFromBuffer(playerInfo.modelData, remotePlayers[playerInfo.id]);
+        if (playerInfo.modelData.buffer) {
+            loadModelFromBuffer(playerInfo.modelData.buffer, remotePlayers[playerInfo.id]);
+        } else if (playerInfo.modelData.path) {
+            updateRemotePlayerModelByUrl(playerInfo.id, playerInfo.modelData.path);
+        }
     }
 }
 
@@ -403,7 +465,15 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 window.addEventListener('contextmenu', (event) => {
-    if (localUsername === '' || currentPlacementState !== PlacementState.NONE || isOverUI(event)) return;
+    if (localUsername === '' || isOverUI(event)) return;
+    
+    // Feature: Cancel placement with right click
+    if (currentPlacementState !== PlacementState.NONE) {
+        event.preventDefault();
+        cancelPlacement();
+        return;
+    }
+
     event.preventDefault();
 
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -457,6 +527,25 @@ window.addEventListener('contextmenu', (event) => {
             }
         }
     }
+});
+
+document.getElementById('menu-catalog-models').addEventListener('click', () => {
+    openCatalog('models', (url) => {
+        socket.emit('placeModel', {
+            modelPath: url,
+            position: contextMenuPoint.clone()
+        });
+        
+        // Optimistic UI for catalog model
+        createPlacedModel({
+            id: 'opt_' + Date.now(),
+            modelPath: url,
+            position: contextMenuPoint.clone(),
+            rotation: { x: 0, y: 0, z: 0 },
+            isOptimistic: true
+        });
+    });
+    closeContextMenu();
 });
 
 // Close menu on click
@@ -547,6 +636,17 @@ function checkGeneralCollision(box, ignorePreview = false) {
 document.getElementById('menu-delete-cube').addEventListener('click', () => {
     if (contextMenuTarget && contextMenuTarget.userData.id) {
         socket.emit('deleteObject', contextMenuTarget.userData.id);
+    }
+    closeContextMenu();
+});
+
+document.getElementById('menu-test-transparency').addEventListener('click', () => {
+    if (contextMenuTarget && contextMenuTarget.material) {
+        // Toggle manual transparency for testing
+        const mat = contextMenuTarget.material;
+        mat.transparent = true;
+        mat.opacity = (mat.opacity === 1.0) ? 0.2 : 1.0;
+        mat.needsUpdate = true;
     }
     closeContextMenu();
 });
@@ -791,38 +891,31 @@ function updatePlayer() {
 function updateOcclusion() {
     if (!playerGroup) return;
 
-    // 1. Reset all cubes/objects to opaque
+    // 1. Reset all cubes to opaque
     scene.traverse(obj => {
-        if (obj.isMesh && obj.userData && obj.userData.id) {
-            obj.material.transparent = false;
+        if (obj.isMesh && obj.userData && obj.userData.id && obj.userData.id.startsWith('cube_')) {
             obj.material.opacity = 1.0;
         }
     });
 
-    // 2. Get player center (local coordinates to global)
+    // 2. Get player center
     const playerBox = new THREE.Box3().setFromObject(playerGroup);
     const targetPoint = playerBox.getCenter(new THREE.Vector3());
 
-    // 3. Raycast from camera to player center
+    // 3. Raycast from camera to center
     const direction = new THREE.Vector3().subVectors(targetPoint, camera.position).normalize();
     const distanceToPlayer = camera.position.distanceTo(targetPoint);
     
     raycaster.set(camera.position, direction);
-    // Intersection against scene children
     const intersects = raycaster.intersectObjects(scene.children, true);
 
     for (let i = 0; i < intersects.length; i++) {
         const hit = intersects[i];
-        
-        // Only objects between camera and player
         if (hit.distance >= distanceToPlayer - 0.5) break; 
 
-        // Climb up to find the root of the hit object
         let obj = hit.object;
         while (obj && obj !== scene) {
-            // Is it a cube? (or any object we want transparent)
             if (obj.userData && obj.userData.id && obj.userData.id.startsWith('cube_')) {
-                obj.material.transparent = true;
                 obj.material.opacity = 0.2;
                 break; 
             }
@@ -900,7 +993,9 @@ function createCube(data) {
     const material = new THREE.MeshStandardMaterial({ 
         color: data.color,
         roughness: 0.4,
-        metalness: 0.3
+        metalness: 0.3,
+        transparent: true, // ALWAYS prepared for transparency
+        opacity: 1.0
     });
     const cube = new THREE.Mesh(geometry, material);
     cube.userData.id = data.id; // Store ID
@@ -938,9 +1033,48 @@ function createCube(data) {
     });
 }
 
+function loadModelByUrl(url) {
+    loadingIndicator.classList.remove('hidden');
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load(url, (gltf) => {
+        while(playerGroup.children.length > 0) playerGroup.remove(playerGroup.children[0]);
+
+        characterMesh = gltf.scene;
+        characterMesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+        playerGroup.add(characterMesh);
+
+        const box = new THREE.Box3().setFromObject(characterMesh);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        characterMesh.position.x -= center.x;
+        characterMesh.position.z -= center.z;
+        characterMesh.position.y -= center.y - (size.y / 2);
+
+        loadingIndicator.classList.add('hidden');
+    });
+}
+
+function updateRemotePlayerModelByUrl(id, url) {
+    const player = remotePlayers[id];
+    if (!player) return;
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load(url, (gltf) => {
+        while(player.group.children.length > 0) player.group.remove(player.group.children[0]);
+        const mesh = gltf.scene;
+        mesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+        player.group.add(mesh);
+        const box = new THREE.Box3().setFromObject(mesh);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        mesh.position.x -= center.x;
+        mesh.position.z -= center.z;
+        mesh.position.y -= center.y - (size.y / 2);
+    });
+}
+
 function createPlacedModel(data) {
     const gltfLoader = new GLTFLoader();
-    gltfLoader.parse(data.modelBuffer, '', (gltf) => {
+    const onParsed = (gltf) => {
         const model = gltf.scene;
         model.traverse((child) => {
             if (child.isMesh) {
@@ -949,7 +1083,7 @@ function createPlacedModel(data) {
             }
         });
         model.position.set(data.position.x, data.position.y, data.position.z);
-        model.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+        model.rotation.set(data.rotation ? data.rotation.x : 0, data.rotation ? data.rotation.y : 0, data.rotation ? data.rotation.z : 0);
         model.userData.id = data.id;
         model.userData.isOptimistic = data.isOptimistic || false;
         idToUuid[data.id] = model.uuid;
@@ -960,5 +1094,11 @@ function createPlacedModel(data) {
         const modelBox = new THREE.Box3().setFromObject(model);
         modelBox.relatedId = data.id;
         wallBoxes.push(modelBox);
-    });
+    };
+
+    if (data.modelBuffer) {
+        gltfLoader.parse(data.modelBuffer, '', onParsed);
+    } else if (data.modelPath) {
+        gltfLoader.load(data.modelPath, onParsed);
+    }
 }
