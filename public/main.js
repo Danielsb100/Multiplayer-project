@@ -309,14 +309,12 @@ function removeOptimisticObject(id) {
     // We can find objects with 'isOptimistic' property
     scene.traverse(obj => {
         if (obj.userData && obj.userData.isOptimistic) {
-            // Check if it's the right one (roughly same position/ID)
             scene.remove(obj);
         }
     });
 
-    // Clean up collision boxes
-    const boxIndex = wallBoxes.findIndex(box => box.relatedId === 'opt_' + id || box.relatedId === id);
-    if (boxIndex !== -1) wallBoxes.splice(boxIndex, 1);
+    // Thorough cleanup: remove ALL boxes that match this ID or its optimistic variant
+    wallBoxes = wallBoxes.filter(box => box.relatedId !== id && box.relatedId !== 'opt_' + id);
 }
 
 socket.on('objectDeleted', (id) => {
@@ -327,11 +325,8 @@ socket.on('objectDeleted', (id) => {
         if (obj) scene.remove(obj);
     }
     
-    // 2. ALWAYS remove from collision boxes (the ghost collision bug was likely here)
-    const boxIndex = wallBoxes.findIndex(box => box.relatedId === id);
-    if (boxIndex !== -1) {
-        wallBoxes.splice(boxIndex, 1);
-    }
+    // 2. THOROUGH cleanup: remove ALL boxes that match this ID or its optimistic variant
+    wallBoxes = wallBoxes.filter(box => box.relatedId !== id && box.relatedId !== 'opt_' + id);
 
     // 3. Clean up the mapping
     delete idToUuid[id];
@@ -538,6 +533,7 @@ window.addEventListener('contextmenu', (event) => {
 
 document.getElementById('menu-catalog-models').addEventListener('click', () => {
     openCatalog('models', (url) => {
+        const tempId = 'opt_model_' + Date.now();
         socket.emit('placeModel', {
             modelPath: url,
             position: contextMenuPoint.clone()
@@ -545,7 +541,7 @@ document.getElementById('menu-catalog-models').addEventListener('click', () => {
         
         // Optimistic UI for catalog model
         createPlacedModel({
-            id: 'opt_' + Date.now(),
+            id: tempId,
             modelPath: url,
             position: contextMenuPoint.clone(),
             rotation: { x: 0, y: 0, z: 0 },
@@ -590,7 +586,7 @@ contextGlbUpload.addEventListener('change', (e) => {
                 if (checkGeneralCollision(tempBox)) {
                     alert("A posição está ocupada!");
                 } else {
-                    const tempId = 'opt_' + Date.now();
+                    const tempId = 'opt_model_' + Date.now();
                     // Optimistic creation
                     createPlacedModel({
                         id: tempId,
@@ -643,17 +639,6 @@ function checkGeneralCollision(box, ignorePreview = false) {
 document.getElementById('menu-delete-cube').addEventListener('click', () => {
     if (contextMenuTarget && contextMenuTarget.userData.id) {
         socket.emit('deleteObject', contextMenuTarget.userData.id);
-    }
-    closeContextMenu();
-});
-
-document.getElementById('menu-test-transparency').addEventListener('click', () => {
-    if (contextMenuTarget && contextMenuTarget.material) {
-        // Toggle manual transparency for testing
-        const mat = contextMenuTarget.material;
-        mat.transparent = true;
-        mat.opacity = (mat.opacity === 1.0) ? 0.2 : 1.0;
-        mat.needsUpdate = true;
     }
     closeContextMenu();
 });
