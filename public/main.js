@@ -9,6 +9,9 @@ const loginScreen = document.getElementById('login-screen');
 const joinBtn = document.getElementById('join-btn');
 const usernameInput = document.getElementById('username-input');
 
+// Map to track object IDs to Three.js UUIDs
+const idToUuid = {};
+
 // Custom Cursor
 const customCursor = document.getElementById('custom-cursor');
 window.addEventListener('mousemove', (e) => {
@@ -31,6 +34,16 @@ let placementStartPoint = new THREE.Vector3();
 let placementBasePoint = new THREE.Vector3();
 let previewCube = null;
 let lastMouseY = 0;
+const MAX_CUBE_HEIGHT = 8; // Height limit as requested
+
+// Context Menu State
+let isMenuOpen = false;
+let contextMenuTarget = null;
+let contextMenuPoint = new THREE.Vector3();
+const contextMenu = document.getElementById('context-menu');
+const menuGroundSection = document.getElementById('menu-ground-section');
+const menuCubeSection = document.getElementById('menu-cube-section');
+const contextGlbUpload = document.getElementById('context-glb-upload');
 
 loginGlbUpload.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -213,8 +226,34 @@ socket.on('initialCubes', (cubes) => {
     if (cubes) cubes.forEach(cube => createCube(cube));
 });
 
+socket.on('initialModels', (models) => {
+    if (models) models.forEach(model => createPlacedModel(model));
+});
+
 socket.on('cubeAdded', (cube) => {
     createCube(cube);
+});
+
+socket.on('modelAdded', (model) => {
+    createPlacedModel(model);
+});
+
+socket.on('objectDeleted', (id) => {
+    const obj = scene.getObjectByProperty('uuid', idToUuid[id]);
+    if (obj) {
+        scene.remove(obj);
+        // Remove from collision boxes
+        const boxIndex = wallBoxes.findIndex(box => box.relatedId === id);
+        if (boxIndex !== -1) wallBoxes.splice(boxIndex, 1);
+        delete idToUuid[id];
+    }
+});
+
+socket.on('objectUpdated', (data) => {
+    const obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
+    if (obj && data.color) {
+        obj.material.color.set(data.color);
+    }
 });
 
 socket.on('chatMessage', (data) => {
@@ -335,12 +374,103 @@ scene.add(plane);
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
+window.addEventListener('contextmenu', (event) => {
+    if (localUsername === '' || currentPlacementState !== PlacementState.NONE) return;
+    event.preventDefault();
+
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    // Filter meshes to interact with (ground and cubes)
+    const targets = [];
+    scene.traverse(obj => {
+        if (obj.isMesh && (obj.name === "ground" || (obj.userData && obj.userData.id))) {
+            targets.push(obj);
+        }
+    });
+
+    const intersects = raycaster.intersectObjects(targets);
+
+    if (intersects.length > 0) {
+        const hit = intersects[0];
+        contextMenuTarget = hit.object;
+        contextMenuPoint.copy(hit.point);
+
+        // Position menu
+        contextMenu.style.left = event.clientX + 'px';
+        contextMenu.style.top = event.clientY + 'px';
+        contextMenu.classList.remove('hidden');
+        isMenuOpen = true;
+
+        if (contextMenuTarget.name === "ground") {
+            menuGroundSection.classList.remove('hidden');
+            menuCubeSection.classList.add('hidden');
+        } else if (contextMenuTarget.userData && contextMenuTarget.userData.id.startsWith('cube_')) {
+            menuGroundSection.classList.add('hidden');
+            menuCubeSection.classList.remove('hidden');
+        }
+    }
+});
+
+// Close menu on click
+window.addEventListener('mousedown', (e) => {
+    if (isMenuOpen && !contextMenu.contains(e.target)) {
+        closeContextMenu();
+    }
+});
+
+function closeContextMenu() {
+    contextMenu.classList.add('hidden');
+    isMenuOpen = false;
+    contextMenuTarget = null;
+}
+
+// Menu Actions
+document.getElementById('menu-import-glb').addEventListener('click', () => {
+    contextGlbUpload.click();
+    closeContextMenu();
+});
+
+contextGlbUpload.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            socket.emit('placeModel', {
+                modelBuffer: event.target.result,
+                position: contextMenuPoint.clone()
+            });
+        };
+        reader.readAsArrayBuffer(file);
+    }
+});
+
+document.getElementById('menu-delete-object').addEventListener('click', () => {
+    if (contextMenuTarget && contextMenuTarget.userData.id) {
+        socket.emit('deleteObject', contextMenuTarget.userData.id);
+    }
+    closeContextMenu();
+});
+
+document.querySelectorAll('.color-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+        if (contextMenuTarget && contextMenuTarget.userData.id) {
+            socket.emit('updateObjectColor', {
+                id: contextMenuTarget.userData.id,
+                color: opt.dataset.color
+            });
+        }
+        closeContextMenu();
+    });
+});
+
 window.addEventListener('mousedown', (event) => {
-    if (localUsername === '' || document.activeElement === chatInput) return;
+    if (localUsername === '' || document.activeElement === chatInput || isMenuOpen) return;
     if (event.button !== 0) return; // Only left click
 
     if (currentPlacementState === PlacementState.NONE) {
-        // Phase 1: Start Base
+        // ... (existing base logic) ...
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
@@ -405,13 +535,14 @@ window.addEventListener('mousemove', (event) => {
             previewCube.scale.set(width || 0.1, 1, depth || 0.1);
             previewCube.position.set(
                 placementStartPoint.x + width / 2,
-                0.5,
+                previewCube.scale.y / 2, // Support scaled Y
                 placementStartPoint.z + depth / 2
             );
         }
     } else if (currentPlacementState === PlacementState.HEIGHT) {
         const deltaY = lastMouseY - event.clientY; // Upwards move increases height
-        const newHeight = Math.max(0.1, previewCube.scale.y + deltaY * 0.05);
+        let newHeight = Math.max(0.1, previewCube.scale.y + deltaY * 0.05);
+        if (newHeight > MAX_CUBE_HEIGHT) newHeight = MAX_CUBE_HEIGHT; // Limit height
         previewCube.scale.y = newHeight;
         previewCube.position.y = newHeight / 2;
         lastMouseY = event.clientY;
@@ -482,7 +613,7 @@ function checkCollision(targetPosition) {
 }
 
 function updatePlayer() {
-    if (localUsername === '') return; // Wait until logged in
+    if (localUsername === '' || isMenuOpen) return; // Wait until logged in or menu closed
 
     let moveX = 0, moveZ = 0;
     if (keys.w) { moveZ -= moveSpeed; moveX -= moveSpeed; }
@@ -596,6 +727,8 @@ function createCube(data) {
         metalness: 0.3
     });
     const cube = new THREE.Mesh(geometry, material);
+    cube.userData.id = data.id; // Store ID
+    idToUuid[data.id] = cube.uuid;
     
     // Apply dimensions from data
     const size = data.size || { w: 1, h: 1, d: 1 };
@@ -609,6 +742,7 @@ function createCube(data) {
     // Add to collision boxes
     cube.updateMatrixWorld();
     const cubeBox = new THREE.Box3().setFromObject(cube);
+    cubeBox.relatedId = data.id;
     wallBoxes.push(cubeBox);
 
     // Minor scale animation when appearing
@@ -624,5 +758,29 @@ function createCube(data) {
                 clearInterval(intr);
             }
         }, 16);
+    });
+}
+
+function createPlacedModel(data) {
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.parse(data.modelBuffer, '', (gltf) => {
+        const model = gltf.scene;
+        model.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        model.position.set(data.position.x, data.position.y, data.position.z);
+        model.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+        model.userData.id = data.id;
+        idToUuid[data.id] = model.uuid;
+        scene.add(model);
+
+        // Add to collision
+        model.updateMatrixWorld();
+        const modelBox = new THREE.Box3().setFromObject(model);
+        modelBox.relatedId = data.id;
+        wallBoxes.push(modelBox);
     });
 }

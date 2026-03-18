@@ -27,9 +27,10 @@ app.get('/health', (req, res) => {
 // Serve static files from the 'public' directory
 app.use(express.static('public'));
 
-// Store connected players and placed cubes
+// Store connected players, placed cubes, and placed models
 const players = {};
 const placedCubes = [];
+const placedModels = []; // New: Stores { id, position, modelData, rotation }
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
@@ -40,16 +41,15 @@ io.on('connection', (socket) => {
         name: 'Guest_' + Math.floor(Math.random() * 1000),
         position: { x: 0, y: 0, z: 0 },
         rotation: { x: 0, y: 0, z: 0 },
-        modelData: null // Will hold the array buffer or base64 of the model
+        modelData: null
     };
 
-    // Send existing players to the new client
+    // Initial sync
     socket.emit('currentPlayers', players);
-    
-    // Send existing cubes to the new client
     socket.emit('initialCubes', placedCubes);
+    socket.emit('initialModels', placedModels); // Sync models
 
-    // Broadcast the new player to everyone else
+    // Broadcast the new player
     socket.broadcast.emit('newPlayer', players[socket.id]);
 
     // Handle name change
@@ -65,7 +65,6 @@ io.on('connection', (socket) => {
         if (players[socket.id]) {
             players[socket.id].position = movementData.position;
             players[socket.id].rotation = movementData.rotation;
-            // Broadcast movement to all OTHER clients
             socket.broadcast.emit('playerMoved', players[socket.id]);
         }
     });
@@ -73,7 +72,6 @@ io.on('connection', (socket) => {
     // Handle full model update
     socket.on('modelUpdate', (modelData) => {
         if (players[socket.id]) {
-            // Broadcast the new model data to everyone else
             players[socket.id].modelData = modelData;
             socket.broadcast.emit('playerModelUpdated', {
                 id: socket.id,
@@ -93,8 +91,10 @@ io.on('connection', (socket) => {
             });
         }
     });
+    
+    // --- Object Management ---
 
-    // Handle cube placement
+    // Handle cube placement (updated)
     socket.on('placeCube', (cubeData) => {
         const newCube = {
             id: 'cube_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
@@ -104,6 +104,39 @@ io.on('connection', (socket) => {
         };
         placedCubes.push(newCube);
         io.emit('cubeAdded', newCube);
+    });
+
+    // Handle model placement
+    socket.on('placeModel', (modelData) => {
+        const newModel = {
+            id: 'model_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            position: modelData.position,
+            rotation: modelData.rotation || { x: 0, y: 0, z: 0 },
+            modelBuffer: modelData.modelBuffer
+        };
+        placedModels.push(newModel);
+        io.emit('modelAdded', newModel);
+    });
+
+    // Handle object deletion
+    socket.on('deleteObject', (id) => {
+        if (id.startsWith('cube_')) {
+            const index = placedCubes.findIndex(c => c.id === id);
+            if (index !== -1) placedCubes.splice(index, 1);
+        } else if (id.startsWith('model_')) {
+            const index = placedModels.findIndex(m => m.id === id);
+            if (index !== -1) placedModels.splice(index, 1);
+        }
+        io.emit('objectDeleted', id);
+    });
+
+    // Handle cube color update
+    socket.on('updateObjectColor', (data) => {
+        const cube = placedCubes.find(c => c.id === data.id);
+        if (cube) {
+            cube.color = data.color;
+            io.emit('objectUpdated', { id: data.id, color: data.color });
+        }
     });
 
     // Handle disconnection

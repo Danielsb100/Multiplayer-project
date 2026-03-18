@@ -76,6 +76,31 @@
         <input type="text" id="chat-input" placeholder="Tipe your message..." autocomplete="off">
     </div>
 
+    <!-- Menu de Contexto (Botão Direito) -->
+    <div id="context-menu" class="context-menu hidden">
+        <div id="menu-ground-section">
+            <div class="menu-item" id="menu-import-glb">📦 Importar Modelo GLB</div>
+        </div>
+        <div id="menu-cube-section" class="hidden">
+            <div class="menu-item color-trigger">🎨 Mudar Cor
+                <div class="color-matrix">
+                    <div class="color-option" style="background: #ef4444;" data-color="#ef4444"></div>
+                    <div class="color-option" style="background: #3b82f6;" data-color="#3b82f6"></div>
+                    <div class="color-option" style="background: #10b981;" data-color="#10b981"></div>
+                    <div class="color-option" style="background: #f59e0b;" data-color="#f59e0b"></div>
+                    <div class="color-option" style="background: #8b5cf6;" data-color="#8b5cf6"></div>
+                    <div class="color-option" style="background: #ec4899;" data-color="#ec4899"></div>
+                    <div class="color-option" style="background: #ffffff;" data-color="#ffffff"></div>
+                    <div class="color-option" style="background: #000000;" data-color="#000000"></div>
+                </div>
+            </div>
+            <div class="menu-item" id="menu-delete-object">🗑️ Deletar Cubo</div>
+        </div>
+    </div>
+
+    <!-- Input oculto para importação via menu -->
+    <input type="file" id="context-glb-upload" accept=".glb,.gltf" class="hidden">
+
     <!-- Indicador de Carregamento (Spinner) para modelos pesados -->
     <div id="loading-indicator" class="hidden">
         <div class="spinner"></div>
