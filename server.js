@@ -30,7 +30,9 @@ app.use(express.static('public'));
 // Store connected players, placed cubes, and placed models
 const players = {};
 const placedCubes = [];
-const placedModels = []; // New: Stores { id, position, modelData, rotation }
+const placedModels = [];
+const chatHistory = []; // New: Stores the last 50 messages
+const MAX_CHAT_LOGS = 50;
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
@@ -47,7 +49,8 @@ io.on('connection', (socket) => {
     // Initial sync
     socket.emit('currentPlayers', players);
     socket.emit('initialCubes', placedCubes);
-    socket.emit('initialModels', placedModels); // Sync models
+    socket.emit('initialModels', placedModels);
+    socket.emit('initialChatHistory', chatHistory); // Sync chat history
 
     // Broadcast the new player
     socket.broadcast.emit('newPlayer', players[socket.id]);
@@ -83,12 +86,18 @@ io.on('connection', (socket) => {
     // Handle chat messages
     socket.on('chatMessage', (message) => {
         if (players[socket.id]) {
-            io.emit('chatMessage', {
+            const chatData = {
                 id: socket.id,
                 name: players[socket.id].name,
                 message: message,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            });
+            };
+            
+            // Save to history
+            chatHistory.push(chatData);
+            if (chatHistory.length > MAX_CHAT_LOGS) chatHistory.shift();
+            
+            io.emit('chatMessage', chatData);
         }
     });
     

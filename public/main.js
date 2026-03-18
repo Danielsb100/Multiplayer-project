@@ -260,6 +260,10 @@ socket.on('chatMessage', (data) => {
     addMessageToChat(data);
 });
 
+socket.on('initialChatHistory', (history) => {
+    if (history) history.forEach(msg => addMessageToChat(msg));
+});
+
 function addOtherPlayer(playerInfo) {
     const avatar = createDefaultAvatar();
     avatar.group.position.copy(playerInfo.position);
@@ -431,7 +435,6 @@ document.getElementById('menu-import-glb').addEventListener('click', () => {
     contextGlbUpload.click();
     closeContextMenu();
 });
-
 contextGlbUpload.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -461,14 +464,14 @@ contextGlbUpload.addEventListener('change', (e) => {
     }
 });
 
-function checkGeneralCollision(box) {
+function checkGeneralCollision(box, ignorePreview = false) {
     // Check wallBoxes (cubes and other models)
     for (const wallBox of wallBoxes) {
         if (box.intersectsBox(wallBox)) return true;
     }
     
     // Check active placement (preview cube)
-    if (previewCube) {
+    if (!ignorePreview && previewCube) {
         const previewBox = new THREE.Box3().setFromObject(previewCube);
         if (box.intersectsBox(previewBox)) return true;
     }
@@ -533,7 +536,8 @@ window.addEventListener('mousedown', (event) => {
     } else if (currentPlacementState === PlacementState.HEIGHT) {
         // Phase 3: Finalize
         const previewBox = new THREE.Box3().setFromObject(previewCube);
-        if (checkGeneralCollision(previewBox)) {
+        // Important: Ignore previewCube itself during this check to avoid self-collision
+        if (checkGeneralCollision(previewBox, true)) {
             alert("Cannot place cube here: Position occupied by player or object!");
             cancelPlacement();
         } else {
