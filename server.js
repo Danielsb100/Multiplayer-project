@@ -27,8 +27,9 @@ app.get('/health', (req, res) => {
 // Serve static files from the 'public' directory
 app.use(express.static('public'));
 
-// Store connected players
+// Store connected players and placed cubes
 const players = {};
+const placedCubes = [];
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
@@ -44,6 +45,9 @@ io.on('connection', (socket) => {
 
     // Send existing players to the new client
     socket.emit('currentPlayers', players);
+    
+    // Send existing cubes to the new client
+    socket.emit('initialCubes', placedCubes);
 
     // Broadcast the new player to everyone else
     socket.broadcast.emit('newPlayer', players[socket.id]);
@@ -88,6 +92,17 @@ io.on('connection', (socket) => {
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             });
         }
+    });
+
+    // Handle cube placement
+    socket.on('placeCube', (cubeData) => {
+        const newCube = {
+            id: 'cube_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            position: cubeData.position,
+            color: cubeData.color || '#ef4444' // Default red
+        };
+        placedCubes.push(newCube);
+        io.emit('cubeAdded', newCube);
     });
 
     // Handle disconnection

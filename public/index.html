@@ -22,35 +22,43 @@
     </script>
 </head>
 <body>
-    <!-- Login Screen Overlay -->
+    <!-- Cursor customizado (Círculo Vermelho) -->
+    <div id="custom-cursor"></div>
+
+    <!-- Tela de Carregamento Inicial / Login -->
     <div id="login-screen" class="login-overlay">
         <div class="login-box">
             <h1>Welcome!</h1>
             <p>Enter your gametag to join the server</p>
+            
+            <!-- Campo para o nome do usuário -->
             <input type="text" id="username-input" placeholder="Your Name" maxlength="15" autocomplete="off">
             
+            <!-- Seção de importação de modelo GLB (Opcional) no Login -->
             <div class="login-upload-section">
                 <label for="login-glb-upload" class="upload-btn mini">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                     Import .glb (Optional)
                 </label>
                 <input type="file" id="login-glb-upload" accept=".glb">
+                <!-- Mostra o nome do arquivo selecionado ou o padrão -->
                 <span id="login-file-name">Default avatar selected</span>
             </div>
 
+            <!-- Botão para confirmar e entrar no mundo -->
             <button id="join-btn">Join 3D World</button>
         </div>
     </div>
 
-    <!-- The canvas where Three.js will render -->
+    <!-- Container onde o Three.js irá renderizar a cena 3D -->
     <div id="canvas-container"></div>
     
-    <!-- Glassmorphism Floating UI Panel -->
+    <!-- Painel de UI Lateral (Painel de Informações) -->
     <div class="ui-panel" id="main-ui">
         <h1>3D Viewer</h1>
         <p>Explore the multiplayer world!</p>
         
-        <!-- Controls Legend -->
+        <!-- Legenda de Controles -->
         <div id="controls-help">
             <p>Mover <strong>WASD</strong></p>
             <p>Olhar <strong>Mouse</strong></p>
@@ -58,25 +66,26 @@
         </div>
     </div>
 
-    <!-- Global Chat UI -->
+    <!-- Estrutura do Chat Global - Histórico (Canto Superior Direito) -->
     <div id="chat-history-container">
         <div id="chat-history"></div>
     </div>
 
+    <!-- Estrutura do Chat Global - Entrada de Texto (Canto Inferior Direito) -->
     <div id="chat-input-container">
         <input type="text" id="chat-input" placeholder="Tipe your message..." autocomplete="off">
     </div>
 
-    <!-- Loading State -->
+    <!-- Indicador de Carregamento (Spinner) para modelos pesados -->
     <div id="loading-indicator" class="hidden">
         <div class="spinner"></div>
         <span>Loading model...</span>
     </div>
 
-    <!-- Socket.io -->
+    <!-- Biblioteca Socket.io para comunicação em tempo real -->
     <script src="/socket.io/socket.io.js"></script>
 
-    <!-- Main Logic -->
+    <!-- Lógica principal do Frontend (Three.js, Sockets e Chat) -->
     <script type="module" src="main.js"></script>
 </body>
 </html>

@@ -9,6 +9,16 @@ const loginScreen = document.getElementById('login-screen');
 const joinBtn = document.getElementById('join-btn');
 const usernameInput = document.getElementById('username-input');
 
+// Custom Cursor
+const customCursor = document.getElementById('custom-cursor');
+window.addEventListener('mousemove', (e) => {
+    customCursor.style.left = e.clientX + 'px';
+    customCursor.style.top = e.clientY + 'px';
+});
+
+window.addEventListener('mousedown', () => customCursor.classList.add('clicking'));
+window.addEventListener('mouseup', () => customCursor.classList.remove('clicking'));
+
 // New Login GLB Elements
 const loginGlbUpload = document.getElementById('login-glb-upload');
 const loginFileName = document.getElementById('login-file-name');
@@ -191,6 +201,14 @@ socket.on('playerModelUpdated', (data) => {
     }
 });
 
+socket.on('initialCubes', (cubes) => {
+    cubes.forEach(cube => createCube(cube));
+});
+
+socket.on('cubeAdded', (cube) => {
+    createCube(cube);
+});
+
 socket.on('chatMessage', (data) => {
     addMessageToChat(data);
 });
@@ -302,7 +320,31 @@ const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.4 });
 const plane = new THREE.Mesh(planeGeometry, planeMaterial);
 plane.rotation.x = -Math.PI / 2;
 plane.receiveShadow = true;
+plane.name = "ground"; // Name it for raycasting
 scene.add(plane);
+
+// --- Raycasting for Cube Placement ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.addEventListener('click', (event) => {
+    if (localUsername === '' || document.activeElement === chatInput) return;
+
+    // Calculate mouse position in normalized device coordinates (-1 to +1)
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(plane);
+
+    if (intersects.length > 0) {
+        const point = intersects[0].point;
+        socket.emit('placeCube', {
+            position: { x: point.x, y: 0.5, z: point.z },
+            color: '#ef4444'
+        });
+    }
+});
 
 const wallsGroup = new THREE.Group();
 scene.add(wallsGroup);
@@ -447,5 +489,33 @@ function loadLocalModel(arrayBuffer) {
     }, (error) => {
         console.error('Error parsing local model', error);
         loadingIndicator.classList.add('hidden');
+    });
+}
+
+function createCube(data) {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshStandardMaterial({ 
+        color: data.color,
+        roughness: 0.4,
+        metalness: 0.3
+    });
+    const cube = new THREE.Mesh(geometry, material);
+    cube.position.set(data.position.x, data.position.y, data.position.z);
+    cube.castShadow = true;
+    cube.receiveShadow = true;
+    scene.add(cube);
+
+    // Minor scale animation when appearing
+    cube.scale.set(0, 0, 0);
+    new Promise(res => {
+        let sc = 0;
+        const intr = setInterval(() => {
+            sc += 0.1;
+            cube.scale.set(sc, sc, sc);
+            if (sc >= 1) {
+                cube.scale.set(1, 1, 1);
+                clearInterval(intr);
+            }
+        }, 16);
     });
 }
