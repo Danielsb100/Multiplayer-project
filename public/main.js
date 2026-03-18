@@ -437,14 +437,57 @@ contextGlbUpload.addEventListener('change', (e) => {
     if (file) {
         const reader = new FileReader();
         reader.onload = (event) => {
-            socket.emit('placeModel', {
-                modelBuffer: event.target.result,
-                position: contextMenuPoint.clone()
+            const buffer = event.target.result;
+            const gltfLoader = new GLTFLoader();
+            // Parse locally first for collision check
+            gltfLoader.parse(buffer, '', (gltf) => {
+                const model = gltf.scene;
+                model.position.copy(contextMenuPoint);
+                model.updateMatrixWorld(true);
+                const tempBox = new THREE.Box3().setFromObject(model);
+                
+                if (checkGeneralCollision(tempBox)) {
+                    alert("Cannot spawn GLB here: Position occupied by player or object!");
+                } else {
+                    socket.emit('placeModel', {
+                        modelBuffer: buffer,
+                        position: contextMenuPoint.clone()
+                    });
+                }
             });
         };
         reader.readAsArrayBuffer(file);
+        e.target.value = ''; // Reset input to allow re-importing same file
     }
 });
+
+function checkGeneralCollision(box) {
+    // Check wallBoxes (cubes and other models)
+    for (const wallBox of wallBoxes) {
+        if (box.intersectsBox(wallBox)) return true;
+    }
+    
+    // Check active placement (preview cube)
+    if (previewCube) {
+        const previewBox = new THREE.Box3().setFromObject(previewCube);
+        if (box.intersectsBox(previewBox)) return true;
+    }
+
+    // Check local player
+    const localBox = new THREE.Box3().setFromObject(playerGroup);
+    if (box.intersectsBox(localBox)) return true;
+    
+    // Check remote players
+    for (const id in remotePlayers) {
+        const player = remotePlayers[id];
+        if (player && player.group) {
+            const remoteBox = new THREE.Box3().setFromObject(player.group);
+            if (box.intersectsBox(remoteBox)) return true;
+        }
+    }
+    
+    return false;
+}
 
 document.getElementById('menu-delete-object').addEventListener('click', () => {
     if (contextMenuTarget && contextMenuTarget.userData.id) {
@@ -489,8 +532,9 @@ window.addEventListener('mousedown', (event) => {
         }
     } else if (currentPlacementState === PlacementState.HEIGHT) {
         // Phase 3: Finalize
-        if (checkCubeCollisionWithPlayers(previewCube)) {
-            alert("Cannot place cube here: A player is in the way!");
+        const previewBox = new THREE.Box3().setFromObject(previewCube);
+        if (checkGeneralCollision(previewBox)) {
+            alert("Cannot place cube here: Position occupied by player or object!");
             cancelPlacement();
         } else {
             const size = {
@@ -555,22 +599,6 @@ function cancelPlacement() {
         previewCube = null;
     }
     currentPlacementState = PlacementState.NONE;
-}
-
-function checkCubeCollisionWithPlayers(cubeMesh) {
-    const cubeBox = new THREE.Box3().setFromObject(cubeMesh);
-    
-    // Check local player
-    const localBox = new THREE.Box3().setFromObject(playerGroup);
-    if (cubeBox.intersectsBox(localBox)) return true;
-    
-    // Check remote players
-    for (const id in remotePlayers) {
-        const remoteBox = new THREE.Box3().setFromObject(remotePlayers[id].group);
-        if (cubeBox.intersectsBox(remoteBox)) return true;
-    }
-    
-    return false;
 }
 
 const wallsGroup = new THREE.Group();
