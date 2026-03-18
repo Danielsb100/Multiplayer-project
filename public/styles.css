@@ -26,6 +26,11 @@ body {
     cursor: none; /* Esconde o cursor padrão */
 }
 
+/* Mostra o cursor padrão sobre a UI */
+.ui-layer, .context-menu, #login-screen {
+    cursor: auto !important;
+}
+
 /* Cursor Customizado (Círculo Vermelho) */
 #custom-cursor {
     position: fixed;
