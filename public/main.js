@@ -320,14 +320,21 @@ function removeOptimisticObject(id) {
 }
 
 socket.on('objectDeleted', (id) => {
-    const obj = scene.getObjectByProperty('uuid', idToUuid[id]);
-    if (obj) {
-        scene.remove(obj);
-        // Remove from collision boxes
-        const boxIndex = wallBoxes.findIndex(box => box.relatedId === id);
-        if (boxIndex !== -1) wallBoxes.splice(boxIndex, 1);
-        delete idToUuid[id];
+    // 1. Remove from scene using ID-to-UUID map
+    const uuid = idToUuid[id];
+    if (uuid) {
+        const obj = scene.getObjectByProperty('uuid', uuid);
+        if (obj) scene.remove(obj);
     }
+    
+    // 2. ALWAYS remove from collision boxes (the ghost collision bug was likely here)
+    const boxIndex = wallBoxes.findIndex(box => box.relatedId === id);
+    if (boxIndex !== -1) {
+        wallBoxes.splice(boxIndex, 1);
+    }
+
+    // 3. Clean up the mapping
+    delete idToUuid[id];
 });
 
 socket.on('objectUpdated', (data) => {
