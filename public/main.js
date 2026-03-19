@@ -306,15 +306,30 @@ socket.on('modelAdded', (model) => {
 });
 
 function removeOptimisticObject(id) {
-    // We can find objects with 'isOptimistic' property
+    // 1. Collect all optimistic objects to remove
+    const toRemove = [];
     scene.traverse(obj => {
         if (obj.userData && obj.userData.isOptimistic) {
-            scene.remove(obj);
+            toRemove.push(obj);
         }
     });
 
-    // Thorough cleanup: remove ALL boxes that match this ID or its optimistic variant
-    wallBoxes = wallBoxes.filter(box => box.relatedId !== id && box.relatedId !== 'opt_' + id);
+    // 2. Safely remove them from scene
+    toRemove.forEach(obj => {
+        scene.remove(obj);
+        // Also remove from mapping if it exists
+        for (const key in idToUuid) {
+            if (idToUuid[key] === obj.uuid) {
+                delete idToUuid[key];
+            }
+        }
+    });
+
+    // 3. Thorough cleanup of wallBoxes: remove ALL optimistic entries
+    wallBoxes = wallBoxes.filter(box => {
+        const rId = box.relatedId ? box.relatedId.toString() : '';
+        return !rId.startsWith('opt_') && rId !== id;
+    });
 }
 
 socket.on('objectDeleted', (id) => {
@@ -325,8 +340,11 @@ socket.on('objectDeleted', (id) => {
         if (obj) scene.remove(obj);
     }
     
-    // 2. THOROUGH cleanup: remove ALL boxes that match this ID or its optimistic variant
-    wallBoxes = wallBoxes.filter(box => box.relatedId !== id && box.relatedId !== 'opt_' + id);
+    // 2. THOROUGH cleanup: remove the specific box from collisions
+    wallBoxes = wallBoxes.filter(box => {
+        const rId = box.relatedId ? box.relatedId.toString() : '';
+        return rId !== id && !rId.startsWith('opt_' + id);
+    });
 
     // 3. Clean up the mapping
     delete idToUuid[id];
@@ -809,7 +827,7 @@ const wall3 = new THREE.Mesh(new THREE.BoxGeometry(1, 4, 10), wallMat);
 wall3.position.set(5, 2, -2.5); wall3.scale.set(1, 1, 0.5); wall3.castShadow = true; wall3.receiveShadow = true;
 
 wallsGroup.add(wall1, wall2, wall3);
-const wallBoxes = [];
+let wallBoxes = [];
 wallsGroup.children.forEach(wall => {
     wall.updateMatrixWorld();
     wallBoxes.push(new THREE.Box3().setFromObject(wall));
