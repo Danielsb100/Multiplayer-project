@@ -62,6 +62,7 @@ io.on('connection', (socket) => {
     players[socket.id] = {
         id: socket.id,
         name: 'Guest_' + Math.floor(Math.random() * 1000),
+        color: '#3b82f6', // Default color
         position: { x: 0, y: 0, z: 0 },
         rotation: { x: 0, y: 0, z: 0 },
         modelData: null
@@ -82,10 +83,15 @@ io.on('connection', (socket) => {
     // Broadcast the new player
     socket.broadcast.emit('newPlayer', players[socket.id]);
 
-    // Handle name change
-    socket.on('setName', (name) => {
+    // Handle name/color update (updated)
+    socket.on('setName', (data) => {
         if (players[socket.id]) {
-            players[socket.id].name = name;
+            if (typeof data === 'string') {
+                players[socket.id].name = data;
+            } else {
+                players[socket.id].name = data.name;
+                players[socket.id].color = data.color;
+            }
             io.emit('playerUpdated', players[socket.id]);
         }
     });

@@ -36,6 +36,23 @@ let previewCube = null;
 let lastMouseY = 0;
 const MAX_CUBE_HEIGHT = 8; // Height limit as requested
 
+// User Color Logic
+const LOGIN_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ffffff', '#94a3b8'];
+let localUserColor = LOGIN_COLORS[Math.floor(Math.random() * LOGIN_COLORS.length)];
+const loginColorOptions = document.querySelectorAll('.login-color-option');
+
+// Initialize login color selection
+loginColorOptions.forEach(opt => {
+    const color = opt.dataset.color;
+    if (color === localUserColor) opt.classList.add('active');
+    
+    opt.addEventListener('click', () => {
+        loginColorOptions.forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        localUserColor = color;
+    });
+});
+
 // Context Menu State
 let isMenuOpen = false;
 let contextMenuTarget = null;
@@ -80,7 +97,7 @@ joinBtn.addEventListener('click', () => {
     const name = usernameInput.value.trim();
     if (name) {
         localUsername = name;
-        socket.emit('setName', name);
+        socket.emit('setName', { name, color: localUserColor });
         
         if (selectedModelBuffer) {
             socket.emit('modelUpdate', { buffer: selectedModelBuffer });
@@ -88,11 +105,14 @@ joinBtn.addEventListener('click', () => {
         } else if (selectedCatalogModelUrl) {
             socket.emit('modelUpdate', { path: selectedCatalogModelUrl });
             loadModelByUrl(selectedCatalogModelUrl);
+        } else if (characterMesh && characterMesh.material) {
+            // Apply chosen color to default avatar
+            characterMesh.material.color.set(localUserColor);
         }
 
         playerGroup.visible = true;
         loginScreen.classList.add('hidden');
-        createGametag(socket.id, name, true);
+        createGametag(socket.id, name, localUserColor, true);
     }
 });
 
@@ -192,17 +212,18 @@ playerGroup.add(localAvatar.group);
 playerGroup.position.set(0, 0, 0);
 playerGroup.visible = false; // Hidden until join
 
-function createGametag(id, name, isLocal) {
+function createGametag(id, name, color, isLocal) {
     if (gametags[id]) {
         gametags[id].element.innerText = name;
+        if (color) gametags[id].element.style.color = color;
         return;
     }
     const element = document.createElement('div');
     element.className = 'gametag';
     element.innerText = name;
-    if (isLocal) element.style.color = '#10b981'; // Green for local
+    if (color) element.style.color = color;
     document.body.appendChild(element);
-    gametags[id] = { element, isLocal };
+    gametags[id] = { element, isLocal, color };
 }
 
 function removeGametag(id) {
@@ -261,7 +282,7 @@ socket.on('playerMoved', (playerInfo) => {
 });
 
 socket.on('playerUpdated', (playerInfo) => {
-    createGametag(playerInfo.id, playerInfo.name, false);
+    createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
 });
 
 socket.on('playerDisconnected', (id) => {
@@ -378,7 +399,7 @@ function addOtherPlayer(playerInfo) {
         avatarContainer: avatar.group // Keep track of the inner group
     };
     
-    createGametag(playerInfo.id, playerInfo.name, false);
+    createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
 
     if (playerInfo.modelData) {
         if (playerInfo.modelData.buffer) {
@@ -719,7 +740,7 @@ window.addEventListener('mousedown', (event) => {
             
             // Create preview cube
             const geo = new THREE.BoxGeometry(1, 1, 1);
-            const mat = new THREE.MeshStandardMaterial({ color: '#ef4444', transparent: true, opacity: 0.5 });
+            const mat = new THREE.MeshStandardMaterial({ color: localUserColor, transparent: true, opacity: 0.5 });
             previewCube = new THREE.Mesh(geo, mat);
             previewCube.position.set(placementStartPoint.x, 0.5, placementStartPoint.z);
             scene.add(previewCube);
@@ -745,14 +766,14 @@ window.addEventListener('mousedown', (event) => {
                 id: tempId,
                 position: pos,
                 size: size,
-                color: '#ef4444',
+                color: localUserColor,
                 isOptimistic: true
             });
 
             socket.emit('placeCube', {
                 position: pos,
                 size: size,
-                color: '#ef4444'
+                color: localUserColor
             });
             cancelPlacement();
         }
