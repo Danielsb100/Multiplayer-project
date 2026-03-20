@@ -73,7 +73,6 @@ const catalogGrid = document.getElementById('catalog-grid');
 const catalogTitle = document.getElementById('catalog-title');
 const closeCatalogBtn = document.getElementById('close-catalog');
 const catalogCharBtn = document.getElementById('catalog-char-btn');
-const catalogStructBtn = document.getElementById('catalog-struct-btn'); // New
 const menuCatalogModels = document.getElementById('menu-catalog-models');
 
 // --- Animation State ---
@@ -209,17 +208,6 @@ catalogCharBtn.addEventListener('click', () => {
         selectedCatalogAnims = item.animations;
         selectedModelBuffer = null;
         loginFileName.innerText = item.name;
-    });
-});
-
-catalogStructBtn.addEventListener('click', () => {
-    openCatalog('structures', (item) => {
-        // Just for visual preview in login if they want, 
-        // but structures are usually for placement via context menu.
-        selectedCatalogModelUrl = item.model;
-        selectedCatalogAnims = null;
-        selectedModelBuffer = null;
-        loginFileName.innerText = "[Estrutura] " + item.name;
     });
 });
 
@@ -1091,27 +1079,33 @@ document.getElementById('menu-delete-model').addEventListener('click', () => {
     closeContextMenu();
 });
 
-document.getElementById('menu-rotate-right').addEventListener('click', () => {
-    if (contextMenuTarget && contextMenuTarget.userData.id) {
-        contextMenuTarget.rotation.y -= Math.PI / 2;
-        socket.emit('updateObjectRotation', {
-            id: contextMenuTarget.userData.id,
-            rotation: { x: 0, y: contextMenuTarget.rotation.y, z: 0 }
-        });
-    }
+// Menu Rotation 90
+document.getElementById('menu-rotate-90-right').addEventListener('click', () => {
+    if (contextMenuTarget) rotateObject(contextMenuTarget, Math.PI / 2);
+    closeContextMenu();
+});
+document.getElementById('menu-rotate-90-left').addEventListener('click', () => {
+    if (contextMenuTarget) rotateObject(contextMenuTarget, -Math.PI / 2);
     closeContextMenu();
 });
 
-document.getElementById('menu-rotate-left').addEventListener('click', () => {
-    if (contextMenuTarget && contextMenuTarget.userData.id) {
-        contextMenuTarget.rotation.y += Math.PI / 2;
-        socket.emit('updateObjectRotation', {
-            id: contextMenuTarget.userData.id,
-            rotation: { x: 0, y: contextMenuTarget.rotation.y, z: 0 }
-        });
-    }
+// Menu Rotation 45
+document.getElementById('menu-rotate-45-right').addEventListener('click', () => {
+    if (contextMenuTarget) rotateObject(contextMenuTarget, Math.PI / 4);
     closeContextMenu();
 });
+document.getElementById('menu-rotate-45-left').addEventListener('click', () => {
+    if (contextMenuTarget) rotateObject(contextMenuTarget, -Math.PI / 4);
+    closeContextMenu();
+});
+
+function rotateObject(target, angle) {
+    target.rotation.y += angle;
+    socket.emit('updateObjectRotation', {
+        id: target.userData.id,
+        rotation: { x: target.rotation.x, y: target.rotation.y, z: target.rotation.z }
+    });
+}
 
 document.querySelectorAll('.color-option').forEach(opt => {
     opt.addEventListener('click', () => {
@@ -1292,9 +1286,10 @@ let moveSpeed = 0.05;
 let currentSurfaceHeight = 0;
 
 function checkCollision(targetPosition) {
-    const playerBox = new THREE.Box3().setFromObject(playerGroup);
-    const offset = targetPosition.clone().sub(playerGroup.position);
-    playerBox.translate(offset);
+    // COMPACT COLLISION: Use a fixed small box for the player (0.4 units wide)
+    const playerBoxSize = new THREE.Vector3(0.4, 1.8, 0.4);
+    const playerCenter = targetPosition.clone().add(new THREE.Vector3(0, 0.9, 0));
+    const playerBox = new THREE.Box3().setFromCenterAndSize(playerCenter, playerBoxSize);
     
     // Check for "wall" collision (only if target height is lower than box.max.y - step)
     for (const wallBox of wallBoxes) {
