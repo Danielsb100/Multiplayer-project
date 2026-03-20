@@ -330,13 +330,13 @@ input[type="file"] {
 
 /* --- Interface do Chat Global --- */
 
-/* Histórico de Mensagens (Canto Superior Direito) */
-#chat-history-container {
+/* --- Interface do Jogador (Player List) --- */
+#player-list-container {
     position: absolute;
     top: 2rem;
     right: 2rem;
-    width: 300px;
-    max-height: 40vh;
+    width: 320px;
+    max-height: 35vh;
     background: var(--panel-bg);
     backdrop-filter: blur(16px);
     border: 1px solid var(--panel-border);
@@ -345,7 +345,115 @@ input[type="file"] {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    pointer-events: none; /* Deixa cliques passarem caso não esteja rolando */
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.player-list-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--panel-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.player-list-header h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+#player-list-content {
+    padding: 0.5rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.player-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    transition: background 0.2s;
+}
+
+.player-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.player-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.player-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+}
+
+.player-name {
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.player-item .is-me {
+    font-size: 0.7rem;
+    background: var(--accent-color);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+}
+
+.call-icon-btn {
+    background: #10b981;
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.call-icon-btn:hover {
+    background: #059669;
+    transform: scale(1.1);
+}
+
+.call-icon-btn.disabled {
+    background: #475569;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Histórico de Mensagens (Repositioned to be below Player List) */
+#chat-history-container {
+    position: absolute;
+    top: calc(35vh + 3rem); /* Dynamic offset based on player list max-height */
+    right: 2rem;
+    width: 320px;
+    max-height: 35vh;
+    background: var(--panel-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    pointer-events: none;
 }
 
 #chat-history {

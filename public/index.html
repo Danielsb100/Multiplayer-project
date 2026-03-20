@@ -72,17 +72,12 @@
     <!-- Container onde o Three.js irá renderizar a cena 3D -->
     <div id="canvas-container"></div>
     
-    <!-- Painel de UI Lateral (Painel de Informações) -->
-    <div class="ui-panel ui-layer" id="main-ui">
-        <h1>3D Viewer</h1>
-        <p>Explore the multiplayer world!</p>
-        
-        <!-- Legenda de Controles -->
-        <div id="controls-help">
-            <p>Mover <strong>WASD</strong></p>
-            <p>Olhar <strong>Mouse</strong></p>
-            <p>Chat <strong>Enter</strong></p>
+    <!-- Player List Container (Top Right) -->
+    <div id="player-list-container" class="ui-layer hidden">
+        <div class="player-list-header">
+            <h3>Jogadores Online</h3>
         </div>
+        <div id="player-list-content"></div>
     </div>
 
     <!-- Estrutura do Chat Global - Histórico (Canto Superior Direito) -->

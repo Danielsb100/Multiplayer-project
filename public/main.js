@@ -110,6 +110,10 @@ const btnHangup = document.getElementById('btn-hangup');
 const btnAnswer = document.getElementById('btn-answer');
 const btnReject = document.getElementById('btn-reject');
 
+// Player List DOM
+const playerListContainer = document.getElementById('player-list-container');
+const playerListContent = document.getElementById('player-list-content');
+
 function isOverUI(event) {
     return event.target.closest('.ui-layer') || event.target.closest('.context-menu');
 }
@@ -156,6 +160,9 @@ joinBtn.addEventListener('click', () => {
 
         // Initialize PeerJS for audio calls
         initPeer();
+        
+        playerListContainer.classList.remove('hidden');
+        updatePlayerList();
     }
 });
 
@@ -328,6 +335,60 @@ function removeGametag(id) {
     }
 }
 
+function updatePlayerList() {
+    if (!localUsername) return;
+    playerListContent.innerHTML = '';
+
+    // 1. Add Me
+    const meDiv = document.createElement('div');
+    meDiv.className = 'player-item';
+    meDiv.innerHTML = `
+        <div class="player-info">
+            <div class="player-status-dot"></div>
+            <span class="player-name">${localUsername}</span>
+            <span class="is-me">VOCÊ</span>
+        </div>
+    `;
+    playerListContent.appendChild(meDiv);
+
+    // 2. Add Others
+    for (const id in remotePlayers) {
+        const player = remotePlayers[id];
+        const name = gametags[id] ? (gametags[id].element.innerText.replace('📞', '').trim()) : 'Carregando...';
+        
+        const playerDiv = document.createElement('div');
+        playerDiv.className = 'player-item';
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'player-info';
+        infoDiv.innerHTML = `
+            <div class="player-status-dot"></div>
+            <span class="player-name">${name}</span>
+        `;
+        
+        const callBtn = document.createElement('button');
+        callBtn.className = 'call-icon-btn';
+        callBtn.innerHTML = '📞';
+        
+        if (!player.peerId) {
+            callBtn.classList.add('disabled');
+            callBtn.title = 'Voz não disponível';
+        }
+
+        callBtn.onclick = () => {
+            if (player.peerId) {
+                makeCall(player.peerId, name);
+            } else {
+                alert('Este jogador ainda não configurou o canal de voz.');
+            }
+        };
+
+        playerDiv.appendChild(infoDiv);
+        playerDiv.appendChild(callBtn);
+        playerListContent.appendChild(playerDiv);
+    }
+}
+
 // Update gametags screen positions
 function updateGametags() {
     const tempV = new THREE.Vector3();
@@ -363,10 +424,12 @@ socket.on('currentPlayers', (players) => {
         if (id === socket.id) return;
         addOtherPlayer(players[id]);
     });
+    updatePlayerList();
 });
 
 socket.on('newPlayer', (playerInfo) => {
     addOtherPlayer(playerInfo);
+    updatePlayerList();
 });
 
 socket.on('playerMoved', (playerInfo) => {
@@ -383,6 +446,7 @@ socket.on('playerMoved', (playerInfo) => {
 
 socket.on('playerUpdated', (playerInfo) => {
     createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
+    updatePlayerList();
 });
 
 socket.on('playerDisconnected', (id) => {
@@ -391,12 +455,14 @@ socket.on('playerDisconnected', (id) => {
         delete remotePlayers[id];
     }
     removeGametag(id);
+    updatePlayerList();
 });
 
 socket.on('playerPeerUpdated', (data) => {
     if (remotePlayers[data.id]) {
         remotePlayers[data.id].peerId = data.peerId;
         console.log(`Remote player ${data.id} has PeerID: ${data.peerId}`);
+        updatePlayerList();
     }
 });
 
