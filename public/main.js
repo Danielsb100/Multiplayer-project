@@ -39,6 +39,7 @@ const MAX_CUBE_HEIGHT = 8; // Height limit as requested
 // User Color Logic
 const LOGIN_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ffffff', '#94a3b8'];
 let localUserColor = LOGIN_COLORS[Math.floor(Math.random() * LOGIN_COLORS.length)];
+let interactionPointGlobal = null; 
 const loginColorOptions = document.querySelectorAll('.login-color-option');
 
 // Initialize login color selection
@@ -304,16 +305,23 @@ function handleAnimationState(animObj, state, duration = 0.2, loop = true) {
     animObj.currentState = state;
 }
 
-function triggerInteract(animObj) {
+function triggerInteract(animObj, targetPoint = null) {
     if (!animObj.mixer || !animObj.actions['interact']) return;
+    
+    // Rotate to face the point if provided
+    if (targetPoint && animObj.mixer.getRoot().parent) {
+        const root = animObj.mixer.getRoot();
+        const parent = root.parent;
+        const dir = new THREE.Vector3().subVectors(targetPoint, parent.position);
+        parent.rotation.y = Math.atan2(dir.x, dir.z);
+    }
+
     const action = animObj.actions['interact'];
     action.reset();
     action.setLoop(THREE.LoopOnce);
     action.clampWhenFinished = false;
     action.setEffectiveWeight(1);
     action.play();
-    
-    // We don't change currentState so the base (idle/walk) keeps playing
 }
 
 // --- Multiplayer & Player Setup ---
@@ -519,7 +527,7 @@ socket.on('playerMoved', (playerInfo) => {
             }
 
             if (playerInfo.didInteract) {
-                triggerInteract(rAnims);
+                triggerInteract(rAnims, playerInfo.interactionPoint);
             }
         }
     }
@@ -654,8 +662,8 @@ socket.on('initialChatHistory', (history) => {
 
 function addOtherPlayer(playerInfo) {
     const avatar = createDefaultAvatar(playerInfo.color);
-    avatar.group.position.copy(playerInfo.position);
-    avatar.group.rotation.setFromVector3(new THREE.Vector3(playerInfo.rotation.x, playerInfo.rotation.y, playerInfo.rotation.z));
+    avatar.group.position.set(playerInfo.position.x, playerInfo.position.y, playerInfo.position.z);
+    avatar.group.rotation.set(playerInfo.rotation.x, playerInfo.rotation.y, playerInfo.rotation.z);
     scene.add(avatar.group);
     
     remotePlayers[playerInfo.id] = {
@@ -736,6 +744,8 @@ function loadModelFromBuffer(arrayBuffer, targetPlayerObj, color = '#3b82f6') {
             });
         }
 
+        newModel.position.set(0, 0, 0);
+        newModel.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(newModel);
         const center = box.getCenter(new THREE.Vector3());
 
@@ -1118,8 +1128,9 @@ window.addEventListener('mousedown', (event) => {
             });
             
             // Trigger interact animation
-            triggerInteract(playerAnims);
+            triggerInteract(playerAnims, contextMenuPoint);
             didInteractThisFrame = true;
+            interactionPointGlobal = contextMenuPoint.clone();
             
             cancelPlacement();
         }
@@ -1282,7 +1293,8 @@ function updatePlayer(delta) {
             animation: playerAnims.currentState,
             isJumping: isJumping,
             jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
-            didInteract: didInteractThisFrame
+            didInteract: didInteractThisFrame,
+            interactionPoint: interactionPointGlobal
         });
         didInteractThisFrame = false; // Reset for next emit
     } else {
@@ -1293,7 +1305,8 @@ function updatePlayer(delta) {
             animation: 'idle',
             isJumping: isJumping,
             jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
-            didInteract: didInteractThisFrame
+            didInteract: didInteractThisFrame,
+            interactionPoint: interactionPointGlobal
         });
         didInteractThisFrame = false;
     }
@@ -1413,6 +1426,8 @@ function loadLocalModel(arrayBuffer) {
             });
         }
 
+        characterMesh.position.set(0, 0, 0);
+        characterMesh.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(characterMesh);
         const center = box.getCenter(new THREE.Vector3());
         characterMesh.position.x = -center.x;
@@ -1517,6 +1532,8 @@ function loadModelByUrl(url, animPaths = null) {
             });
         }
 
+        characterMesh.position.set(0, 0, 0);
+        characterMesh.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(characterMesh);
         const center = box.getCenter(new THREE.Vector3());
         
@@ -1573,6 +1590,8 @@ function updateRemotePlayerModelByUrl(id, url, animPaths = null, color = '#3b82f
             });
         }
 
+        mesh.position.set(0, 0, 0);
+        mesh.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(mesh);
         const center = box.getCenter(new THREE.Vector3());
         
