@@ -149,9 +149,37 @@ joinBtn.addEventListener('click', () => {
                 animations: selectedCatalogAnims 
             });
             loadModelByUrl(selectedCatalogModelUrl, selectedCatalogAnims);
-        } else if (characterMesh && characterMesh.material) {
-            // Apply chosen color to default avatar
-            characterMesh.material.color.set(localUserColor);
+        } else {
+            // Try loading the default GLB character
+            const defaultModelPath = 'assets/characters/default/default.glb';
+            const defaultModelAnims = {
+                idle: 'assets/characters/default/idle.glb',
+                walk: 'assets/characters/default/walk.glb',
+                jump: 'assets/characters/default/jump.glb',
+                interact: 'assets/characters/default/interact.glb'
+            };
+            
+            // Check if it exists via a fetch (simplified check)
+            fetch(defaultModelPath, { method: 'HEAD' })
+                .then(res => {
+                    if (res.ok) {
+                        socket.emit('modelUpdate', { 
+                            path: defaultModelPath,
+                            animations: defaultModelAnims 
+                        });
+                        loadModelByUrl(defaultModelPath, defaultModelAnims);
+                    } else {
+                        // Fallback to cube if default.glb is not found
+                        if (characterMesh && characterMesh.material) {
+                            characterMesh.material.color.set(localUserColor);
+                        }
+                    }
+                })
+                .catch(() => {
+                    if (characterMesh && characterMesh.material) {
+                        characterMesh.material.color.set(localUserColor);
+                    }
+                });
         }
 
         playerGroup.visible = true;
@@ -234,6 +262,20 @@ controls.target.set(0, 0, 0);
 controls.enableRotate = false; // Keep isometric view
 
 // --- Animation Manager ---
+function applyCharacterColor(model, color) {
+    if (!model) return;
+    model.traverse((child) => {
+        if (child.isMesh) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach(mat => {
+                if (mat.name && mat.name.toLowerCase().includes('clothes')) {
+                    if (mat.color) mat.color.set(color);
+                }
+            });
+        }
+    });
+}
+
 function handleAnimationState(animObj, state, duration = 0.2, loop = true) {
     if (!animObj.mixer || animObj.currentState === state) return;
     
@@ -269,10 +311,10 @@ const playerGroup = new THREE.Group();
 let characterMesh = null;
 scene.add(playerGroup);
 
-function createDefaultAvatar() {
+function createDefaultAvatar(color = '#3b82f6') {
     const group = new THREE.Group();
     const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
-    const bodyMat = new THREE.MeshStandardMaterial({ color: '#3b82f6', roughness: 0.3, metalness: 0.2 });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3, metalness: 0.2 });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.position.y = 0.5;
     body.castShadow = true;
@@ -287,7 +329,7 @@ function createDefaultAvatar() {
 }
 
 // Local player setup
-const localAvatar = createDefaultAvatar();
+const localAvatar = createDefaultAvatar(localUserColor);
 characterMesh = localAvatar.bodyMesh;
 playerGroup.add(localAvatar.group);
 playerGroup.position.set(0, 0, 0);
@@ -446,6 +488,15 @@ socket.on('playerMoved', (playerInfo) => {
 
 socket.on('playerUpdated', (playerInfo) => {
     createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
+    if (remotePlayers[playerInfo.id]) {
+        if (remotePlayers[playerInfo.id].mainMesh) {
+            // Apply color to material if it's the default cube or has 'clothes' material
+            if (remotePlayers[playerInfo.id].mainMesh.material) {
+                remotePlayers[playerInfo.id].mainMesh.material.color.set(playerInfo.color);
+            }
+            applyCharacterColor(remotePlayers[playerInfo.id].mainMesh, playerInfo.color);
+        }
+    }
     updatePlayerList();
 });
 
@@ -561,7 +612,7 @@ socket.on('initialChatHistory', (history) => {
 });
 
 function addOtherPlayer(playerInfo) {
-    const avatar = createDefaultAvatar();
+    const avatar = createDefaultAvatar(playerInfo.color);
     avatar.group.position.copy(playerInfo.position);
     avatar.group.rotation.setFromVector3(new THREE.Vector3(playerInfo.rotation.x, playerInfo.rotation.y, playerInfo.rotation.z));
     scene.add(avatar.group);
@@ -569,7 +620,8 @@ function addOtherPlayer(playerInfo) {
     remotePlayers[playerInfo.id] = {
         group: avatar.group,
         mainMesh: avatar.bodyMesh,
-        avatarContainer: avatar.group, // Keep track of the inner group
+        color: playerInfo.color,
+        avatarContainer: avatar.group, 
         anims: {
             mixer: null,
             actions: {},
@@ -584,8 +636,22 @@ function addOtherPlayer(playerInfo) {
         if (playerInfo.modelData.buffer) {
             loadModelFromBuffer(playerInfo.modelData.buffer, remotePlayers[playerInfo.id]);
         } else if (playerInfo.modelData.path) {
-            updateRemotePlayerModelByUrl(playerInfo.id, playerInfo.modelData.path);
+            updateRemotePlayerModelByUrl(playerInfo.id, playerInfo.modelData.path, playerInfo.modelData.animations);
         }
+    } else {
+        // Try loading default model for remote player if no specific model selected
+        const defaultModelPath = 'assets/characters/default/default.glb';
+        fetch(defaultModelPath, { method: 'HEAD' }).then(res => {
+            if (res.ok) {
+                const defaultModelAnims = {
+                    idle: 'assets/characters/default/idle.glb',
+                    walk: 'assets/characters/default/walk.glb',
+                    jump: 'assets/characters/default/jump.glb',
+                    interact: 'assets/characters/default/interact.glb'
+                };
+                updateRemotePlayerModelByUrl(playerInfo.id, defaultModelPath, defaultModelAnims);
+            }
+        });
     }
 }
 
@@ -605,6 +671,30 @@ function loadModelFromBuffer(arrayBuffer, targetPlayerObj) {
             }
         });
 
+        targetPlayerObj.avatarContainer.add(newModel);
+        targetPlayerObj.mainMesh = newModel;
+        
+        // Apply character color to 'clothes' material
+        applyCharacterColor(newModel, targetPlayerObj.color || '#3b82f6');
+
+        // Setup Mixer for remote player with buffer model
+        targetPlayerObj.anims.mixer = new THREE.AnimationMixer(newModel);
+        targetPlayerObj.anims.actions = {};
+        targetPlayerObj.anims.currentState = null;
+
+        if (gltf.animations && gltf.animations.length > 0) {
+            const states = ['idle', 'walk', 'jump', 'interact'];
+            gltf.animations.forEach(clip => {
+                const lowerName = clip.name.toLowerCase();
+                states.forEach(state => {
+                    if (lowerName.includes(state)) {
+                        targetPlayerObj.anims.actions[state] = targetPlayerObj.anims.mixer.clipAction(clip);
+                        if (state === 'idle') handleAnimationState(targetPlayerObj.anims, 'idle');
+                    }
+                });
+            });
+        }
+
         const box = new THREE.Box3().setFromObject(newModel);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
@@ -612,9 +702,6 @@ function loadModelFromBuffer(arrayBuffer, targetPlayerObj) {
         newModel.position.x -= center.x;
         newModel.position.z -= center.z;
         newModel.position.y -= center.y - (size.y / 2);
-
-        targetPlayerObj.avatarContainer.add(newModel);
-        targetPlayerObj.mainMesh = newModel;
     }, (error) => {
         console.error('Error parsing remote model', error);
     });
@@ -1215,25 +1302,36 @@ function loadLocalModel(arrayBuffer) {
     loadingIndicator.classList.remove('hidden');
     const gltfLoader = new GLTFLoader();
     gltfLoader.parse(arrayBuffer, '', (gltf) => {
-        // Remove old character container contents
-        while(playerGroup.children.length > 0){
-            playerGroup.remove(playerGroup.children[0]);
-        }
+        while(playerGroup.children.length > 0) playerGroup.remove(playerGroup.children[0]);
 
         characterMesh = gltf.scene;
-        characterMesh.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
-        });
-
+        characterMesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
         playerGroup.add(characterMesh);
+        
+        // Apply local character color to 'clothes' material
+        applyCharacterColor(characterMesh, localUserColor);
+
+        // Setup Mixer for local player with buffer model
+        playerAnims.mixer = new THREE.AnimationMixer(characterMesh);
+        playerAnims.actions = {};
+        playerAnims.currentState = null;
+
+        if (gltf.animations && gltf.animations.length > 0) {
+            const states = ['idle', 'walk', 'jump', 'interact'];
+            gltf.animations.forEach(clip => {
+                const lowerName = clip.name.toLowerCase();
+                states.forEach(state => {
+                    if (lowerName.includes(state)) {
+                        playerAnims.actions[state] = playerAnims.mixer.clipAction(clip);
+                        if (state === 'idle') handleAnimationState(playerAnims, 'idle');
+                    }
+                });
+            });
+        }
 
         const box = new THREE.Box3().setFromObject(characterMesh);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
-
         characterMesh.position.x -= center.x;
         characterMesh.position.z -= center.z;
         characterMesh.position.y -= center.y - (size.y / 2);
@@ -1300,13 +1398,30 @@ function loadModelByUrl(url, animPaths = null) {
         characterMesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
         playerGroup.add(characterMesh);
 
-        // Setup Mixer if animations are provided
-        if (animPaths) {
-            playerAnims.mixer = new THREE.AnimationMixer(characterMesh);
-            playerAnims.actions = {};
-            playerAnims.currentState = null;
+        // Apply character color to 'clothes' material
+        applyCharacterColor(characterMesh, localUserColor);
 
-            // Load each animation
+        // Setup Mixer
+        playerAnims.mixer = new THREE.AnimationMixer(characterMesh);
+        playerAnims.actions = {};
+        playerAnims.currentState = null;
+
+        // 1. Auto-detect embedded animations (actions from Blender)
+        if (gltf.animations && gltf.animations.length > 0) {
+            const states = ['idle', 'walk', 'jump', 'interact'];
+            gltf.animations.forEach(clip => {
+                const lowerName = clip.name.toLowerCase();
+                states.forEach(state => {
+                    if (lowerName.includes(state)) {
+                        playerAnims.actions[state] = playerAnims.mixer.clipAction(clip);
+                        if (state === 'idle') handleAnimationState(playerAnims, 'idle');
+                    }
+                });
+            });
+        }
+
+        // 2. Load external animations (as overrides if provided)
+        if (animPaths) {
             Object.entries(animPaths).forEach(([name, path]) => {
                 gltfLoader.load(path, (animGltf) => {
                     const clip = animGltf.animations[0];
@@ -1317,8 +1432,6 @@ function loadModelByUrl(url, animPaths = null) {
                     }
                 });
             });
-        } else {
-            playerAnims.mixer = null;
         }
 
         const box = new THREE.Box3().setFromObject(characterMesh);
@@ -1341,13 +1454,31 @@ function updateRemotePlayerModelByUrl(id, url, animPaths = null) {
         const mesh = gltf.scene;
         mesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
         player.group.add(mesh);
+        
+        // Apply character color to 'clothes' material
+        applyCharacterColor(mesh, playerInfo.color);
 
         // Setup Mixer for remote
-        if (animPaths) {
-            player.anims.mixer = new THREE.AnimationMixer(mesh);
-            player.anims.actions = {};
-            player.anims.currentState = null;
+        player.anims.mixer = new THREE.AnimationMixer(mesh);
+        player.anims.actions = {};
+        player.anims.currentState = null;
 
+        // 1. Embedded Animations
+        if (gltf.animations && gltf.animations.length > 0) {
+            const states = ['idle', 'walk', 'jump', 'interact'];
+            gltf.animations.forEach(clip => {
+                const lowerName = clip.name.toLowerCase();
+                states.forEach(state => {
+                    if (lowerName.includes(state)) {
+                        player.anims.actions[state] = player.anims.mixer.clipAction(clip);
+                        if (state === 'idle') handleAnimationState(player.anims, 'idle');
+                    }
+                });
+            });
+        }
+
+        // 2. External Animations
+        if (animPaths) {
             Object.entries(animPaths).forEach(([name, path]) => {
                 gltfLoader.load(path, (animGltf) => {
                     const clip = animGltf.animations[0];
