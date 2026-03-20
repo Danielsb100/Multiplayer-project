@@ -87,6 +87,12 @@ const GRAVITY = -0.01;
 const JUMP_FORCE = 0.2;
 let isGrounded = true;
 
+// Parabolic Jump State
+let isJumping = false;
+let jumpTime = 0;
+const JUMP_DURATION = 0.6; // Seconds
+const JUMP_HEIGHT = 1.5;
+
 // PeerJS & Audio State
 let peer = null;
 let localStream = null;
@@ -697,11 +703,10 @@ function loadModelFromBuffer(arrayBuffer, targetPlayerObj) {
 
         const box = new THREE.Box3().setFromObject(newModel);
         const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
 
-        newModel.position.x -= center.x;
-        newModel.position.z -= center.z;
-        newModel.position.y -= center.y - (size.y / 2);
+        newModel.position.x = -center.x;
+        newModel.position.z = -center.z;
+        newModel.position.y = -box.min.y;
     }, (error) => {
         console.error('Error parsing remote model', error);
     });
@@ -734,10 +739,16 @@ window.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
     if (keys.hasOwnProperty(key)) keys[key] = true;
     
-    // Jump trigger
-    if (e.code === 'Space') {
+    // Jump trigger (Parabolic)
+    if (e.code === 'Space' && !isJumping) {
         keys[' '] = true;
-        handleAnimationState(playerAnims, 'jump', 0.1, false);
+        isJumping = true;
+        jumpTime = 0;
+        // Start jump animation at 0 weight (it will be modulated in updatePlayer)
+        if (playerAnims.actions['jump']) {
+            playerAnims.actions['jump'].setEffectiveWeight(0);
+            playerAnims.actions['jump'].play();
+        }
     }
     
     // Interact trigger
@@ -867,6 +878,9 @@ document.getElementById('menu-catalog-models').addEventListener('click', () => {
             position: contextMenuPoint.clone()
         });
         
+        // Trigger interact animation
+        handleAnimationState(playerAnims, 'interact', 0.1, false);
+        
         // Optimistic UI for catalog model
         createPlacedModel({
             id: tempId,
@@ -928,6 +942,9 @@ contextGlbUpload.addEventListener('change', (e) => {
                         modelBuffer: buffer,
                         position: contextMenuPoint.clone()
                     });
+
+                    // Trigger interact animation
+                    handleAnimationState(playerAnims, 'interact', 0.1, false);
                 }
             });
         };
@@ -1064,6 +1081,10 @@ window.addEventListener('mousedown', (event) => {
                 size: size,
                 color: localUserColor
             });
+            
+            // Trigger interact animation
+            handleAnimationState(playerAnims, 'interact', 0.1, false);
+            
             cancelPlacement();
         }
     }
@@ -1164,8 +1185,30 @@ function checkCollision(targetPosition) {
     return false;
 }
 
-function updatePlayer() {
-    if (localUsername === '' || isMenuOpen) return; // Wait until logged in or menu closed
+function updatePlayer(delta) {
+    if (localUsername === '' || isMenuOpen) return;
+
+    // --- Parabolic Jump Handling ---
+    if (isJumping) {
+        jumpTime += delta;
+        let progress = Math.min(jumpTime / JUMP_DURATION, 1);
+        let parabola = Math.sin(progress * Math.PI);
+        
+        playerGroup.position.y = parabola * JUMP_HEIGHT;
+        
+        // Modulate animation weight
+        if (playerAnims.actions['jump']) {
+            playerAnims.actions['jump'].setEffectiveWeight(parabola);
+        }
+        
+        if (progress >= 1) {
+            isJumping = false;
+            playerGroup.position.y = 0;
+            if (playerAnims.actions['jump']) {
+                playerAnims.actions['jump'].fadeOut(0.2);
+            }
+        }
+    }
 
     let moveX = 0, moveZ = 0;
     if (keys.w) { moveZ -= moveSpeed; moveX -= moveSpeed; }
@@ -1270,7 +1313,7 @@ function animate() {
         }
     }
 
-    updatePlayer();
+    updatePlayer(delta);
     updateOcclusion(); // Check for blocked view
     updateGametags();
     controls.update();
@@ -1331,10 +1374,9 @@ function loadLocalModel(arrayBuffer) {
 
         const box = new THREE.Box3().setFromObject(characterMesh);
         const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        characterMesh.position.x -= center.x;
-        characterMesh.position.z -= center.z;
-        characterMesh.position.y -= center.y - (size.y / 2);
+        characterMesh.position.x = -center.x;
+        characterMesh.position.z = -center.z;
+        characterMesh.position.y = -box.min.y;
 
         loadingIndicator.classList.add('hidden');
     }, (error) => {
@@ -1436,10 +1478,10 @@ function loadModelByUrl(url, animPaths = null) {
 
         const box = new THREE.Box3().setFromObject(characterMesh);
         const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        characterMesh.position.x -= center.x;
-        characterMesh.position.z -= center.z;
-        characterMesh.position.y -= center.y - (size.y / 2);
+        
+        characterMesh.position.x = -center.x;
+        characterMesh.position.z = -center.z;
+        characterMesh.position.y = -box.min.y;
 
         loadingIndicator.classList.add('hidden');
     });
@@ -1492,10 +1534,10 @@ function updateRemotePlayerModelByUrl(id, url, animPaths = null) {
 
         const box = new THREE.Box3().setFromObject(mesh);
         const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        mesh.position.x -= center.x;
-        mesh.position.z -= center.z;
-        mesh.position.y -= center.y - (size.y / 2);
+        
+        mesh.position.x = -center.x;
+        mesh.position.z = -center.z;
+        mesh.position.y = -box.min.y;
     });
 }
 
