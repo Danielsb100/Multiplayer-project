@@ -285,6 +285,10 @@ function applyCharacterColor(model, color) {
 function handleAnimationState(animObj, state, duration = 0.2, loop = true) {
     if (!animObj.mixer || animObj.currentState === state) return;
     
+    // Restriction: This only handles 'idle' and 'walk' base states now.
+    // 'jump' and 'interact' are handled as overlays.
+    if (state !== 'idle' && state !== 'walk') return;
+
     const nextAction = animObj.actions[state];
     if (!nextAction) return;
 
@@ -296,17 +300,20 @@ function handleAnimationState(animObj, state, duration = 0.2, loop = true) {
     nextAction.loop = loop ? THREE.LoopRepeat : THREE.LoopOnce;
     nextAction.clampWhenFinished = !loop;
 
-    if (!loop) {
-        animObj.mixer.addEventListener('finished', function onFinished() {
-            animObj.mixer.removeEventListener('finished', onFinished);
-            // Return to previous state (usually idle or walk)
-            const fallbackState = (keys.w || keys.a || keys.s || keys.d) ? 'walk' : 'idle';
-            handleAnimationState(animObj, fallbackState);
-        });
-    }
-
     animObj.currentAction = nextAction;
     animObj.currentState = state;
+}
+
+function triggerInteract(animObj) {
+    if (!animObj.mixer || !animObj.actions['interact']) return;
+    const action = animObj.actions['interact'];
+    action.reset();
+    action.setLoop(THREE.LoopOnce);
+    action.clampWhenFinished = false;
+    action.setEffectiveWeight(1);
+    action.play();
+    
+    // We don't change currentState so the base (idle/walk) keeps playing
 }
 
 // --- Multiplayer & Player Setup ---
@@ -485,12 +492,40 @@ socket.on('playerMoved', (playerInfo) => {
         remotePlayers[playerInfo.id].group.position.copy(playerInfo.position);
         remotePlayers[playerInfo.id].group.rotation.setFromVector3(new THREE.Vector3(playerInfo.rotation.x, playerInfo.rotation.y, playerInfo.rotation.z));
         
-        // Update remote animation
+        // Update remote height if jumping
+        if (playerInfo.isJumping) {
+            remotePlayers[playerInfo.id].group.position.y = playerInfo.position.y;
+        } else {
+            remotePlayers[playerInfo.id].group.position.y = 0;
+        }
+
+        // Update remote base animation
         if (playerInfo.animation && remotePlayers[playerInfo.id].anims) {
             handleAnimationState(remotePlayers[playerInfo.id].anims, playerInfo.animation);
         }
+
+        // Handle remote jump/interact overlays
+        if (remotePlayers[playerInfo.id].anims) {
+            const rAnims = remotePlayers[playerInfo.id].anims;
+            if (playerInfo.isJumping) {
+                if (rAnims.actions['jump']) {
+                    rAnims.actions['jump'].setEffectiveWeight(playerInfo.jumpAlpha || 0);
+                    rAnims.actions['jump'].play();
+                }
+            } else {
+                if (rAnims.actions['jump']) {
+                    if (rAnims.actions['jump'].isRunning()) rAnims.actions['jump'].fadeOut(0.2);
+                }
+            }
+
+            if (playerInfo.didInteract) {
+                triggerInteract(rAnims);
+            }
+        }
     }
 });
+
+let didInteractThisFrame = false; // New flag
 
 socket.on('playerUpdated', (playerInfo) => {
     createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
@@ -528,9 +563,9 @@ socket.on('playerModelUpdated', (data) => {
         const mData = data.modelData;
         if (mData) {
             if (mData.buffer) {
-                loadModelFromBuffer(mData.buffer, remotePlayers[data.id]);
+                loadModelFromBuffer(mData.buffer, remotePlayers[data.id], data.color);
             } else if (mData.path) {
-                updateRemotePlayerModelByUrl(data.id, mData.path, mData.animations);
+                updateRemotePlayerModelByUrl(data.id, mData.path, mData.animations, data.color);
             }
         }
     }
@@ -640,9 +675,9 @@ function addOtherPlayer(playerInfo) {
 
     if (playerInfo.modelData) {
         if (playerInfo.modelData.buffer) {
-            loadModelFromBuffer(playerInfo.modelData.buffer, remotePlayers[playerInfo.id]);
+            loadModelFromBuffer(playerInfo.modelData.buffer, remotePlayers[playerInfo.id], playerInfo.color);
         } else if (playerInfo.modelData.path) {
-            updateRemotePlayerModelByUrl(playerInfo.id, playerInfo.modelData.path, playerInfo.modelData.animations);
+            updateRemotePlayerModelByUrl(playerInfo.id, playerInfo.modelData.path, playerInfo.modelData.animations, playerInfo.color);
         }
     } else {
         // Try loading default model for remote player if no specific model selected
@@ -655,13 +690,13 @@ function addOtherPlayer(playerInfo) {
                     jump: 'assets/characters/default/jump.glb',
                     interact: 'assets/characters/default/interact.glb'
                 };
-                updateRemotePlayerModelByUrl(playerInfo.id, defaultModelPath, defaultModelAnims);
+                updateRemotePlayerModelByUrl(playerInfo.id, defaultModelPath, defaultModelAnims, playerInfo.color);
             }
         });
     }
 }
 
-function loadModelFromBuffer(arrayBuffer, targetPlayerObj) {
+function loadModelFromBuffer(arrayBuffer, targetPlayerObj, color = '#3b82f6') {
     const gltfLoader = new GLTFLoader();
     gltfLoader.parse(arrayBuffer, '', (gltf) => {
         // Clear previous meshes inside the inner group
@@ -681,7 +716,7 @@ function loadModelFromBuffer(arrayBuffer, targetPlayerObj) {
         targetPlayerObj.mainMesh = newModel;
         
         // Apply character color to 'clothes' material
-        applyCharacterColor(newModel, targetPlayerObj.color || '#3b82f6');
+        applyCharacterColor(newModel, color);
 
         // Setup Mixer for remote player with buffer model
         targetPlayerObj.anims.mixer = new THREE.AnimationMixer(newModel);
@@ -746,14 +781,14 @@ window.addEventListener('keydown', (e) => {
         jumpTime = 0;
         // Start jump animation at 0 weight (it will be modulated in updatePlayer)
         if (playerAnims.actions['jump']) {
-            playerAnims.actions['jump'].setEffectiveWeight(0);
-            playerAnims.actions['jump'].play();
+            playerAnims.actions['jump'].reset().setEffectiveWeight(0).play();
         }
     }
     
     // Interact trigger
     if (key === 'e') {
-        handleAnimationState(playerAnims, 'interact', 0.1, false);
+        triggerInteract(playerAnims);
+        didInteractThisFrame = true;
     }
 });
 
@@ -1083,7 +1118,8 @@ window.addEventListener('mousedown', (event) => {
             });
             
             // Trigger interact animation
-            handleAnimationState(playerAnims, 'interact', 0.1, false);
+            triggerInteract(playerAnims);
+            didInteractThisFrame = true;
             
             cancelPlacement();
         }
@@ -1239,22 +1275,27 @@ function updatePlayer(delta) {
         }
         playerGroup.rotation.y = Math.atan2(moveX, moveZ);
         
-        // Broadcast movement with animation state
+        // Broadcast movement with animation state and jump/interact flags
         socket.emit('playerMovement', {
             position: playerGroup.position,
             rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
-            animation: playerAnims.currentState
+            animation: playerAnims.currentState,
+            isJumping: isJumping,
+            jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
+            didInteract: didInteractThisFrame
         });
+        didInteractThisFrame = false; // Reset for next emit
     } else {
         handleAnimationState(playerAnims, 'idle');
-        // Still broadcast idle state periodically or when it changes
-        if (playerAnims.currentState === 'idle') {
-             socket.emit('playerMovement', {
-                position: playerGroup.position,
-                rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
-                animation: 'idle'
-            });
-        }
+        socket.emit('playerMovement', {
+            position: playerGroup.position,
+            rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
+            animation: 'idle',
+            isJumping: isJumping,
+            jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
+            didInteract: didInteractThisFrame
+        });
+        didInteractThisFrame = false;
     }
 
     const cameraOffset = new THREE.Vector3(20, 20, 20);
@@ -1487,7 +1528,7 @@ function loadModelByUrl(url, animPaths = null) {
     });
 }
 
-function updateRemotePlayerModelByUrl(id, url, animPaths = null) {
+function updateRemotePlayerModelByUrl(id, url, animPaths = null, color = '#3b82f6') {
     const player = remotePlayers[id];
     if (!player) return;
     const gltfLoader = new GLTFLoader();
@@ -1498,7 +1539,7 @@ function updateRemotePlayerModelByUrl(id, url, animPaths = null) {
         player.group.add(mesh);
         
         // Apply character color to 'clothes' material
-        applyCharacterColor(mesh, playerInfo.color);
+        applyCharacterColor(mesh, color);
 
         // Setup Mixer for remote
         player.anims.mixer = new THREE.AnimationMixer(mesh);

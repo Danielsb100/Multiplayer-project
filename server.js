@@ -162,7 +162,8 @@ io.on('connection', (socket) => {
             players[socket.id].modelData = modelData;
             socket.broadcast.emit('playerModelUpdated', {
                 id: socket.id,
-                modelData: modelData
+                modelData: modelData,
+                color: players[socket.id].color // Include color for replication
             });
         }
     });
