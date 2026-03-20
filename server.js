@@ -8,7 +8,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*", // allow connections from any origin
+        origin: "*", 
         methods: ["GET", "POST"]
     }
 });
@@ -18,18 +18,54 @@ function getCatalogItems(subDir) {
     const dirPath = path.join(__dirname, 'public', 'assets', subDir);
     if (!fs.existsSync(dirPath)) return [];
     
-    return fs.readdirSync(dirPath)
-        .filter(file => file.endsWith('.glb'))
-        .map(file => {
+    const items = [];
+    const files = fs.readdirSync(dirPath);
+
+    files.forEach(file => {
+        const fullPath = path.join(dirPath, file);
+        const stats = fs.statSync(fullPath);
+
+        if (stats.isDirectory() && subDir === 'characters') {
+            // New logic for character folders
+            const name = file;
+            const modelPath = `assets/${subDir}/${name}/${name}.glb`;
+            const iconPath = `assets/${subDir}/${name}/${name}.png`;
+            const fullModelPath = path.join(__dirname, 'public', modelPath);
+            const fullIconPath = path.join(__dirname, 'public', iconPath);
+
+            if (fs.existsSync(fullModelPath)) {
+                const anims = ['idle', 'walk', 'jump', 'interact'];
+                const animations = {};
+                anims.forEach(anim => {
+                    const animPath = `assets/${subDir}/${name}/${anim}.glb`;
+                    if (fs.existsSync(path.join(__dirname, 'public', animPath))) {
+                        animations[anim] = animPath;
+                    }
+                });
+
+                items.push({
+                    name: name,
+                    model: modelPath,
+                    icon: fs.existsSync(fullIconPath) ? iconPath : 'assets/default.png',
+                    animations: animations,
+                    type: 'complex'
+                });
+            }
+        } else if (file.endsWith('.glb')) {
+            // Legacy/Model logic (flat files)
             const name = file.replace('.glb', '');
             const iconRelative = `assets/${subDir}/${name}.png`;
             const iconFull = path.join(__dirname, 'public', iconRelative);
-            return {
+            items.push({
                 name: name,
                 model: `assets/${subDir}/${file}`,
-                icon: fs.existsSync(iconFull) ? iconRelative : 'assets/default.png'
-            };
-        });
+                icon: fs.existsSync(iconFull) ? iconRelative : 'assets/default.png',
+                type: 'simple'
+            });
+        }
+    });
+
+    return items;
 }
 
 const PORT = parseInt(process.env.PORT || 3000, 10);
@@ -65,7 +101,9 @@ io.on('connection', (socket) => {
         color: '#3b82f6', // Default color
         position: { x: 0, y: 0, z: 0 },
         rotation: { x: 0, y: 0, z: 0 },
-        modelData: null
+        animation: 'idle', // New: Track animation state
+        modelData: null,
+        peerId: null // New: Store PeerJS ID for audio calls
     };
 
     // Initial sync
@@ -96,11 +134,24 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle peerId sync (New)
+    socket.on('setPeerId', (peerId) => {
+        if (players[socket.id]) {
+            players[socket.id].peerId = peerId;
+            console.log(`Player ${players[socket.id].name} set PeerID: ${peerId}`);
+            socket.broadcast.emit('playerPeerUpdated', {
+                id: socket.id,
+                peerId: peerId
+            });
+        }
+    });
+
     // Handle movement
     socket.on('playerMovement', (movementData) => {
         if (players[socket.id]) {
             players[socket.id].position = movementData.position;
             players[socket.id].rotation = movementData.rotation;
+            players[socket.id].animation = movementData.animation || 'idle'; // Store animation
             socket.broadcast.emit('playerMoved', players[socket.id]);
         }
     });

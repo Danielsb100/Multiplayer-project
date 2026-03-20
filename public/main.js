@@ -66,12 +66,49 @@ const contextGlbUpload = document.getElementById('context-glb-upload');
 // Catalog State & UI
 let catalogData = { characters: [], models: [] };
 let selectedCatalogModelUrl = null;
+let selectedCatalogAnims = null; // New
 const catalogOverlay = document.getElementById('catalog-overlay');
 const catalogGrid = document.getElementById('catalog-grid');
 const catalogTitle = document.getElementById('catalog-title');
 const closeCatalogBtn = document.getElementById('close-catalog');
 const catalogCharBtn = document.getElementById('catalog-char-btn');
 const menuCatalogModels = document.getElementById('menu-catalog-models');
+
+// --- Animation State ---
+const playerAnims = {
+    mixer: null,
+    actions: {},
+    currentState: null,
+    currentAction: null
+};
+let playerState = 'idle'; // idle, walk, jump, interact
+let jumpVelocity = 0;
+const GRAVITY = -0.01;
+const JUMP_FORCE = 0.2;
+let isGrounded = true;
+
+// PeerJS & Audio State
+let peer = null;
+let localStream = null;
+let currentCall = null;
+let callDurationInterval = null;
+let secondsElapsed = 0;
+let audioContext = null;
+let analyser = null;
+let dataArray = null;
+let animationFrameId = null;
+
+// Audio DOM Elements
+const audioCallLayer = document.getElementById('audio-call-layer');
+const callingName = document.getElementById('calling-name');
+const callTimer = document.getElementById('call-timer');
+const remoteAudio = document.getElementById('remote-audio');
+const incomingModal = document.getElementById('incoming-modal');
+const incomingCaller = document.getElementById('incoming-caller');
+const btnMute = document.getElementById('btn-mute');
+const btnHangup = document.getElementById('btn-hangup');
+const btnAnswer = document.getElementById('btn-answer');
+const btnReject = document.getElementById('btn-reject');
 
 function isOverUI(event) {
     return event.target.closest('.ui-layer') || event.target.closest('.context-menu');
@@ -103,8 +140,11 @@ joinBtn.addEventListener('click', () => {
             socket.emit('modelUpdate', { buffer: selectedModelBuffer });
             loadLocalModel(selectedModelBuffer);
         } else if (selectedCatalogModelUrl) {
-            socket.emit('modelUpdate', { path: selectedCatalogModelUrl });
-            loadModelByUrl(selectedCatalogModelUrl);
+            socket.emit('modelUpdate', { 
+                path: selectedCatalogModelUrl,
+                animations: selectedCatalogAnims 
+            });
+            loadModelByUrl(selectedCatalogModelUrl, selectedCatalogAnims);
         } else if (characterMesh && characterMesh.material) {
             // Apply chosen color to default avatar
             characterMesh.material.color.set(localUserColor);
@@ -113,14 +153,18 @@ joinBtn.addEventListener('click', () => {
         playerGroup.visible = true;
         loginScreen.classList.add('hidden');
         createGametag(socket.id, name, localUserColor, true);
+
+        // Initialize PeerJS for audio calls
+        initPeer();
     }
 });
 
 catalogCharBtn.addEventListener('click', () => {
-    openCatalog('characters', (url) => {
-        selectedCatalogModelUrl = url;
+    openCatalog('characters', (item) => {
+        selectedCatalogModelUrl = item.model;
+        selectedCatalogAnims = item.animations;
         selectedModelBuffer = null;
-        loginFileName.innerText = url.split('/').pop();
+        loginFileName.innerText = item.name;
     });
 });
 
@@ -138,7 +182,7 @@ function renderCatalog(type, onSelect) {
             <span>${item.name}</span>
         `;
         div.onclick = () => {
-            onSelect(item.model);
+            onSelect(item); // Pass full item instead of just model URL
             catalogOverlay.classList.add('hidden');
         };
         catalogGrid.appendChild(div);
@@ -155,6 +199,8 @@ const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#0f172a');
 scene.fog = new THREE.FogExp2('#0f172a', 0.015);
+
+const clock = new THREE.Clock(); // For animations
 
 const frustumSize = 15;
 const aspect = window.innerWidth / window.innerHeight;
@@ -179,6 +225,34 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.target.set(0, 0, 0);
 controls.enableRotate = false; // Keep isometric view
+
+// --- Animation Manager ---
+function handleAnimationState(animObj, state, duration = 0.2, loop = true) {
+    if (!animObj.mixer || animObj.currentState === state) return;
+    
+    const nextAction = animObj.actions[state];
+    if (!nextAction) return;
+
+    if (animObj.currentAction) {
+        animObj.currentAction.fadeOut(duration);
+    }
+
+    nextAction.reset().fadeIn(duration).play();
+    nextAction.loop = loop ? THREE.LoopRepeat : THREE.LoopOnce;
+    nextAction.clampWhenFinished = !loop;
+
+    if (!loop) {
+        animObj.mixer.addEventListener('finished', function onFinished() {
+            animObj.mixer.removeEventListener('finished', onFinished);
+            // Return to previous state (usually idle or walk)
+            const fallbackState = (keys.w || keys.a || keys.s || keys.d) ? 'walk' : 'idle';
+            handleAnimationState(animObj, fallbackState);
+        });
+    }
+
+    animObj.currentAction = nextAction;
+    animObj.currentState = state;
+}
 
 // --- Multiplayer & Player Setup ---
 const remotePlayers = {}; // Stores meshes and groups
@@ -220,7 +294,28 @@ function createGametag(id, name, color, isLocal) {
     }
     const element = document.createElement('div');
     element.className = 'gametag';
-    element.innerText = name;
+    element.innerHTML = `<span>${name}</span>`;
+    
+    if (!isLocal) {
+        const callBtn = document.createElement('button');
+        callBtn.innerText = '📞';
+        callBtn.className = 'gametag-call-btn';
+        callBtn.style.marginLeft = '8px';
+        callBtn.style.background = 'none';
+        callBtn.style.border = 'none';
+        callBtn.style.cursor = 'pointer';
+        callBtn.onclick = (e) => {
+            e.stopPropagation();
+            const player = remotePlayers[id];
+            if (player && player.peerId) {
+                makeCall(player.peerId, name);
+            } else {
+                alert('Jogador ainda não configurou canal de voz.');
+            }
+        };
+        element.appendChild(callBtn);
+    }
+
     if (color) element.style.color = color;
     document.body.appendChild(element);
     gametags[id] = { element, isLocal, color };
@@ -278,6 +373,11 @@ socket.on('playerMoved', (playerInfo) => {
     if (remotePlayers[playerInfo.id]) {
         remotePlayers[playerInfo.id].group.position.copy(playerInfo.position);
         remotePlayers[playerInfo.id].group.rotation.setFromVector3(new THREE.Vector3(playerInfo.rotation.x, playerInfo.rotation.y, playerInfo.rotation.z));
+        
+        // Update remote animation
+        if (playerInfo.animation && remotePlayers[playerInfo.id].anims) {
+            handleAnimationState(remotePlayers[playerInfo.id].anims, playerInfo.animation);
+        }
     }
 });
 
@@ -293,6 +393,13 @@ socket.on('playerDisconnected', (id) => {
     removeGametag(id);
 });
 
+socket.on('playerPeerUpdated', (data) => {
+    if (remotePlayers[data.id]) {
+        remotePlayers[data.id].peerId = data.peerId;
+        console.log(`Remote player ${data.id} has PeerID: ${data.peerId}`);
+    }
+});
+
 socket.on('playerModelUpdated', (data) => {
     if (remotePlayers[data.id]) {
         const mData = data.modelData;
@@ -300,7 +407,7 @@ socket.on('playerModelUpdated', (data) => {
             if (mData.buffer) {
                 loadModelFromBuffer(mData.buffer, remotePlayers[data.id]);
             } else if (mData.path) {
-                updateRemotePlayerModelByUrl(data.id, mData.path);
+                updateRemotePlayerModelByUrl(data.id, mData.path, mData.animations);
             }
         }
     }
@@ -396,7 +503,13 @@ function addOtherPlayer(playerInfo) {
     remotePlayers[playerInfo.id] = {
         group: avatar.group,
         mainMesh: avatar.bodyMesh,
-        avatarContainer: avatar.group // Keep track of the inner group
+        avatarContainer: avatar.group, // Keep track of the inner group
+        anims: {
+            mixer: null,
+            actions: {},
+            currentState: null,
+            currentAction: null
+        }
     };
     
     createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
@@ -442,7 +555,7 @@ function loadModelFromBuffer(arrayBuffer, targetPlayerObj) {
 }
 
 // --- Input Handling ---
-const keys = { w: false, a: false, s: false, d: false };
+const keys = { w: false, a: false, s: false, d: false, ' ': false, e: false };
 const chatInput = document.getElementById('chat-input');
 const chatHistory = document.getElementById('chat-history');
 
@@ -465,12 +578,26 @@ window.addEventListener('keydown', (e) => {
         return;
     }
 
-    if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
+    const key = e.key.toLowerCase();
+    if (keys.hasOwnProperty(key)) keys[key] = true;
+    
+    // Jump trigger
+    if (e.code === 'Space') {
+        keys[' '] = true;
+        handleAnimationState(playerAnims, 'jump', 0.1, false);
+    }
+    
+    // Interact trigger
+    if (key === 'e') {
+        handleAnimationState(playerAnims, 'interact', 0.1, false);
+    }
 });
 
 window.addEventListener('keyup', (e) => {
     if (document.activeElement === usernameInput || document.activeElement === chatInput) return;
-    if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
+    const key = e.key.toLowerCase();
+    if (keys.hasOwnProperty(key)) keys[key] = false;
+    if (e.code === 'Space') keys[' '] = false;
 });
 
 // --- Lighting & Environment ---
@@ -899,6 +1026,7 @@ function updatePlayer() {
     }
 
     if (moveX !== 0 || moveZ !== 0) {
+        handleAnimationState(playerAnims, 'walk');
         const targetPos = playerGroup.position.clone();
         targetPos.x += moveX;
         targetPos.z += moveZ;
@@ -915,11 +1043,22 @@ function updatePlayer() {
         }
         playerGroup.rotation.y = Math.atan2(moveX, moveZ);
         
-        // Broadcast movement
+        // Broadcast movement with animation state
         socket.emit('playerMovement', {
             position: playerGroup.position,
-            rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z }
+            rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
+            animation: playerAnims.currentState
         });
+    } else {
+        handleAnimationState(playerAnims, 'idle');
+        // Still broadcast idle state periodically or when it changes
+        if (playerAnims.currentState === 'idle') {
+             socket.emit('playerMovement', {
+                position: playerGroup.position,
+                rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
+                animation: 'idle'
+            });
+        }
     }
 
     const cameraOffset = new THREE.Vector3(20, 20, 20);
@@ -966,6 +1105,18 @@ function updateOcclusion() {
 
 function animate() {
     requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    
+    // Update local mixer
+    if (playerAnims.mixer) playerAnims.mixer.update(delta);
+    
+    // Update remote mixers
+    for (const id in remotePlayers) {
+        if (remotePlayers[id].anims && remotePlayers[id].anims.mixer) {
+            remotePlayers[id].anims.mixer.update(delta);
+        }
+    }
+
     updatePlayer();
     updateOcclusion(); // Check for blocked view
     updateGametags();
@@ -1073,7 +1224,7 @@ function createCube(data) {
     });
 }
 
-function loadModelByUrl(url) {
+function loadModelByUrl(url, animPaths = null) {
     loadingIndicator.classList.remove('hidden');
     const gltfLoader = new GLTFLoader();
     gltfLoader.load(url, (gltf) => {
@@ -1082,6 +1233,27 @@ function loadModelByUrl(url) {
         characterMesh = gltf.scene;
         characterMesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
         playerGroup.add(characterMesh);
+
+        // Setup Mixer if animations are provided
+        if (animPaths) {
+            playerAnims.mixer = new THREE.AnimationMixer(characterMesh);
+            playerAnims.actions = {};
+            playerAnims.currentState = null;
+
+            // Load each animation
+            Object.entries(animPaths).forEach(([name, path]) => {
+                gltfLoader.load(path, (animGltf) => {
+                    const clip = animGltf.animations[0];
+                    if (clip) {
+                        const action = playerAnims.mixer.clipAction(clip);
+                        playerAnims.actions[name] = action;
+                        if (name === 'idle') handleAnimationState(playerAnims, 'idle');
+                    }
+                });
+            });
+        } else {
+            playerAnims.mixer = null;
+        }
 
         const box = new THREE.Box3().setFromObject(characterMesh);
         const center = box.getCenter(new THREE.Vector3());
@@ -1094,7 +1266,7 @@ function loadModelByUrl(url) {
     });
 }
 
-function updateRemotePlayerModelByUrl(id, url) {
+function updateRemotePlayerModelByUrl(id, url, animPaths = null) {
     const player = remotePlayers[id];
     if (!player) return;
     const gltfLoader = new GLTFLoader();
@@ -1103,6 +1275,24 @@ function updateRemotePlayerModelByUrl(id, url) {
         const mesh = gltf.scene;
         mesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
         player.group.add(mesh);
+
+        // Setup Mixer for remote
+        if (animPaths) {
+            player.anims.mixer = new THREE.AnimationMixer(mesh);
+            player.anims.actions = {};
+            player.anims.currentState = null;
+
+            Object.entries(animPaths).forEach(([name, path]) => {
+                gltfLoader.load(path, (animGltf) => {
+                    const clip = animGltf.animations[0];
+                    if (clip) {
+                        player.anims.actions[name] = player.anims.mixer.clipAction(clip);
+                        if (name === 'idle') handleAnimationState(player.anims, 'idle');
+                    }
+                });
+            });
+        }
+
         const box = new THREE.Box3().setFromObject(mesh);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
@@ -1142,3 +1332,167 @@ function createPlacedModel(data) {
         gltfLoader.load(data.modelPath, onParsed);
     }
 }
+
+// --- 4. PeerJS & P2P Audio Logic ---
+
+async function initPeer() {
+    // Get microphone access
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        console.log('Microphone Ready');
+    } catch (err) {
+        console.error('Microphone access denied:', err);
+        return;
+    }
+
+    // Official audio-call-app URL on Railway
+    const AUDIO_SERVER_HOST = 'audio-call-app-production.up.railway.app'; 
+
+    peer = new Peer({
+        host: AUDIO_SERVER_HOST,
+        port: 443,
+        path: '/peerjs',
+        secure: true
+    });
+
+    peer.on('open', (id) => {
+        console.log('PeerJS Connected, ID:', id);
+        socket.emit('setPeerId', id);
+    });
+
+    peer.on('call', (call) => {
+        if (currentCall) {
+            call.answer();
+            call.close();
+            return;
+        }
+
+        incomingCaller.innerText = call.peer;
+        incomingModal.classList.remove('hidden');
+
+        btnAnswer.onclick = () => {
+            incomingModal.classList.add('hidden');
+            answerCall(call);
+        };
+
+        btnReject.onclick = () => {
+            incomingModal.classList.add('hidden');
+            call.answer();
+            call.close();
+        };
+    });
+
+    peer.on('error', (err) => {
+        console.error('Peer error:', err.type);
+    });
+}
+
+function makeCall(targetPeerId, name) {
+    if (!localStream) return alert('Microfone não detectado.');
+
+    callingName.innerText = name;
+    audioCallLayer.classList.remove('hidden');
+
+    currentCall = peer.call(targetPeerId, localStream);
+    setupCallListeners(currentCall);
+    startTimer();
+}
+
+function answerCall(call) {
+    currentCall = call;
+    currentCall.answer(localStream);
+    callingName.innerText = call.peer;
+    audioCallLayer.classList.remove('hidden');
+
+    setupCallListeners(currentCall);
+    startTimer();
+}
+
+function setupCallListeners(call) {
+    call.on('stream', (remoteStream) => {
+        remoteAudio.srcObject = remoteStream;
+        setupVisualizer(remoteStream);
+    });
+
+    call.on('close', () => {
+        resetAudioUI();
+    });
+}
+
+function setupVisualizer(stream) {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioContext.state === 'suspended') audioContext.resume();
+
+    const source = audioContext.createMediaStreamSource(stream);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 32;
+    source.connect(analyser);
+
+    const bufferLength = analyser.frequencyBinCount;
+    dataArray = new Uint8Array(bufferLength);
+    const bars = document.querySelectorAll('.bar');
+
+    function draw() {
+        if (!currentCall) {
+            cancelAnimationFrame(animationFrameId);
+            return;
+        }
+        animationFrameId = requestAnimationFrame(draw);
+        analyser.getByteFrequencyData(dataArray);
+
+        bars.forEach((bar, index) => {
+            const val = dataArray[index] || 0;
+            const height = Math.max(5, (val / 255) * 25);
+            bar.style.height = `${height}px`;
+            bar.style.opacity = 0.3 + (val / 255) * 0.7;
+        });
+    }
+    draw();
+}
+
+function resetAudioUI() {
+    stopTimer();
+    audioCallLayer.classList.add('hidden');
+    if (currentCall) currentCall = null;
+    remoteAudio.srcObject = null;
+    
+    const bars = document.querySelectorAll('.bar');
+    bars.forEach(bar => {
+        bar.style.height = '5px';
+        bar.style.opacity = 0.3;
+    });
+}
+
+function startTimer() {
+    secondsElapsed = 0;
+    callTimer.innerText = '00:00';
+    callDurationInterval = setInterval(() => {
+        secondsElapsed++;
+        const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+        const secs = String(secondsElapsed % 60).padStart(2, '0');
+        callTimer.innerText = `${mins}:${secs}`;
+    }, 1000);
+}
+
+function stopTimer() {
+    clearInterval(callDurationInterval);
+}
+
+btnHangup.onclick = () => {
+    if (currentCall) currentCall.close();
+    resetAudioUI();
+};
+
+btnMute.onclick = () => {
+    const enabled = localStream.getAudioTracks()[0].enabled;
+    if (enabled) {
+        localStream.getAudioTracks()[0].enabled = false;
+        btnMute.innerText = '🔇';
+    } else {
+        localStream.getAudioTracks()[0].enabled = true;
+        btnMute.innerText = '🎤';
+    }
+};
+

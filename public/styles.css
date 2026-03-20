@@ -686,3 +686,141 @@ input[type="file"] {
     border-color: white;
     box-shadow: 0 0 15px currentColor;
 }
+/* --- Audio Call UI (New) --- */
+#audio-call-layer {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    z-index: 100;
+}
+
+.audio-call-card {
+    padding: 1.5rem;
+    border-radius: 20px;
+    width: 280px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    animation: slideIn 0.4s ease-out;
+}
+
+.audio-call-card h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.call-timer {
+    font-size: 1.5rem;
+    font-weight: 300;
+    font-family: 'Outfit', sans-serif;
+}
+
+.audio-visualizer {
+    display: flex;
+    gap: 4px;
+    height: 30px;
+    align-items: flex-end;
+}
+
+.bar {
+    width: 6px;
+    background: var(--accent-color);
+    border-radius: 3px;
+    height: 5px;
+}
+
+/* Reusing animations from audio app */
+@keyframes dance {
+    from { height: 5px; opacity: 0.3; }
+    to { height: 25px; opacity: 1; }
+}
+
+.call-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.call-actions button {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    transition: all 0.2s;
+}
+
+#btn-mute {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+#btn-hangup {
+    background: #ef4444;
+    color: white;
+}
+
+#btn-hangup:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+}
+
+/* Incoming Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 200;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    padding: 2rem;
+    border-radius: 24px;
+    width: 320px;
+    text-align: center;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.modal-actions button {
+    flex: 1;
+    padding: 0.75rem;
+    border-radius: 12px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.success-btn {
+    background: #10b981;
+    color: white;
+}
+
+.danger-btn {
+    background: #ef4444;
+    color: white;
+}
+
+.glass {
+    background: rgba(30, 41, 59, 0.7);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+}

@@ -20,6 +20,7 @@
             }
         }
     </script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
     <!-- Cursor customizado (Círculo Vermelho) -->
@@ -133,6 +134,42 @@
 
     <!-- Biblioteca Socket.io para comunicação em tempo real -->
     <script src="/socket.io/socket.io.js"></script>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio call UI Elements (New) -->
+    <div id="audio-call-layer" class="ui-layer hidden">
+        <div class="audio-call-card glass">
+            <h2 id="calling-name">Chamando...</h2>
+            <div class="call-timer">00:00</div>
+            <div class="audio-visualizer">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+            <div class="call-actions">
+                <button id="btn-mute" class="secondary-btn">🎤</button>
+                <button id="btn-hangup" class="danger-btn">✖</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Incoming Call Notification (New) -->
+    <div id="incoming-modal" class="modal hidden ui-layer">
+        <div class="modal-content glass">
+            <h3>Chamada de <span id="incoming-caller">...</span></h3>
+            <div class="modal-actions">
+                <button id="btn-answer" class="success-btn">Atender</button>
+                <button id="btn-reject" class="danger-btn">Recusar</button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="remote-audio" autoplay></audio>
 
     <!-- Catálogo de Assets (Overlay) -->
     <div id="catalog-overlay" class="hidden ui-layer">
