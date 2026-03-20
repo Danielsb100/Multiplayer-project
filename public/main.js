@@ -58,6 +58,10 @@ loginColorOptions.forEach(opt => {
 let isMenuOpen = false;
 let contextMenuTarget = null;
 let contextMenuPoint = new THREE.Vector3();
+
+// --- Collision Structures ---
+const wallBoxes = [];
+const preciseColliders = [];
 const contextMenu = document.getElementById('context-menu');
 const menuGroundSection = document.getElementById('menu-ground-section');
 const menuCubeSection = document.getElementById('menu-cube-section');
@@ -626,10 +630,21 @@ function removeOptimisticObject(id) {
     });
 
     // 3. Thorough cleanup of wallBoxes: remove ALL optimistic entries
-    wallBoxes = wallBoxes.filter(box => {
+    for (let i = wallBoxes.length - 1; i >= 0; i--) {
+        const box = wallBoxes[i];
         const rId = box.relatedId ? box.relatedId.toString() : '';
-        return !rId.startsWith('opt_') && rId !== id;
-    });
+        if (rId.startsWith('opt_') || rId === id) {
+            wallBoxes.splice(i, 1);
+        }
+    }
+    
+    // 4. Cleanup preciseColliders
+    for (let i = preciseColliders.length - 1; i >= 0; i--) {
+        const col = preciseColliders[i];
+        if (col.userData && col.userData.id && (col.userData.id.toString().startsWith('opt_') || col.userData.id.toString() === id)) {
+            preciseColliders.splice(i, 1);
+        }
+    }
 }
 
 socket.on('objectDeleted', (id) => {
@@ -641,12 +656,18 @@ socket.on('objectDeleted', (id) => {
     }
     
     // 2. THOROUGH cleanup: remove the specific box from collisions
-    wallBoxes = wallBoxes.filter(box => {
-        const rId = box.relatedId ? box.relatedId.toString() : '';
-        return rId !== id && !rId.startsWith('opt_' + id);
-    });
+    for (let i = wallBoxes.length - 1; i >= 0; i--) {
+        if (wallBoxes[i].relatedId == id) wallBoxes.splice(i, 1);
+    }
 
-    // 3. Clean up the mapping
+    // 3. Cleanup preciseColliders
+    for (let i = preciseColliders.length - 1; i >= 0; i--) {
+        if (preciseColliders[i].userData && preciseColliders[i].userData.id == id) {
+            preciseColliders.splice(i, 1);
+        }
+    }
+    
+    // 4. Clean up the mapping
     delete idToUuid[id];
 });
 
@@ -1250,11 +1271,12 @@ const wall3 = new THREE.Mesh(new THREE.BoxGeometry(1, 4, 10), wallMat);
 wall3.position.set(5, 2, -2.5); wall3.scale.set(1, 1, 0.5); wall3.castShadow = true; wall3.receiveShadow = true;
 
 wallsGroup.add(wall1, wall2, wall3);
-let wallBoxes = [];
-wallsGroup.children.forEach(wall => {
-    wall.updateMatrixWorld();
-    wallBoxes.push(new THREE.Box3().setFromObject(wall));
-});
+    wall1.updateMatrixWorld();
+    wallBoxes.push(new THREE.Box3().setFromObject(wall1));
+    wall2.updateMatrixWorld();
+    wallBoxes.push(new THREE.Box3().setFromObject(wall2));
+    wall3.updateMatrixWorld();
+    wallBoxes.push(new THREE.Box3().setFromObject(wall3));
 
 function getSurfaceHeight(xzPos) {
     let maxHeight = 0;
@@ -1291,14 +1313,46 @@ function checkCollision(targetPosition) {
     const playerCenter = targetPosition.clone().add(new THREE.Vector3(0, 0.9, 0));
     const playerBox = new THREE.Box3().setFromCenterAndSize(playerCenter, playerBoxSize);
     
-    // Check for "wall" collision (only if target height is lower than box.max.y - step)
+    // 1. Check for "wall" collision (Cubes and Legacy Models)
     for (const wallBox of wallBoxes) {
         if (playerBox.intersectsBox(wallBox)) {
-            // If we are significantly below the top of the box, it's a wall
             const feetY = targetPosition.y;
-            if (feetY < wallBox.max.y - 0.5) return true; // 0.5 is step height
+            if (feetY < wallBox.max.y - 0.5) return true;
         }
     }
+    
+    // 2. PRECISE MESH COLLISION (Structures)
+    if (preciseColliders.length > 0) {
+        const moveDir = targetPosition.clone().sub(playerGroup.position);
+        const moveDist = moveDir.length();
+        if (moveDist > 0.001) {
+            moveDir.normalize();
+            
+            // Multiple rays to cover the player's width
+            const playerRadius = 0.2;
+            const rayOffsets = [
+                new THREE.Vector3(0, 0.2, 0),        // Base center
+                new THREE.Vector3(playerRadius, 0.2, playerRadius),
+                new THREE.Vector3(-playerRadius, 0.2, playerRadius),
+                new THREE.Vector3(playerRadius, 0.2, -playerRadius),
+                new THREE.Vector3(-playerRadius, 0.2, -playerRadius),
+                new THREE.Vector3(0, 1.0, 0),        // Waist height
+                new THREE.Vector3(0, 1.7, 0)         // Head level
+            ];
+
+            for (const offset of rayOffsets) {
+                const rayStart = playerGroup.position.clone().add(offset);
+                raycaster.set(rayStart, moveDir);
+                const hits = raycaster.intersectObjects(preciseColliders, true);
+                
+                // If we hit a collision mesh within the step distance
+                if (hits.length > 0 && hits[0].distance <= moveDist + 0.05) {
+                    return true;
+                }
+            }
+        }
+    }
+    
     return false;
 }
 
@@ -1727,20 +1781,18 @@ function createPlacedModel(data) {
                 hasCollisionMeshes = true;
                 child.visible = false; // Hide collision helpers
                 
-                // Extract bounding boxes from all children of the collision node
+                // Add the mesh itself to preciseColliders for raycasting
                 child.traverse(c => {
                     if (c.isMesh) {
                         c.visible = false;
-                        c.updateMatrixWorld(true);
-                        const box = new THREE.Box3().setFromObject(c);
-                        box.relatedId = data.id;
-                        wallBoxes.push(box);
+                        c.userData.id = data.id; // Mark for deletion cleanup
+                        preciseColliders.push(c);
                     }
                 });
             }
         });
 
-        // Fallback to whole-object collision if no 'collision' mesh found
+        // Fallback to whole-object collision ONLY if no 'collision' mesh found
         if (!hasCollisionMeshes) {
             const modelBox = new THREE.Box3().setFromObject(model);
             modelBox.relatedId = data.id;
