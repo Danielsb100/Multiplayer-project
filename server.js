@@ -115,7 +115,8 @@ io.on('connection', (socket) => {
     // Send Catalog Data
     socket.emit('catalogData', {
         characters: getCatalogItems('characters'),
-        models: getCatalogItems('models')
+        models: getCatalogItems('models'),
+        structures: getCatalogItems('structures')
     });
 
     // Broadcast the new player
@@ -207,7 +208,8 @@ io.on('connection', (socket) => {
             position: modelData.position,
             rotation: modelData.rotation || { x: 0, y: 0, z: 0 },
             modelBuffer: modelData.modelBuffer || null,
-            modelPath: modelData.modelPath || null
+            modelPath: modelData.modelPath || null,
+            isStructure: modelData.isStructure || false
         };
         placedModels.push(newModel);
         io.emit('modelAdded', newModel);

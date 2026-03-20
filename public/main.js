@@ -73,6 +73,7 @@ const catalogGrid = document.getElementById('catalog-grid');
 const catalogTitle = document.getElementById('catalog-title');
 const closeCatalogBtn = document.getElementById('close-catalog');
 const catalogCharBtn = document.getElementById('catalog-char-btn');
+const catalogStructBtn = document.getElementById('catalog-struct-btn'); // New
 const menuCatalogModels = document.getElementById('menu-catalog-models');
 
 // --- Animation State ---
@@ -98,6 +99,7 @@ const JUMP_HEIGHT = 1.5;
 let peer = null;
 let localStream = null;
 let currentCall = null;
+const peerIdToName = {}; // Map peerId -> name
 let callDurationInterval = null;
 let secondsElapsed = 0;
 let audioContext = null;
@@ -210,11 +212,25 @@ catalogCharBtn.addEventListener('click', () => {
     });
 });
 
+catalogStructBtn.addEventListener('click', () => {
+    openCatalog('structures', (item) => {
+        // Just for visual preview in login if they want, 
+        // but structures are usually for placement via context menu.
+        selectedCatalogModelUrl = item.model;
+        selectedCatalogAnims = null;
+        selectedModelBuffer = null;
+        loginFileName.innerText = "[Estrutura] " + item.name;
+    });
+});
+
 closeCatalogBtn.addEventListener('click', () => catalogOverlay.classList.add('hidden'));
 
 function renderCatalog(type, onSelect) {
     catalogGrid.innerHTML = '';
-    catalogTitle.innerText = type === 'characters' ? 'Escolher Avatar' : 'Catálogo de Objetos';
+    
+    if (type === 'characters') catalogTitle.innerText = 'Escolher Avatar';
+    else if (type === 'structures') catalogTitle.innerText = 'Elementos de Estrutura';
+    else catalogTitle.innerText = 'Catálogo de Objetos';
     
     catalogData[type].forEach(item => {
         const div = document.createElement('div');
@@ -486,6 +502,7 @@ socket.on('currentPlayers', (players) => {
     Object.keys(players).forEach((id) => {
         if (id === socket.id) return;
         addOtherPlayer(players[id]);
+        if (players[id].peerId) peerIdToName[players[id].peerId] = players[id].name;
     });
     updatePlayerList();
 });
@@ -561,6 +578,7 @@ socket.on('playerDisconnected', (id) => {
 socket.on('playerPeerUpdated', (data) => {
     if (remotePlayers[data.id]) {
         remotePlayers[data.id].peerId = data.peerId;
+        peerIdToName[data.peerId] = remotePlayers[data.id].name || 'Player';
         console.log(`Remote player ${data.id} has PeerID: ${data.peerId}`);
         updatePlayerList();
     }
@@ -916,27 +934,60 @@ window.addEventListener('contextmenu', (event) => {
 });
 
 document.getElementById('menu-catalog-models').addEventListener('click', () => {
-    openCatalog('models', (url) => {
+    openCatalog('models', (item) => {
         const tempId = 'opt_model_' + Date.now();
         socket.emit('placeModel', {
-            modelPath: url,
-            position: contextMenuPoint.clone()
+            modelPath: item.model,
+            position: contextMenuPoint.clone(),
+            isStructure: false
         });
         
         // Trigger interact animation
-        handleAnimationState(playerAnims, 'interact', 0.1, false);
+        triggerInteract(playerAnims, contextMenuPoint);
+        didInteractThisFrame = true;
         
         // Optimistic UI for catalog model
         createPlacedModel({
             id: tempId,
-            modelPath: url,
+            modelPath: item.model,
             position: contextMenuPoint.clone(),
             rotation: { x: 0, y: 0, z: 0 },
-            isOptimistic: true
+            isOptimistic: true,
+            isStructure: false
         });
     });
     closeContextMenu();
 });
+
+// Add Structures to Context Menu
+const menuCatalogStructs = document.createElement('div');
+menuCatalogStructs.className = 'menu-item';
+menuCatalogStructs.innerHTML = '🏗️ Estruturas (Paredes/Escadas)';
+document.getElementById('menu-ground-section').appendChild(menuCatalogStructs);
+
+menuCatalogStructs.onclick = () => {
+    openCatalog('structures', (item) => {
+        const tempId = 'opt_struct_' + Date.now();
+        socket.emit('placeModel', {
+            modelPath: item.model,
+            position: contextMenuPoint.clone(),
+            isStructure: true
+        });
+        
+        triggerInteract(playerAnims, contextMenuPoint);
+        didInteractThisFrame = true;
+        
+        createPlacedModel({
+            id: tempId,
+            modelPath: item.model,
+            position: contextMenuPoint.clone(),
+            rotation: { x: 0, y: 0, z: 0 },
+            isOptimistic: true,
+            isStructure: true
+        });
+    });
+    closeContextMenu();
+};
 
 // Close menu on click
 window.addEventListener('mousedown', (e) => {
@@ -1211,6 +1262,21 @@ wallsGroup.children.forEach(wall => {
     wallBoxes.push(new THREE.Box3().setFromObject(wall));
 });
 
+function getSurfaceHeight(xzPos) {
+    let maxHeight = 0;
+    const testPoint = new THREE.Vector3(xzPos.x, 10, xzPos.z); // Start high
+    const dummyBox = new THREE.Box3().setFromCenterAndSize(testPoint, new THREE.Vector3(0.1, 20, 0.1));
+    
+    for (const box of wallBoxes) {
+        // Simplified XZ check
+        if (xzPos.x >= box.min.x && xzPos.x <= box.max.x && 
+            xzPos.z >= box.min.z && xzPos.z <= box.max.z) {
+            if (box.max.y > maxHeight) maxHeight = box.max.y;
+        }
+    }
+    return maxHeight;
+}
+
 window.addEventListener('resize', () => {
     const aspect = window.innerWidth / window.innerHeight;
     camera.left = -frustumSize * aspect / 2;
@@ -1222,18 +1288,41 @@ window.addEventListener('resize', () => {
 });
 
 // --- Movement Logic ---
-let moveSpeed = 0.05; // Slightly faster
+let moveSpeed = 0.05; 
+let currentSurfaceHeight = 0;
 
 function checkCollision(targetPosition) {
     const playerBox = new THREE.Box3().setFromObject(playerGroup);
     const offset = targetPosition.clone().sub(playerGroup.position);
     playerBox.translate(offset);
-    for (const wallBox of wallBoxes) if (playerBox.intersectsBox(wallBox)) return true;
+    
+    // Check for "wall" collision (only if target height is lower than box.max.y - step)
+    for (const wallBox of wallBoxes) {
+        if (playerBox.intersectsBox(wallBox)) {
+            // If we are significantly below the top of the box, it's a wall
+            const feetY = targetPosition.y;
+            if (feetY < wallBox.max.y - 0.5) return true; // 0.5 is step height
+        }
+    }
     return false;
 }
 
 function updatePlayer(delta) {
     if (localUsername === '' || isMenuOpen) return;
+
+    // --- Ground/Surface Logic ---
+    const targetSurface = getSurfaceHeight(playerGroup.position);
+    
+    // Smooth step-up or gravity
+    if (!isJumping) {
+        // If we are on a platform, snap to it or fall towards it
+        if (playerGroup.position.y < targetSurface) {
+            playerGroup.position.y = targetSurface; // Instant step-up for now
+        } else if (playerGroup.position.y > targetSurface) {
+            playerGroup.position.y = Math.max(targetSurface, playerGroup.position.y - 0.1); // Gravity fall
+        }
+        currentSurfaceHeight = targetSurface;
+    }
 
     // --- Parabolic Jump Handling ---
     if (isJumping) {
@@ -1241,7 +1330,8 @@ function updatePlayer(delta) {
         let progress = Math.min(jumpTime / JUMP_DURATION, 1);
         let parabola = Math.sin(progress * Math.PI);
         
-        playerGroup.position.y = parabola * JUMP_HEIGHT;
+        // Jump starts relative to the surface height at the start of the jump
+        playerGroup.position.y = currentSurfaceHeight + (parabola * JUMP_HEIGHT);
         
         // Modulate animation weight
         if (playerAnims.actions['jump']) {
@@ -1250,11 +1340,15 @@ function updatePlayer(delta) {
         
         if (progress >= 1) {
             isJumping = false;
-            playerGroup.position.y = 0;
+            playerGroup.position.y = targetSurface; // Land on current surface
+            currentSurfaceHeight = targetSurface;
             if (playerAnims.actions['jump']) {
                 playerAnims.actions['jump'].fadeOut(0.2);
             }
         }
+        
+        // CRITICAL: Emit even if not moving horizontally during jump
+        broadcastMovement();
     }
 
     let moveX = 0, moveZ = 0;
@@ -1285,45 +1379,44 @@ function updatePlayer(delta) {
             }
         }
         playerGroup.rotation.y = Math.atan2(moveX, moveZ);
-        
-        // Broadcast movement with animation state and jump/interact flags
-        socket.emit('playerMovement', {
-            position: playerGroup.position,
-            rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
-            animation: playerAnims.currentState,
-            isJumping: isJumping,
-            jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
-            didInteract: didInteractThisFrame,
-            interactionPoint: interactionPointGlobal
-        });
-        didInteractThisFrame = false; // Reset for next emit
+        broadcastMovement();
     } else {
         handleAnimationState(playerAnims, 'idle');
-        socket.emit('playerMovement', {
-            position: playerGroup.position,
-            rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
-            animation: 'idle',
-            isJumping: isJumping,
-            jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
-            didInteract: didInteractThisFrame,
-            interactionPoint: interactionPointGlobal
-        });
-        didInteractThisFrame = false;
+        broadcastMovement();
     }
-
+    
+    // Camera follow logic (moved back inside updatePlayer)
     const cameraOffset = new THREE.Vector3(20, 20, 20);
     const targetCamPos = playerGroup.position.clone().add(cameraOffset);
     camera.position.lerp(targetCamPos, 0.1);
     controls.target.set(playerGroup.position.x, playerGroup.position.y, playerGroup.position.z);
 }
 
+function broadcastMovement() {
+    socket.emit('playerMovement', {
+        position: playerGroup.position,
+        rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
+        animation: playerAnims.currentState,
+        isJumping: isJumping,
+        jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
+        didInteract: didInteractThisFrame,
+        interactionPoint: interactionPointGlobal
+    });
+    didInteractThisFrame = false; // Reset for next emit
+}
+
+
 function updateOcclusion() {
     if (!playerGroup) return;
 
-    // 1. Reset all cubes to opaque
+    // 1. Reset all transparent objects
     scene.traverse(obj => {
-        if (obj.isMesh && obj.userData && obj.userData.id && obj.userData.id.startsWith('cube_')) {
-            obj.material.opacity = 1.0;
+        if (obj.isMesh && obj.material && obj.material.transparent) {
+            // Restore opacity if it was changed by occlusion
+            if (obj.userData.wasOccluded) {
+                obj.material.opacity = 1.0;
+                obj.userData.wasOccluded = false;
+            }
         }
     });
 
@@ -1343,12 +1436,21 @@ function updateOcclusion() {
         if (hit.distance >= distanceToPlayer - 0.5) break; 
 
         let obj = hit.object;
-        while (obj && obj !== scene) {
-            if (obj.userData && obj.userData.id && obj.userData.id.startsWith('cube_')) {
-                obj.material.opacity = 0.2;
+        // Check if this object should be occluded (cubes or structures)
+        let root = obj;
+        while (root && root !== scene) {
+            if (root.userData && root.userData.id && (root.userData.id.startsWith('cube_') || root.userData.isStructure)) {
+                // Apply transparency to all meshes in this root
+                root.traverse(child => {
+                    if (child.isMesh && child.material) {
+                        child.material.transparent = true;
+                        child.material.opacity = 0.2;
+                        child.userData.wasOccluded = true;
+                    }
+                });
                 break; 
             }
-            obj = obj.parent;
+            root = root.parent;
         }
     }
 }
@@ -1609,20 +1711,46 @@ function createPlacedModel(data) {
             if (child.isMesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
+                // Ensure materials support transparency
+                if (child.material) child.material.transparent = true;
             }
         });
         model.position.set(data.position.x, data.position.y, data.position.z);
         model.rotation.set(data.rotation ? data.rotation.x : 0, data.rotation ? data.rotation.y : 0, data.rotation ? data.rotation.z : 0);
         model.userData.id = data.id;
         model.userData.isOptimistic = data.isOptimistic || false;
+        model.userData.isStructure = data.isStructure || false; // Important for occlusion
         idToUuid[data.id] = model.uuid;
         scene.add(model);
 
-        // Add to collision
-        model.updateMatrixWorld();
-        const modelBox = new THREE.Box3().setFromObject(model);
-        modelBox.relatedId = data.id;
-        wallBoxes.push(modelBox);
+        model.updateMatrixWorld(true);
+        
+        // --- Custom Collision Mesh Extraction ---
+        let hasCollisionMeshes = false;
+        model.traverse(child => {
+            if (child.name.toLowerCase().includes('collision')) {
+                hasCollisionMeshes = true;
+                child.visible = false; // Hide collision helpers
+                
+                // Extract bounding boxes from all children of the collision node
+                child.traverse(c => {
+                    if (c.isMesh) {
+                        c.visible = false;
+                        c.updateMatrixWorld(true);
+                        const box = new THREE.Box3().setFromObject(c);
+                        box.relatedId = data.id;
+                        wallBoxes.push(box);
+                    }
+                });
+            }
+        });
+
+        // Fallback to whole-object collision if no 'collision' mesh found
+        if (!hasCollisionMeshes) {
+            const modelBox = new THREE.Box3().setFromObject(model);
+            modelBox.relatedId = data.id;
+            wallBoxes.push(modelBox);
+        }
     };
 
     if (data.modelBuffer) {
@@ -1666,7 +1794,8 @@ async function initPeer() {
             return;
         }
 
-        incomingCaller.innerText = call.peer;
+        const callerName = peerIdToName[call.peer] || 'Desconhecido';
+        incomingCaller.innerText = callerName;
         incomingModal.classList.remove('hidden');
 
         btnAnswer.onclick = () => {
