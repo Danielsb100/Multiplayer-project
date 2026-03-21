@@ -625,32 +625,28 @@ socket.on('modelAdded', (model) => {
 function removeOptimisticObject(id) {
     if (id) abortedLoads.add(id);
     
-    const toRemove = [];
+    // Find objects by ID directly instead of traversing the whole scene
+    const targets = [];
     scene.traverse(obj => {
-        if (obj.userData && (obj.userData.isOptimistic || (id && obj.userData.id === id))) {
-            toRemove.push(obj);
+        if (obj.userData && obj.userData.id === id) {
+            targets.push(obj);
         }
     });
 
-    toRemove.forEach(obj => {
-        const objId = obj.userData.id;
-        if (objId) abortedLoads.add(objId);
-        
+    targets.forEach(obj => {
         // 1. CLEANUP collisions from arrays
         for (let i = wallBoxes.length - 1; i >= 0; i--) {
-            if (wallBoxes[i].relatedId == objId) wallBoxes.splice(i, 1);
+            if (wallBoxes[i].relatedId == id) wallBoxes.splice(i, 1);
         }
         for (let i = preciseColliders.length - 1; i >= 0; i--) {
-            if (preciseColliders[i].userData && preciseColliders[i].userData.id == objId) {
+            if (preciseColliders[i].userData && preciseColliders[i].userData.id == id) {
                 preciseColliders.splice(i, 1);
             }
         }
         
         // 2. Remove from scene and mapping
         scene.remove(obj);
-        for (const key in idToUuid) {
-            if (idToUuid[key] === obj.uuid) delete idToUuid[key];
-        }
+        delete idToUuid[id];
     });
 }
 
@@ -1363,18 +1359,21 @@ function getSurfaceHeight(xzPos) {
     
     // 2. Precise Mesh Check (Ramps, Stairs, Slopes)
     if (preciseColliders.length > 0) {
-        // Step Height Logic: Only detect surfaces within [foot-level, foot-level + 0.4]
-        // This prevents hitting ceilings/lintels but allows climbing steps.
-        const currentY = targetPosition ? targetPosition.y : 0;
-        const rayOrigin = new THREE.Vector3(xzPos.x, currentY + 0.4, xzPos.z);
+        // Cast from current feet + 0.6 downwards. 
+        // 0.6 allows stepping up standard structural heights (stair steps).
+        const originY = (targetPosition ? targetPosition.y : 0) + 0.6;
+        const rayOrigin = new THREE.Vector3(xzPos.x, originY, xzPos.z);
         const rayDir = new THREE.Vector3(0, -1, 0);
         raycaster.set(rayOrigin, rayDir);
         
+        // Specifically update world matrices before raycasting to respect rotation
+        preciseColliders.forEach(c => c.updateMatrixWorld(true));
+        
         const hits = raycaster.intersectObjects(preciseColliders, true);
         if (hits.length > 0) {
-            // Find the highest point hit below our ray origin
             const hitY = hits[0].point.y;
-            if (hitY > maxHeight) maxHeight = hitY;
+            // Floor safety: don't snap to things too high above
+            if (hitY > maxHeight && hitY <= originY) maxHeight = hitY;
         }
     }
     
@@ -1869,11 +1868,20 @@ function createPlacedModel(data) {
         model.userData.id = data.id;
         model.userData.isOptimistic = data.isOptimistic || false;
         model.userData.isStructure = data.isStructure || false; // Important for occlusion
-        
+        // Springboard: If this model ALREADY exists at this ID, ignore it (prevents race condition)
+        if (idToUuid[data.id]) {
+            const oldObj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
+            if (oldObj && !data.isOptimistic) {
+                // If the real one arrived, but the optimistic one is still here, kill the optimistic one
+                if (oldObj.userData.isOptimistic) scene.remove(oldObj);
+            }
+        }
+
         model.updateMatrixWorld(true);
         const placementBox = new THREE.Box3().setFromObject(model);
         if (data.isOptimistic && checkOverlap(placementBox, data.id)) {
             alert("Não é possível colocar: Espaço ocupado!");
+            activeLoads.delete(data.id);
             return;
         }
 
@@ -1912,8 +1920,10 @@ function createPlacedModel(data) {
             }
         });
 
-        // Fallback to whole-object collision ONLY if no 'collision' mesh found
-        if (!hasCollisionMeshes) {
+        // --- IMPORTANT CHANGE ---
+        // Structures ONLY use preciseColliders (Mesh) for collision.
+        // We do NOT add them to wallBoxes (AABB) to avoid "Giant Square" 45° issues.
+        if (!hasCollisionMeshes && !data.isStructure) {
             const modelBox = new THREE.Box3().setFromObject(model);
             modelBox.relatedId = data.id;
             wallBoxes.push(modelBox);
