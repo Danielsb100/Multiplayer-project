@@ -62,6 +62,16 @@ let contextMenuPoint = new THREE.Vector3();
 // --- Collision Structures ---
 const wallBoxes = [];
 const preciseColliders = [];
+const GRID_SIZE = 1.0; // 1 meter grid as requested
+
+function snapToGrid(v) {
+    if (!v) return v;
+    return new THREE.Vector3(
+        Math.round(v.x / GRID_SIZE) * GRID_SIZE,
+        v.y,
+        Math.round(v.z / GRID_SIZE) * GRID_SIZE
+    );
+}
 const contextMenu = document.getElementById('context-menu');
 const menuGroundSection = document.getElementById('menu-ground-section');
 const menuCubeSection = document.getElementById('menu-cube-section');
@@ -674,8 +684,29 @@ socket.on('objectDeleted', (id) => {
 socket.on('objectUpdated', (data) => {
     const obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
     if (obj) {
-        if (data.color) obj.material.color.set(data.color);
-        if (data.rotation) obj.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+        if (data.color) {
+            // Support both cubes (simple mat) and models (traversal)
+            if (obj.material) {
+                obj.material.color.set(data.color);
+            } else {
+                obj.traverse(child => {
+                    if (child.isMesh && child.material && !child.name.toLowerCase().includes('collision')) {
+                        child.material.color.set(data.color);
+                    }
+                });
+            }
+        }
+        if (data.rotation) {
+            obj.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+            obj.updateMatrixWorld(true);
+            
+            // Sync wallBoxes for the remote object too
+            for (const box of wallBoxes) {
+                if (box.relatedId == data.id) {
+                    box.setFromObject(obj);
+                }
+            }
+        }
     }
 });
 
@@ -919,7 +950,7 @@ window.addEventListener('contextmenu', (event) => {
         const finalHit = hit || groundHit;
         if (finalHit) {
             contextMenuTarget = finalHit.object;
-            contextMenuPoint.copy(finalHit.point);
+            contextMenuPoint.copy(snapToGrid(finalHit.point)); // Apply Grid Snap
 
             // Position menu
             contextMenu.style.left = event.clientX + 'px';
@@ -1122,6 +1153,15 @@ document.getElementById('menu-rotate-45-left').addEventListener('click', () => {
 
 function rotateObject(target, angle) {
     target.rotation.y += angle;
+    target.updateMatrixWorld(true);
+    
+    // Update wallBoxes for this ID
+    for (const box of wallBoxes) {
+        if (box.relatedId == target.userData.id) {
+            box.setFromObject(target);
+        }
+    }
+    
     socket.emit('updateObjectRotation', {
         id: target.userData.id,
         rotation: { x: target.rotation.x, y: target.rotation.y, z: target.rotation.z }
@@ -1153,7 +1193,7 @@ window.addEventListener('mousedown', (event) => {
 
         if (intersects.length > 0) {
             currentPlacementState = PlacementState.BASE;
-            placementStartPoint.copy(intersects[0].point);
+            placementStartPoint.copy(snapToGrid(intersects[0].point));
             
             // Create preview cube
             const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -1230,7 +1270,7 @@ window.addEventListener('mousemove', (event) => {
         const intersects = raycaster.intersectObject(plane);
 
         if (intersects.length > 0) {
-            const currentPoint = intersects[0].point;
+            const currentPoint = snapToGrid(intersects[0].point);
             const width = currentPoint.x - placementStartPoint.x;
             const depth = currentPoint.z - placementStartPoint.z;
             
@@ -1280,16 +1320,30 @@ wallsGroup.add(wall1, wall2, wall3);
 
 function getSurfaceHeight(xzPos) {
     let maxHeight = 0;
-    const testPoint = new THREE.Vector3(xzPos.x, 10, xzPos.z); // Start high
-    const dummyBox = new THREE.Box3().setFromCenterAndSize(testPoint, new THREE.Vector3(0.1, 20, 0.1));
     
+    // 1. Box check (Cubes and static walls)
     for (const box of wallBoxes) {
-        // Simplified XZ check
         if (xzPos.x >= box.min.x && xzPos.x <= box.max.x && 
             xzPos.z >= box.min.z && xzPos.z <= box.max.z) {
             if (box.max.y > maxHeight) maxHeight = box.max.y;
         }
     }
+    
+    // 2. Precise Mesh Check (Ramps, Stairs, Slopes)
+    if (preciseColliders.length > 0) {
+        // Cast a ray from high above downwards to find the surface
+        const rayOrigin = new THREE.Vector3(xzPos.x, 50, xzPos.z);
+        const rayDir = new THREE.Vector3(0, -1, 0);
+        raycaster.set(rayOrigin, rayDir);
+        
+        const hits = raycaster.intersectObjects(preciseColliders, true);
+        if (hits.length > 0) {
+            // Find the highest point hit (in case of multiple layers)
+            const hitY = hits[0].point.y;
+            if (hitY > maxHeight) maxHeight = hitY;
+        }
+    }
+    
     return maxHeight;
 }
 
@@ -1777,7 +1831,9 @@ function createPlacedModel(data) {
         // --- Custom Collision Mesh Extraction ---
         let hasCollisionMeshes = false;
         model.traverse(child => {
-            if (child.name.toLowerCase().includes('collision')) {
+            // Check if name contains 'collision' (handles 'collision.001', 'collision_box', etc.)
+            const isCollision = child.name.toLowerCase().includes('collision');
+            if (isCollision) {
                 hasCollisionMeshes = true;
                 child.visible = false; // Hide collision helpers
                 
