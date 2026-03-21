@@ -964,10 +964,13 @@ window.addEventListener('contextmenu', (event) => {
 
             if (contextMenuTarget.name === "ground") {
                 menuGroundSection.classList.remove('hidden');
-            } else if (contextMenuTarget.userData && contextMenuTarget.userData.id.startsWith('cube_')) {
-                menuCubeSection.classList.remove('hidden');
-            } else if (contextMenuTarget.userData && contextMenuTarget.userData.id.startsWith('model_')) {
-                menuModelSection.classList.remove('hidden');
+            } else if (contextMenuTarget.userData && contextMenuTarget.userData.id) {
+                const id = contextMenuTarget.userData.id.toString();
+                if (id.startsWith('cube_')) {
+                    menuCubeSection.classList.remove('hidden');
+                } else if (id.includes('model_') || id.includes('struct_')) {
+                    menuModelSection.classList.remove('hidden');
+                }
             }
         }
     }
@@ -1331,8 +1334,9 @@ function getSurfaceHeight(xzPos) {
     
     // 2. Precise Mesh Check (Ramps, Stairs, Slopes)
     if (preciseColliders.length > 0) {
-        // Cast a ray from high above downwards to find the surface
-        const rayOrigin = new THREE.Vector3(xzPos.x, 50, xzPos.z);
+        // Cast a ray from slightly above the player downwards
+        // Using +1.2 ensures we don't hit the ceiling of a 2.5m room while on the ground.
+        const rayOrigin = new THREE.Vector3(xzPos.x, (targetPosition ? targetPosition.y : 0) + 1.2, xzPos.z);
         const rayDir = new THREE.Vector3(0, -1, 0);
         raycaster.set(rayOrigin, rayDir);
         
