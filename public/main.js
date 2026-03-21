@@ -960,12 +960,13 @@ window.addEventListener('contextmenu', (event) => {
             contextMenu.style.left = event.clientX + 'px';
             contextMenu.style.top = event.clientY + 'px';
             contextMenu.classList.remove('hidden');
-            // --- ROOT FINDER ---
-            // Ensure we interact with the model ROOT (the one with userData.id)
             let root = finalHit.object;
-            while (root && root !== scene) {
-                if (root.userData && root.userData.id) break;
-                root = root.parent;
+            // ONLY find root if it's NOT the ground
+            if (root.name !== "ground") {
+                while (root && root !== scene) {
+                    if (root.userData && root.userData.id) break;
+                    root = root.parent;
+                }
             }
             contextMenuTarget = root || finalHit.object;
             contextMenuPoint.copy(snapToGrid(finalHit.point)); 
@@ -979,7 +980,8 @@ window.addEventListener('contextmenu', (event) => {
             menuCubeSection.classList.add('hidden');
             menuModelSection.classList.add('hidden');
 
-            if (contextMenuTarget.name === "ground") {
+            // Ground name check must be exact
+            if (contextMenuTarget.name === "ground" || (contextMenuTarget.object && contextMenuTarget.object.name === "ground")) {
                 menuGroundSection.classList.remove('hidden');
             } else if (contextMenuTarget.userData && contextMenuTarget.userData.id) {
                 const id = contextMenuTarget.userData.id.toString().toLowerCase();
@@ -1172,16 +1174,27 @@ document.getElementById('menu-rotate-45-left').addEventListener('click', () => {
 });
 
 function checkOverlap(box, ignoreId) {
-    // Check against cubes/walls AABBs
+    // 1. Check against wallBoxes (cubes/simple walls)
     for (const otherBox of wallBoxes) {
         if (otherBox.relatedId === ignoreId) continue;
-        // Padded intersection check
         if (box.intersectsBox(otherBox)) {
-            // Check if they are truly overlapping or just touching
             const intersection = box.clone().intersect(otherBox);
             if (intersection.max.x - intersection.min.x > 0.01 &&
-                intersection.max.z - intersection.min.z > 0.01) {
-                return true;
+                intersection.max.z - intersection.min.z > 0.01) return true;
+        }
+    }
+    
+    // 2. Check against ALL other models in scene (for structures)
+    // We use a simple AABB check for performance during placement/rotation
+    for (const key in idToUuid) {
+        if (key === ignoreId) continue;
+        const otherObj = scene.getObjectByProperty('uuid', idToUuid[key]);
+        if (otherObj) {
+            const otherBox = new THREE.Box3().setFromObject(otherObj);
+            if (box.intersectsBox(otherBox)) {
+                const intersection = box.clone().intersect(otherBox);
+                if (intersection.max.x - intersection.min.x > 0.05 &&
+                    intersection.max.z - intersection.min.z > 0.05) return true;
             }
         }
     }
