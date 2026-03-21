@@ -611,16 +611,27 @@ socket.on('initialModels', (models) => {
 });
 
 socket.on('cubeAdded', (cube) => {
-    // Remove optimistic ghost if exists
-    removeOptimisticObject(cube.id);
+    cleanupByPosition(cube.position);
     createCube(cube);
 });
 
 socket.on('modelAdded', (model) => {
-    // Remove optimistic ghost if exists
-    removeOptimisticObject(model.id);
+    cleanupByPosition(model.position);
     createPlacedModel(model);
 });
+
+function cleanupByPosition(pos) {
+    const targets = [];
+    const pVec = new THREE.Vector3(pos.x, pos.y, pos.z);
+    scene.traverse(obj => {
+        if (obj.userData && obj.userData.id) {
+            if (obj.position.distanceTo(pVec) < 0.1) {
+                targets.push(obj.userData.id);
+            }
+        }
+    });
+    targets.forEach(id => removeOptimisticObject(id));
+}
 
 function removeOptimisticObject(id) {
     if (id) abortedLoads.add(id);
@@ -949,6 +960,19 @@ window.addEventListener('contextmenu', (event) => {
             contextMenu.style.left = event.clientX + 'px';
             contextMenu.style.top = event.clientY + 'px';
             contextMenu.classList.remove('hidden');
+            // --- ROOT FINDER ---
+            // Ensure we interact with the model ROOT (the one with userData.id)
+            let root = finalHit.object;
+            while (root && root !== scene) {
+                if (root.userData && root.userData.id) break;
+                root = root.parent;
+            }
+            contextMenuTarget = root || finalHit.object;
+            contextMenuPoint.copy(snapToGrid(finalHit.point)); 
+
+            contextMenu.style.left = event.clientX + 'px';
+            contextMenu.style.top = event.clientY + 'px';
+            contextMenu.classList.remove('hidden');
             isMenuOpen = true;
 
             menuGroundSection.classList.add('hidden');
@@ -958,10 +982,10 @@ window.addEventListener('contextmenu', (event) => {
             if (contextMenuTarget.name === "ground") {
                 menuGroundSection.classList.remove('hidden');
             } else if (contextMenuTarget.userData && contextMenuTarget.userData.id) {
-                const id = contextMenuTarget.userData.id.toString();
-                if (id.startsWith('cube_')) {
+                const id = contextMenuTarget.userData.id.toString().toLowerCase();
+                if (id.includes('cube')) {
                     menuCubeSection.classList.remove('hidden');
-                } else if (id.includes('model_') || id.includes('struct_')) {
+                } else if (id.includes('model') || id.includes('struct')) {
                     menuModelSection.classList.remove('hidden');
                 }
             }
@@ -1359,21 +1383,26 @@ function getSurfaceHeight(xzPos) {
     
     // 2. Precise Mesh Check (Ramps, Stairs, Slopes)
     if (preciseColliders.length > 0) {
-        // Cast from current feet + 0.6 downwards. 
-        // 0.6 allows stepping up standard structural heights (stair steps).
-        const originY = (targetPosition ? targetPosition.y : 0) + 0.6;
+        // ULTIMATE PHYSICS: Cast from Eye Level (1.8m)
+        // This ensures the ray always sees the floor/ramp from a safe height.
+        const originY = (playerGroup ? playerGroup.position.y : 0) + 1.8;
         const rayOrigin = new THREE.Vector3(xzPos.x, originY, xzPos.z);
         const rayDir = new THREE.Vector3(0, -1, 0);
         raycaster.set(rayOrigin, rayDir);
         
-        // Specifically update world matrices before raycasting to respect rotation
+        // Refresh world matrices
         preciseColliders.forEach(c => c.updateMatrixWorld(true));
         
         const hits = raycaster.intersectObjects(preciseColliders, true);
         if (hits.length > 0) {
             const hitY = hits[0].point.y;
-            // Floor safety: don't snap to things too high above
-            if (hitY > maxHeight && hitY <= originY) maxHeight = hitY;
+            const currentFeetY = playerGroup ? playerGroup.position.y : 0;
+            
+            // STEP LIMIT: Only accept surface if it's within [feet-0.5, feet+0.5]
+            // This prevents "jumping" to high roofs while allowing ramps/stairs.
+            if (hitY > maxHeight && hitY <= currentFeetY + 0.5) {
+                maxHeight = hitY;
+            }
         }
     }
     
