@@ -62,7 +62,10 @@ let contextMenuPoint = new THREE.Vector3();
 // --- Collision Structures ---
 const wallBoxes = [];
 const preciseColliders = [];
-const GRID_SIZE = 1.0; // 1 meter grid as requested
+const GRID_SIZE = 1.0; 
+
+const activeLoads = new Set();
+const abortedLoads = new Set();
 
 function snapToGrid(v) {
     if (!v) return v;
@@ -620,15 +623,18 @@ socket.on('modelAdded', (model) => {
 });
 
 function removeOptimisticObject(id) {
+    if (id) abortedLoads.add(id);
+    
     const toRemove = [];
     scene.traverse(obj => {
-        if (obj.userData && obj.userData.isOptimistic) {
+        if (obj.userData && (obj.userData.isOptimistic || (id && obj.userData.id === id))) {
             toRemove.push(obj);
         }
     });
 
     toRemove.forEach(obj => {
         const objId = obj.userData.id;
+        if (objId) abortedLoads.add(objId);
         
         // 1. CLEANUP collisions from arrays
         for (let i = wallBoxes.length - 1; i >= 0; i--) {
@@ -1145,10 +1151,37 @@ document.getElementById('menu-rotate-45-left').addEventListener('click', () => {
     closeContextMenu();
 });
 
+function checkOverlap(box, ignoreId) {
+    // Check against cubes/walls AABBs
+    for (const otherBox of wallBoxes) {
+        if (otherBox.relatedId === ignoreId) continue;
+        // Padded intersection check
+        if (box.intersectsBox(otherBox)) {
+            // Check if they are truly overlapping or just touching
+            const intersection = box.clone().intersect(otherBox);
+            if (intersection.max.x - intersection.min.x > 0.01 &&
+                intersection.max.z - intersection.min.z > 0.01) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 function rotateObject(target, angle) {
+    const oldRotationY = target.rotation.y;
     target.rotation.y += angle;
     target.updateMatrixWorld(true);
     
+    // Check if target is model or structure - and check overlap after rotation
+    const newBox = new THREE.Box3().setFromObject(target);
+    if (checkOverlap(newBox, target.userData.id)) {
+        target.rotation.y = oldRotationY;
+        target.updateMatrixWorld(true);
+        alert("Não é possível girar: Espaço ocupado!");
+        return;
+    }
+
     // Refresh all collision children world matrices
     target.traverse(c => {
         if (c.isMesh) c.updateMatrixWorld(true);
@@ -1330,17 +1363,16 @@ function getSurfaceHeight(xzPos) {
     
     // 2. Precise Mesh Check (Ramps, Stairs, Slopes)
     if (preciseColliders.length > 0) {
-        // Cast a ray from above head height downwards
-        // Increased to +2.5 to catch higher steps or steep ramps reliably.
-        const originY = (targetPosition ? targetPosition.y : 0) + 2.5;
-        const rayOrigin = new THREE.Vector3(xzPos.x, originY, xzPos.z);
+        // Step Height Logic: Only detect surfaces within [foot-level, foot-level + 0.4]
+        // This prevents hitting ceilings/lintels but allows climbing steps.
+        const currentY = targetPosition ? targetPosition.y : 0;
+        const rayOrigin = new THREE.Vector3(xzPos.x, currentY + 0.4, xzPos.z);
         const rayDir = new THREE.Vector3(0, -1, 0);
         raycaster.set(rayOrigin, rayDir);
         
         const hits = raycaster.intersectObjects(preciseColliders, true);
         if (hits.length > 0) {
-            // Find the point hit. 
-            // We take hits[0] as it is the closest to the origin (highest surface)
+            // Find the highest point hit below our ray origin
             const hitY = hits[0].point.y;
             if (hitY > maxHeight) maxHeight = hitY;
         }
@@ -1809,8 +1841,20 @@ function updateRemotePlayerModelByUrl(id, url, animPaths = null, color = '#3b82f
 }
 
 function createPlacedModel(data) {
+    if (abortedLoads.has(data.id)) {
+        abortedLoads.delete(data.id);
+        return;
+    }
+    activeLoads.add(data.id);
+
     const gltfLoader = new GLTFLoader();
     const onParsed = (gltf) => {
+        activeLoads.delete(data.id);
+        if (abortedLoads.has(data.id)) {
+            abortedLoads.delete(data.id);
+            return;
+        }
+
         const model = gltf.scene;
         model.traverse((child) => {
             if (child.isMesh) {
@@ -1825,12 +1869,30 @@ function createPlacedModel(data) {
         model.userData.id = data.id;
         model.userData.isOptimistic = data.isOptimistic || false;
         model.userData.isStructure = data.isStructure || false; // Important for occlusion
+        
+        model.updateMatrixWorld(true);
+        const placementBox = new THREE.Box3().setFromObject(model);
+        if (data.isOptimistic && checkOverlap(placementBox, data.id)) {
+            alert("Não é possível colocar: Espaço ocupado!");
+            return;
+        }
+
         idToUuid[data.id] = model.uuid;
         scene.add(model);
 
         model.updateMatrixWorld(true);
         
         // --- Custom Collision Mesh Extraction ---
+        // SAFETY: Clear any existing collisions for this ID (prevents ghosts)
+        for (let i = wallBoxes.length - 1; i >= 0; i--) {
+            if (wallBoxes[i].relatedId == data.id) wallBoxes.splice(i, 1);
+        }
+        for (let i = preciseColliders.length - 1; i >= 0; i--) {
+            if (preciseColliders[i].userData && preciseColliders[i].userData.id == data.id) {
+                preciseColliders.splice(i, 1);
+            }
+        }
+
         let hasCollisionMeshes = false;
         model.traverse(child => {
             // Check if name contains 'collision' (handles 'collision.001', 'collision_box', etc.)
