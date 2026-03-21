@@ -620,7 +620,6 @@ socket.on('modelAdded', (model) => {
 });
 
 function removeOptimisticObject(id) {
-    // 1. Collect all optimistic objects to remove
     const toRemove = [];
     scene.traverse(obj => {
         if (obj.userData && obj.userData.isOptimistic) {
@@ -628,33 +627,25 @@ function removeOptimisticObject(id) {
         }
     });
 
-    // 2. Safely remove them from scene
     toRemove.forEach(obj => {
-        scene.remove(obj);
-        // Also remove from mapping if it exists
-        for (const key in idToUuid) {
-            if (idToUuid[key] === obj.uuid) {
-                delete idToUuid[key];
+        const objId = obj.userData.id;
+        
+        // 1. CLEANUP collisions from arrays
+        for (let i = wallBoxes.length - 1; i >= 0; i--) {
+            if (wallBoxes[i].relatedId == objId) wallBoxes.splice(i, 1);
+        }
+        for (let i = preciseColliders.length - 1; i >= 0; i--) {
+            if (preciseColliders[i].userData && preciseColliders[i].userData.id == objId) {
+                preciseColliders.splice(i, 1);
             }
         }
+        
+        // 2. Remove from scene and mapping
+        scene.remove(obj);
+        for (const key in idToUuid) {
+            if (idToUuid[key] === obj.uuid) delete idToUuid[key];
+        }
     });
-
-    // 3. Thorough cleanup of wallBoxes: remove ALL optimistic entries
-    for (let i = wallBoxes.length - 1; i >= 0; i--) {
-        const box = wallBoxes[i];
-        const rId = box.relatedId ? box.relatedId.toString() : '';
-        if (rId.startsWith('opt_') || rId === id) {
-            wallBoxes.splice(i, 1);
-        }
-    }
-    
-    // 4. Cleanup preciseColliders
-    for (let i = preciseColliders.length - 1; i >= 0; i--) {
-        const col = preciseColliders[i];
-        if (col.userData && col.userData.id && (col.userData.id.toString().startsWith('opt_') || col.userData.id.toString() === id)) {
-            preciseColliders.splice(i, 1);
-        }
-    }
 }
 
 socket.on('objectDeleted', (id) => {
@@ -1158,6 +1149,11 @@ function rotateObject(target, angle) {
     target.rotation.y += angle;
     target.updateMatrixWorld(true);
     
+    // Refresh all collision children world matrices
+    target.traverse(c => {
+        if (c.isMesh) c.updateMatrixWorld(true);
+    });
+    
     // Update wallBoxes for this ID
     for (const box of wallBoxes) {
         if (box.relatedId == target.userData.id) {
@@ -1334,15 +1330,17 @@ function getSurfaceHeight(xzPos) {
     
     // 2. Precise Mesh Check (Ramps, Stairs, Slopes)
     if (preciseColliders.length > 0) {
-        // Cast a ray from slightly above the player downwards
-        // Using +1.2 ensures we don't hit the ceiling of a 2.5m room while on the ground.
-        const rayOrigin = new THREE.Vector3(xzPos.x, (targetPosition ? targetPosition.y : 0) + 1.2, xzPos.z);
+        // Cast a ray from above head height downwards
+        // Increased to +2.5 to catch higher steps or steep ramps reliably.
+        const originY = (targetPosition ? targetPosition.y : 0) + 2.5;
+        const rayOrigin = new THREE.Vector3(xzPos.x, originY, xzPos.z);
         const rayDir = new THREE.Vector3(0, -1, 0);
         raycaster.set(rayOrigin, rayDir);
         
         const hits = raycaster.intersectObjects(preciseColliders, true);
         if (hits.length > 0) {
-            // Find the highest point hit (in case of multiple layers)
+            // Find the point hit. 
+            // We take hits[0] as it is the closest to the origin (highest surface)
             const hitY = hits[0].point.y;
             if (hitY > maxHeight) maxHeight = hitY;
         }
