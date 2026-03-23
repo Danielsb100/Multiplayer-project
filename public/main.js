@@ -301,15 +301,24 @@ mapLoader.load('assets/maps/map/map.glb', (gltf) => {
             child.receiveShadow = true;
 
             const name = child.name ? child.name.toLowerCase() : '';
-            if (name.includes('collision_')) {
+            if (name.includes('collision')) {
                 child.visible = false;
                 child.userData.id = 'env_col_' + child.uuid;
                 preciseColliders.push(child);
-            } else if (name.includes('wall_')) {
+            } else if (name.includes('wall')) {
                 const box = new THREE.Box3().setFromObject(child);
                 box.relatedId = 'env_wall_' + child.uuid;
                 wallBoxes.push(box);
-            } else if (name.includes('floor_')) {
+                
+                // Important for Occlusion Logic (makes walls transparent)
+                child.userData.id = box.relatedId;
+                child.userData.isStructure = true; 
+                // Clone material so fading one wall doesn't fade all walls sharing the same material
+                if (child.material) {
+                    child.material = child.material.clone();
+                    child.material.transparent = true;
+                }
+            } else if (name.includes('floor')) {
                 child.userData.id = 'env_floor_' + child.uuid;
                 preciseColliders.push(child);
             }
