@@ -787,6 +787,15 @@ function loadModelFromBuffer(arrayBuffer, targetPlayerObj, color = '#3b82f6') {
             }
         });
 
+        // Center BEFORE parenting so Box3 is in local (model) space, not world space
+        newModel.position.set(0, 0, 0);
+        newModel.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(newModel);
+        const center = box.getCenter(new THREE.Vector3());
+        newModel.position.x = -center.x;
+        newModel.position.z = -center.z;
+        newModel.position.y = -box.min.y;
+
         targetPlayerObj.avatarContainer.add(newModel);
         targetPlayerObj.mainMesh = newModel;
         
@@ -810,15 +819,6 @@ function loadModelFromBuffer(arrayBuffer, targetPlayerObj, color = '#3b82f6') {
                 });
             });
         }
-
-        newModel.position.set(0, 0, 0);
-        newModel.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(newModel);
-        const center = box.getCenter(new THREE.Vector3());
-
-        newModel.position.x = -center.x;
-        newModel.position.z = -center.z;
-        newModel.position.y = -box.min.y;
     }, (error) => {
         console.error('Error parsing remote model', error);
     });
@@ -1167,9 +1167,9 @@ function checkOverlap(box, ignoreId) {
 function rotateObject(target, angle) {
     const oldRotationY = target.rotation.y;
     target.rotation.y += angle;
-    target.updateMatrixWorld(true);
+    target.updateMatrixWorld(true); // Rotates root + all children (including collision meshes)
     
-    // Check if target is model or structure - and check overlap after rotation
+    // Check overlap after rotation
     const newBox = new THREE.Box3().setFromObject(target);
     if (checkOverlap(newBox, target.userData.id)) {
         target.rotation.y = oldRotationY;
@@ -1178,15 +1178,15 @@ function rotateObject(target, angle) {
         return;
     }
 
-    // Refresh all collision children world matrices
-    target.traverse(c => {
-        if (c.isMesh) c.updateMatrixWorld(true);
-    });
-    
-    // Update wallBoxes for this ID
-    for (const box of wallBoxes) {
-        if (box.relatedId == target.userData.id) {
-            box.setFromObject(target);
+    // Update AABB in wallBoxes (only for simple objects — not for those with preciseColliders)
+    // For objects with preciseColliders (structures), the collision meshes follow the root
+    // automatically as children — no separate update needed.
+    const hasPC = preciseColliders.some(c => c.userData.id == target.userData.id);
+    if (!hasPC) {
+        for (const box of wallBoxes) {
+            if (box.relatedId == target.userData.id) {
+                box.setFromObject(target);
+            }
         }
     }
     
@@ -1637,10 +1637,19 @@ function loadLocalModel(arrayBuffer) {
 
         characterMesh = gltf.scene;
         characterMesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
-        playerGroup.add(characterMesh);
         
         // Apply local character color to 'clothes' material
         applyCharacterColor(characterMesh, localUserColor);
+
+        // Center BEFORE parenting so Box3 is in local (model) space, not world space
+        characterMesh.position.set(0, 0, 0);
+        const box = new THREE.Box3().setFromObject(characterMesh);
+        const center = box.getCenter(new THREE.Vector3());
+        characterMesh.position.x = -center.x;
+        characterMesh.position.z = -center.z;
+        characterMesh.position.y = -box.min.y;
+
+        playerGroup.add(characterMesh);
 
         // Setup Mixer for local player with buffer model
         playerAnims.mixer = new THREE.AnimationMixer(characterMesh);
@@ -1659,14 +1668,6 @@ function loadLocalModel(arrayBuffer) {
                 });
             });
         }
-
-        characterMesh.position.set(0, 0, 0);
-        characterMesh.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(characterMesh);
-        const center = box.getCenter(new THREE.Vector3());
-        characterMesh.position.x = -center.x;
-        characterMesh.position.z = -center.z;
-        characterMesh.position.y = -box.min.y;
 
         loadingIndicator.classList.add('hidden');
     }, (error) => {
@@ -1728,10 +1729,19 @@ function loadModelByUrl(url, animPaths = null) {
 
         characterMesh = gltf.scene;
         characterMesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
-        playerGroup.add(characterMesh);
 
         // Apply character color to 'clothes' material
         applyCharacterColor(characterMesh, localUserColor);
+
+        // Center BEFORE parenting so Box3 is in local (model) space, not world space
+        characterMesh.position.set(0, 0, 0);
+        const box = new THREE.Box3().setFromObject(characterMesh);
+        const center = box.getCenter(new THREE.Vector3());
+        characterMesh.position.x = -center.x;
+        characterMesh.position.z = -center.z;
+        characterMesh.position.y = -box.min.y;
+
+        playerGroup.add(characterMesh);
 
         // Setup Mixer
         playerAnims.mixer = new THREE.AnimationMixer(characterMesh);
@@ -1766,15 +1776,6 @@ function loadModelByUrl(url, animPaths = null) {
             });
         }
 
-        characterMesh.position.set(0, 0, 0);
-        characterMesh.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(characterMesh);
-        const center = box.getCenter(new THREE.Vector3());
-        
-        characterMesh.position.x = -center.x;
-        characterMesh.position.z = -center.z;
-        characterMesh.position.y = -box.min.y;
-
         loadingIndicator.classList.add('hidden');
     });
 }
@@ -1789,6 +1790,16 @@ function updateRemotePlayerModelByUrl(id, url, animPaths = null, color = '#3b82f
         while(container.children.length > 0) container.remove(container.children[0]);
         const mesh = gltf.scene;
         mesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+
+        // Center BEFORE parenting so Box3 is in local (model) space, not world space
+        mesh.position.set(0, 0, 0);
+        mesh.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(mesh);
+        const center = box.getCenter(new THREE.Vector3());
+        mesh.position.x = -center.x;
+        mesh.position.z = -center.z;
+        mesh.position.y = -box.min.y;
+
         container.add(mesh);
         
         // Apply character color to 'clothes' material
@@ -1825,15 +1836,6 @@ function updateRemotePlayerModelByUrl(id, url, animPaths = null, color = '#3b82f
                 });
             });
         }
-
-        mesh.position.set(0, 0, 0);
-        mesh.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(mesh);
-        const center = box.getCenter(new THREE.Vector3());
-        
-        mesh.position.x = -center.x;
-        mesh.position.z = -center.z;
-        mesh.position.y = -box.min.y;
     });
 }
 
