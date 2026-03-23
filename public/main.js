@@ -966,6 +966,14 @@ scene.add(plane);
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
+// --- 3D Cursor Marker ---
+const cursorGeo = new THREE.RingGeometry(0.3, 0.4, 32);
+const cursorMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+const cursorMarker = new THREE.Mesh(cursorGeo, cursorMat);
+cursorMarker.rotation.x = -Math.PI / 2;
+cursorMarker.visible = false;
+scene.add(cursorMarker);
+
 window.addEventListener('contextmenu', (event) => {
     if (localUsername === '' || isOverUI(event)) return;
     
@@ -1034,8 +1042,9 @@ window.addEventListener('contextmenu', (event) => {
             menuCubeSection.classList.add('hidden');
             menuModelSection.classList.add('hidden');
 
-            // Ground name check must be exact
-            if (contextMenuTarget.name === "ground" || (contextMenuTarget.object && contextMenuTarget.object.name === "ground")) {
+            // Ground name check must be exact OR an environment mesh
+            const isEnv = contextMenuTarget.userData && contextMenuTarget.userData.id && contextMenuTarget.userData.id.toString().includes('env_');
+            if (contextMenuTarget.name === "ground" || (contextMenuTarget.object && contextMenuTarget.object.name === "ground") || isEnv) {
                 menuGroundSection.classList.remove('hidden');
             } else if (contextMenuTarget.userData && contextMenuTarget.userData.id) {
                 const id = contextMenuTarget.userData.id.toString().toLowerCase();
@@ -1374,6 +1383,41 @@ window.addEventListener('mousemove', (event) => {
         customCursor.classList.add('ui-hover');
     } else {
         customCursor.classList.remove('ui-hover');
+    }
+
+    // --- 3D Cursor Projection ---
+    if (currentPlacementState === PlacementState.NONE) {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        
+        let hitPoint = null;
+        let hitNormal = null;
+        const intersects = raycaster.intersectObjects(scene.children, true);
+        for (const hit of intersects) {
+            let isPlayerOrGhost = false;
+            let root = hit.object;
+            while (root && root !== scene) {
+                if (root === playerGroup || (root.userData && root.userData.isOptimistic) || root === cursorMarker) isPlayerOrGhost = true;
+                root = root.parent;
+            }
+            if (!isPlayerOrGhost) {
+                hitPoint = hit.point;
+                hitNormal = hit.face ? hit.face.normal : new THREE.Vector3(0,1,0); 
+                break;
+            }
+        }
+        
+        if (hitPoint && hitNormal) {
+            cursorMarker.position.copy(hitPoint);
+            cursorMarker.position.addScaledVector(hitNormal, 0.05); // Hover slightly above
+            cursorMarker.lookAt(hitPoint.clone().add(hitNormal));
+            cursorMarker.visible = true;
+        } else {
+            cursorMarker.visible = false;
+        }
+    } else {
+        cursorMarker.visible = false;
     }
 
     if (currentPlacementState === PlacementState.BASE) {
