@@ -1307,11 +1307,28 @@ window.addEventListener('mousedown', (event) => {
             if (hitPoint) {
                 const startPos = playerGroup.position.clone();
                 try {
-                    let groupID = _pathfinding.getGroup(_navmeshZone, startPos);
-                    if (groupID === null) groupID = _pathfinding.getGroup(_navmeshZone, hitPoint);
-                    if (groupID === null) groupID = 0; // Fallback to main island
+                    const zoneData = _pathfinding.zones[_navmeshZone];
+                    let groupID = 0;
+                    let closestStart = null;
+                    
+                    if (zoneData && zoneData.groups) {
+                        let minDist = Infinity;
+                        for (let g = 0; g < zoneData.groups.length; g++) {
+                            const node = _pathfinding.getClosestNode(startPos, _navmeshZone, g);
+                            if (node) {
+                                const dist = node.centroid.distanceToSquared(startPos);
+                                if (dist < minDist) {
+                                    minDist = dist;
+                                    closestStart = node;
+                                    groupID = g;
+                                }
+                            }
+                        }
+                    } else {
+                        groupID = _pathfinding.getGroup(_navmeshZone, startPos) || 0;
+                        closestStart = _pathfinding.getClosestNode(startPos, _navmeshZone, groupID);
+                    }
 
-                    const closestStart = _pathfinding.getClosestNode(startPos, _navmeshZone, groupID);
                     const closestEnd = _pathfinding.getClosestNode(hitPoint, _navmeshZone, groupID);
 
                     if (closestStart && closestEnd) {
