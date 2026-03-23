@@ -306,9 +306,9 @@ mapLoader.load('assets/maps/map/map.glb', (gltf) => {
                 child.userData.id = 'env_col_' + child.uuid;
                 preciseColliders.push(child);
             } else if (name.includes('wall')) {
-                const box = new THREE.Box3().setFromObject(child);
-                box.relatedId = 'env_wall_' + child.uuid;
-                wallBoxes.push(box);
+                // Add to precise colliders instead of wallBoxes to allow doorways/passages
+                child.userData.id = 'env_wall_' + child.uuid;
+                preciseColliders.push(child);
                 
                 // Important for Occlusion Logic (makes walls transparent)
                 child.userData.id = box.relatedId;
