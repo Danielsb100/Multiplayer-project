@@ -301,27 +301,22 @@ mapLoader.load('assets/maps/map/map.glb', (gltf) => {
             child.receiveShadow = true;
 
             const name = child.name ? child.name.toLowerCase() : '';
+            
             if (name.includes('collision')) {
                 child.visible = false;
-                child.userData.id = 'env_col_' + child.uuid;
-                preciseColliders.push(child);
             } else if (name.includes('wall')) {
-                // Add to precise colliders instead of wallBoxes to allow doorways/passages
-                child.userData.id = 'env_wall_' + child.uuid;
-                preciseColliders.push(child);
-                
                 // Important for Occlusion Logic (makes walls transparent)
-                child.userData.id = box.relatedId;
                 child.userData.isStructure = true; 
                 // Clone material so fading one wall doesn't fade all walls sharing the same material
                 if (child.material) {
                     child.material = child.material.clone();
                     child.material.transparent = true;
                 }
-            } else if (name.includes('floor')) {
-                child.userData.id = 'env_floor_' + child.uuid;
-                preciseColliders.push(child);
             }
+            
+            // ALL map geometry is now used for precise physical collisions
+            child.userData.id = 'env_mesh_' + child.uuid;
+            preciseColliders.push(child);
         }
     });
     console.log("Environment map loaded successfully.");
