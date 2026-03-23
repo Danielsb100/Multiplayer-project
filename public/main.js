@@ -1318,24 +1318,8 @@ function cancelPlacement() {
     currentPlacementState = PlacementState.NONE;
 }
 
-const wallsGroup = new THREE.Group();
-scene.add(wallsGroup);
 
-const wallMat = new THREE.MeshStandardMaterial({ color: '#64748b', roughness: 0.8 });
-const wall1 = new THREE.Mesh(new THREE.BoxGeometry(1, 4, 10), wallMat);
-wall1.position.set(-5, 2, 0); wall1.castShadow = true; wall1.receiveShadow = true;
-const wall2 = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 1), wallMat);
-wall2.position.set(0, 2, -5); wall2.castShadow = true; wall2.receiveShadow = true;
-const wall3 = new THREE.Mesh(new THREE.BoxGeometry(1, 4, 10), wallMat);
-wall3.position.set(5, 2, -2.5); wall3.scale.set(1, 1, 0.5); wall3.castShadow = true; wall3.receiveShadow = true;
 
-wallsGroup.add(wall1, wall2, wall3);
-    wall1.updateMatrixWorld();
-    wallBoxes.push(new THREE.Box3().setFromObject(wall1));
-    wall2.updateMatrixWorld();
-    wallBoxes.push(new THREE.Box3().setFromObject(wall2));
-    wall3.updateMatrixWorld();
-    wallBoxes.push(new THREE.Box3().setFromObject(wall3));
 
 function getSurfaceHeight(xzPos) {
     let maxHeight = 0;
@@ -1350,23 +1334,20 @@ function getSurfaceHeight(xzPos) {
     
     // 2. Precise Mesh Check (Ramps, Stairs, Slopes)
     if (preciseColliders.length > 0) {
-        // ULTIMATE PHYSICS: Cast from Eye Level (1.8m)
-        // This ensures the ray always sees the floor/ramp from a safe height.
+        // Cast from Eye Level (1.8m) — ensures ray sees floor/ramp from safe height
         const originY = (playerGroup ? playerGroup.position.y : 0) + 1.8;
         const rayOrigin = new THREE.Vector3(xzPos.x, originY, xzPos.z);
         const rayDir = new THREE.Vector3(0, -1, 0);
         raycaster.set(rayOrigin, rayDir);
         
-        // Refresh world matrices
-        preciseColliders.forEach(c => c.updateMatrixWorld(true));
-        
+        // NOTE: matrixWorld is guaranteed current because animate() calls
+        // scene.updateMatrixWorld(true) before any game logic runs.
         const hits = raycaster.intersectObjects(preciseColliders, true);
         if (hits.length > 0) {
             const hitY = hits[0].point.y;
             const currentFeetY = playerGroup ? playerGroup.position.y : 0;
             
-            // STEP LIMIT: Only accept surface if it's within [feet-0.5, feet+0.5]
-            // This prevents "jumping" to high roofs while allowing ramps/stairs.
+            // STEP LIMIT: Only accept surface within [feet-0.5, feet+0.5]
             if (hitY > maxHeight && hitY <= currentFeetY + 0.5) {
                 maxHeight = hitY;
             }
@@ -1590,6 +1571,11 @@ function updateOcclusion() {
 function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
+    
+    // CRITICAL: Update ALL world matrices FIRST, before any collision/game logic.
+    // renderer.render() would do this later, but checkCollision and getSurfaceHeight
+    // need current matrices. Without this, rotated collision meshes appear stale.
+    scene.updateMatrixWorld(true);
     
     // Update local mixer
     if (playerAnims.mixer) playerAnims.mixer.update(delta);
