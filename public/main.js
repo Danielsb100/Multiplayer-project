@@ -519,15 +519,13 @@ socket.on('newPlayer', (playerInfo) => {
 
 socket.on('playerMoved', (playerInfo) => {
     if (remotePlayers[playerInfo.id]) {
+        // Copy full position (x, y, z) to the anchor group — Y is always replicated
         remotePlayers[playerInfo.id].group.position.copy(playerInfo.position);
-        remotePlayers[playerInfo.id].group.rotation.setFromVector3(new THREE.Vector3(playerInfo.rotation.x, playerInfo.rotation.y, playerInfo.rotation.z));
-        
-        // Update remote height if jumping
-        if (playerInfo.isJumping) {
-            remotePlayers[playerInfo.id].group.position.y = playerInfo.position.y;
-        } else {
-            remotePlayers[playerInfo.id].group.position.y = 0;
-        }
+        remotePlayers[playerInfo.id].group.rotation.set(
+            playerInfo.rotation.x,
+            playerInfo.rotation.y,
+            playerInfo.rotation.z
+        );
 
         // Update remote base animation
         if (playerInfo.animation && remotePlayers[playerInfo.id].anims) {
@@ -611,12 +609,10 @@ socket.on('initialModels', (models) => {
 });
 
 socket.on('cubeAdded', (cube) => {
-    cleanupByPosition(cube.position);
     createCube(cube);
 });
 
 socket.on('modelAdded', (model) => {
-    cleanupByPosition(model.position);
     createPlacedModel(model);
 });
 
@@ -723,16 +719,25 @@ socket.on('initialChatHistory', (history) => {
 });
 
 function addOtherPlayer(playerInfo) {
+    // Anchor group: holds only network position/rotation — never touched visually
+    const anchorGroup = new THREE.Group();
+    anchorGroup.position.set(playerInfo.position.x, playerInfo.position.y, playerInfo.position.z);
+    anchorGroup.rotation.set(playerInfo.rotation.x, playerInfo.rotation.y, playerInfo.rotation.z);
+    scene.add(anchorGroup);
+
+    // Avatar container: child of anchor — all visual mesh loading/centering goes here
+    const avatarContainer = new THREE.Group();
+    anchorGroup.add(avatarContainer);
+
+    // Default avatar goes into avatarContainer
     const avatar = createDefaultAvatar(playerInfo.color);
-    avatar.group.position.set(playerInfo.position.x, playerInfo.position.y, playerInfo.position.z);
-    avatar.group.rotation.set(playerInfo.rotation.x, playerInfo.rotation.y, playerInfo.rotation.z);
-    scene.add(avatar.group);
+    avatarContainer.add(avatar.group);
     
     remotePlayers[playerInfo.id] = {
-        group: avatar.group,
+        group: anchorGroup,          // anchor: use this for position/rotation from network
+        avatarContainer: avatarContainer, // visual container: use this for model loading
         mainMesh: avatar.bodyMesh,
         color: playerInfo.color,
-        avatarContainer: avatar.group, 
         anims: {
             mixer: null,
             actions: {},
@@ -997,7 +1002,6 @@ window.addEventListener('contextmenu', (event) => {
 
 document.getElementById('menu-catalog-models').addEventListener('click', () => {
     openCatalog('models', (item) => {
-        const tempId = 'opt_model_' + Date.now();
         socket.emit('placeModel', {
             modelPath: item.model,
             position: contextMenuPoint.clone(),
@@ -1007,16 +1011,7 @@ document.getElementById('menu-catalog-models').addEventListener('click', () => {
         // Trigger interact animation
         triggerInteract(playerAnims, contextMenuPoint);
         didInteractThisFrame = true;
-        
-        // Optimistic UI for catalog model
-        createPlacedModel({
-            id: tempId,
-            modelPath: item.model,
-            position: contextMenuPoint.clone(),
-            rotation: { x: 0, y: 0, z: 0 },
-            isOptimistic: true,
-            isStructure: false
-        });
+        // Object will appear when server confirms via 'modelAdded'
     });
     closeContextMenu();
 });
@@ -1029,7 +1024,6 @@ document.getElementById('menu-ground-section').appendChild(menuCatalogStructs);
 
 menuCatalogStructs.onclick = () => {
     openCatalog('structures', (item) => {
-        const tempId = 'opt_struct_' + Date.now();
         socket.emit('placeModel', {
             modelPath: item.model,
             position: contextMenuPoint.clone(),
@@ -1038,15 +1032,7 @@ menuCatalogStructs.onclick = () => {
         
         triggerInteract(playerAnims, contextMenuPoint);
         didInteractThisFrame = true;
-        
-        createPlacedModel({
-            id: tempId,
-            modelPath: item.model,
-            position: contextMenuPoint.clone(),
-            rotation: { x: 0, y: 0, z: 0 },
-            isOptimistic: true,
-            isStructure: true
-        });
+        // Object will appear when server confirms via 'modelAdded'
     });
     closeContextMenu();
 };
@@ -1075,36 +1061,13 @@ contextGlbUpload.addEventListener('change', (e) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             const buffer = event.target.result;
-            const gltfLoader = new GLTFLoader();
-            // Parse locally first for collision check
-            gltfLoader.parse(buffer, '', (gltf) => {
-                const model = gltf.scene;
-                model.position.copy(contextMenuPoint);
-                model.updateMatrixWorld(true);
-                const tempBox = new THREE.Box3().setFromObject(model);
-                
-                if (checkGeneralCollision(tempBox)) {
-                    alert("A posição está ocupada!");
-                } else {
-                    const tempId = 'opt_model_' + Date.now();
-                    // Optimistic creation
-                    createPlacedModel({
-                        id: tempId,
-                        modelBuffer: buffer,
-                        position: contextMenuPoint.clone(),
-                        rotation: { x: 0, y: 0, z: 0 },
-                        isOptimistic: true
-                    });
-
-                    socket.emit('placeModel', {
-                        modelBuffer: buffer,
-                        position: contextMenuPoint.clone()
-                    });
-
-                    // Trigger interact animation
-                    handleAnimationState(playerAnims, 'interact', 0.1, false);
-                }
+            socket.emit('placeModel', {
+                modelBuffer: buffer,
+                position: contextMenuPoint.clone()
             });
+            // Object will appear when server confirms via 'modelAdded'
+            triggerInteract(playerAnims, contextMenuPoint);
+            didInteractThisFrame = true;
         };
         reader.readAsArrayBuffer(file);
         e.target.value = ''; // Reset input to allow re-importing same file
@@ -1282,21 +1245,12 @@ window.addEventListener('mousedown', (event) => {
             };
             const pos = previewCube.position.clone();
 
-            // Optimistic creation
-            const tempId = 'opt_cube_' + Date.now();
-            createCube({
-                id: tempId,
-                position: pos,
-                size: size,
-                color: localUserColor,
-                isOptimistic: true
-            });
-
             socket.emit('placeCube', {
                 position: pos,
                 size: size,
                 color: localUserColor
             });
+            // Cube will appear when server confirms via 'cubeAdded'
             
             // Trigger interact animation
             triggerInteract(playerAnims, contextMenuPoint);
@@ -1830,10 +1784,12 @@ function updateRemotePlayerModelByUrl(id, url, animPaths = null, color = '#3b82f
     if (!player) return;
     const gltfLoader = new GLTFLoader();
     gltfLoader.load(url, (gltf) => {
-        while(player.group.children.length > 0) player.group.remove(player.group.children[0]);
+        // Use avatarContainer (visual child) — NOT group (network anchor)
+        const container = player.avatarContainer || player.group;
+        while(container.children.length > 0) container.remove(container.children[0]);
         const mesh = gltf.scene;
         mesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
-        player.group.add(mesh);
+        container.add(mesh);
         
         // Apply character color to 'clothes' material
         applyCharacterColor(mesh, color);
