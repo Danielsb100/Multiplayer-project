@@ -1350,16 +1350,8 @@ window.addEventListener('mousedown', (event) => {
                     const closestEnd = _pathfinding.getClosestNode(hitPoint, _navmeshZone, groupID);
 
                     if (closestStart && closestEnd) {
-                        const path = _pathfinding.findPath(closestStart.centroid, closestEnd.centroid, _navmeshZone, groupID);
+                        const path = _pathfinding.findPath(startPos, hitPoint, _navmeshZone, groupID);
                         if (path && path.length > 0) {
-                            // Force exact end position instead of snapping to centroid
-                            path[path.length - 1] = hitPoint.clone();
-
-                            // Remove the starting centroid to avoid walking backwards slightly
-                            if (path.length > 1) {
-                                path.shift(); 
-                            }
-
                             localPlayerPath = path;
                         } else { 
                             localPlayerPath = [hitPoint];
