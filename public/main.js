@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { Pathfinding } from 'three-pathfinding';
 
-// --- 0. Socket & Login ---
+// Global variables for pathfinding
+const _pathfinding = new Pathfinding();
+const _navmeshZone = 'level1';
+let localPlayerPath = null;// --- 0. Socket & Login ---
 const socket = io();
 let localUsername = '';
 const loginScreen = document.getElementById('login-screen');
@@ -301,6 +305,13 @@ mapLoader.load('assets/maps/map/map.glb', (gltf) => {
             child.receiveShadow = true;
 
             const name = child.name ? child.name.toLowerCase() : '';
+            
+            // NavMesh Extraction
+            if (name.includes('navmesh')) {
+                child.visible = false;
+                _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(child.geometry));
+                return; // Skip collision and render for navmesh
+            }
             
             if (name.includes('collision')) {
                 child.visible = false;
@@ -1035,6 +1046,19 @@ window.addEventListener('contextmenu', (event) => {
     }
 });
 
+document.getElementById('menu-create-block').addEventListener('click', () => {
+    currentPlacementState = PlacementState.BASE;
+    placementStartPoint.copy(contextMenuPoint);
+    
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const mat = new THREE.MeshStandardMaterial({ color: localUserColor, transparent: true, opacity: 0.5 });
+    previewCube = new THREE.Mesh(geo, mat);
+    previewCube.position.set(placementStartPoint.x, 0.5, placementStartPoint.z);
+    scene.add(previewCube);
+    
+    closeContextMenu();
+});
+
 document.getElementById('menu-catalog-models').addEventListener('click', () => {
     openCatalog('models', (item) => {
         socket.emit('placeModel', {
@@ -1248,22 +1272,43 @@ window.addEventListener('mousedown', (event) => {
     if (event.button !== 0) return; // Only left click
 
     if (currentPlacementState === PlacementState.NONE) {
-        // ... (existing base logic) ...
+        // --- Pathfinding Interaction ---
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObject(plane);
-
+        
+        const intersects = raycaster.intersectObjects(scene.children, true);
         if (intersects.length > 0) {
-            currentPlacementState = PlacementState.BASE;
-            placementStartPoint.copy(snapToGrid(intersects[0].point));
-            
-            // Create preview cube
-            const geo = new THREE.BoxGeometry(1, 1, 1);
-            const mat = new THREE.MeshStandardMaterial({ color: localUserColor, transparent: true, opacity: 0.5 });
-            previewCube = new THREE.Mesh(geo, mat);
-            previewCube.position.set(placementStartPoint.x, 0.5, placementStartPoint.z);
-            scene.add(previewCube);
+            let hitPoint = null;
+            for (const hit of intersects) {
+                let isPlayerOrGhost = false;
+                let root = hit.object;
+                while (root && root !== scene) {
+                    if (root === playerGroup || (root.userData && root.userData.isOptimistic)) isPlayerOrGhost = true;
+                    root = root.parent;
+                }
+                if (!isPlayerOrGhost) {
+                    hitPoint = hit.point;
+                    break;
+                }
+            }
+            if (hitPoint) {
+                const startPos = playerGroup.position.clone();
+                try {
+                    const groupID = _pathfinding.getGroup(_navmeshZone, startPos);
+                    const path = _pathfinding.findPath(startPos, hitPoint, _navmeshZone, groupID);
+                    if (path && path.length > 0) {
+                        localPlayerPath = path;
+                        if (localPlayerPath.length > 1 && localPlayerPath[0].distanceTo(startPos) < 0.5) {
+                            localPlayerPath.shift();
+                        }
+                    } else { 
+                        localPlayerPath = [hitPoint];
+                    }
+                } catch(e) {
+                    localPlayerPath = [hitPoint];
+                }
+            }
         }
     } else if (currentPlacementState === PlacementState.HEIGHT) {
         // Phase 3: Finalize
@@ -1499,15 +1544,40 @@ function updatePlayer(delta) {
         broadcastMovement();
     }
 
-    let moveX = 0, moveZ = 0;
-    if (keys.w) { moveZ -= moveSpeed; moveX -= moveSpeed; }
-    if (keys.s) { moveZ += moveSpeed; moveX += moveSpeed; }
-    if (keys.a) { moveX -= moveSpeed; moveZ += moveSpeed; }
-    if (keys.d) { moveX += moveSpeed; moveZ -= moveSpeed; }
+    // --- Manual input interrupts auto-walk ---
+    if (keys.w || keys.a || keys.s || keys.d) {
+        localPlayerPath = null;
+    }
 
-    if ((keys.w || keys.s) && (keys.a || keys.d)) {
-        moveX *= 0.7071;
-        moveZ *= 0.7071;
+    let moveX = 0, moveZ = 0;
+    
+    // Pathfinding logic override
+    if (localPlayerPath && localPlayerPath.length > 0) {
+        const targetPoint = localPlayerPath[0];
+        const dir = new THREE.Vector3().subVectors(targetPoint, playerGroup.position);
+        dir.y = 0; // Move ONLY on XZ plane
+        
+        const dist = dir.length();
+        if (dist < 0.1) {
+            // Reached waypoint
+            localPlayerPath.shift();
+            if (localPlayerPath.length === 0) localPlayerPath = null;
+        } else {
+            dir.normalize();
+            moveX = dir.x * moveSpeed;
+            moveZ = dir.z * moveSpeed;
+        }
+    } else {
+        // Traditional WASD
+        if (keys.w) { moveZ -= moveSpeed; moveX -= moveSpeed; }
+        if (keys.s) { moveZ += moveSpeed; moveX += moveSpeed; }
+        if (keys.a) { moveX -= moveSpeed; moveZ += moveSpeed; }
+        if (keys.d) { moveX += moveSpeed; moveZ -= moveSpeed; }
+
+        if ((keys.w || keys.s) && (keys.a || keys.d)) {
+            moveX *= 0.7071;
+            moveZ *= 0.7071;
+        }
     }
 
     if (moveX !== 0 || moveZ !== 0) {

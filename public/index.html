@@ -16,7 +16,8 @@
         {
             "imports": {
                 "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "three-pathfinding": "https://unpkg.com/three-pathfinding/dist/three-pathfinding.module.js"
             }
         }
     </script>
@@ -92,6 +93,7 @@
     <!-- Menu de Contexto (Botão Direito) -->
     <div id="context-menu" class="context-menu hidden">
         <div id="menu-ground-section">
+            <div class="menu-item" id="menu-create-block">🧱 Criar Bloco</div>
             <div class="menu-item" id="menu-catalog-models">📚 Catálogo de Objetos</div>
             <div class="menu-item" id="menu-import-glb">📦 Importar Local (.glb)</div>
         </div>
