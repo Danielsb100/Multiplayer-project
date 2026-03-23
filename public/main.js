@@ -309,7 +309,10 @@ mapLoader.load('assets/maps/map/map.glb', (gltf) => {
             // NavMesh Extraction
             if (name.includes('navmesh')) {
                 child.visible = false;
-                _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(child.geometry));
+                child.updateMatrixWorld(true);
+                const geo = child.geometry.clone();
+                geo.applyMatrix4(child.matrixWorld);
+                _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(geo));
                 return; // Skip collision and render for navmesh
             }
             
@@ -1295,17 +1298,28 @@ window.addEventListener('mousedown', (event) => {
             if (hitPoint) {
                 const startPos = playerGroup.position.clone();
                 try {
-                    const groupID = _pathfinding.getGroup(_navmeshZone, startPos);
-                    const path = _pathfinding.findPath(startPos, hitPoint, _navmeshZone, groupID);
-                    if (path && path.length > 0) {
-                        localPlayerPath = path;
-                        if (localPlayerPath.length > 1 && localPlayerPath[0].distanceTo(startPos) < 0.5) {
-                            localPlayerPath.shift();
+                    let groupID = _pathfinding.getGroup(_navmeshZone, startPos);
+                    if (groupID === null) groupID = _pathfinding.getGroup(_navmeshZone, hitPoint);
+                    if (groupID === null) groupID = 0; // Fallback to main island
+
+                    const closestStart = _pathfinding.getClosestNode(startPos, _navmeshZone, groupID);
+                    const closestEnd = _pathfinding.getClosestNode(hitPoint, _navmeshZone, groupID);
+
+                    if (closestStart && closestEnd) {
+                        const path = _pathfinding.findPath(closestStart.centroid, closestEnd.centroid, _navmeshZone, groupID);
+                        if (path && path.length > 0) {
+                            localPlayerPath = path;
+                            if (localPlayerPath.length > 1 && localPlayerPath[0].distanceTo(startPos) < 0.5) {
+                                localPlayerPath.shift();
+                            }
+                        } else { 
+                            localPlayerPath = [hitPoint];
                         }
-                    } else { 
+                    } else {
                         localPlayerPath = [hitPoint];
                     }
                 } catch(e) {
+                    console.error("Pathfinding error:", e);
                     localPlayerPath = [hitPoint];
                 }
             }
