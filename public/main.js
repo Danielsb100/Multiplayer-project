@@ -1317,10 +1317,15 @@ window.addEventListener('mousedown', (event) => {
                     if (closestStart && closestEnd) {
                         const path = _pathfinding.findPath(closestStart.centroid, closestEnd.centroid, _navmeshZone, groupID);
                         if (path && path.length > 0) {
-                            localPlayerPath = path;
-                            if (localPlayerPath.length > 1 && localPlayerPath[0].distanceTo(startPos) < 0.5) {
-                                localPlayerPath.shift();
+                            // Force exact end position instead of snapping to centroid
+                            path[path.length - 1] = hitPoint.clone();
+
+                            // Remove the starting centroid to avoid walking backwards slightly
+                            if (path.length > 1) {
+                                path.shift(); 
                             }
+
+                            localPlayerPath = path;
                         } else { 
                             localPlayerPath = [hitPoint];
                         }
@@ -1402,9 +1407,13 @@ window.addEventListener('mousemove', (event) => {
                 root = root.parent;
             }
             if (!isPlayerOrGhost) {
-                hitPoint = hit.point;
-                hitNormal = hit.face ? hit.face.normal : new THREE.Vector3(0,1,0); 
-                break;
+                // Check if it's a floor (normal points UP)
+                let isFloor = hit.face && hit.face.normal.y > 0.5;
+                if (isFloor) {
+                    hitPoint = hit.point;
+                    hitNormal = hit.face.normal; 
+                    break;
+                }
             }
         }
         
