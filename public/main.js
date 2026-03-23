@@ -289,6 +289,37 @@ controls.dampingFactor = 0.05;
 controls.target.set(0, 0, 0);
 controls.enableRotate = false; // Keep isometric view
 
+// --- Environment Map Loading ---
+const mapLoader = new GLTFLoader();
+mapLoader.load('assets/maps/map/map.glb', (gltf) => {
+    const environmentMap = gltf.scene;
+    scene.add(environmentMap);
+
+    environmentMap.traverse((child) => {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+
+            const name = child.name ? child.name.toLowerCase() : '';
+            if (name.includes('collision_')) {
+                child.visible = false;
+                child.userData.id = 'env_col_' + child.uuid;
+                preciseColliders.push(child);
+            } else if (name.includes('wall_')) {
+                const box = new THREE.Box3().setFromObject(child);
+                box.relatedId = 'env_wall_' + child.uuid;
+                wallBoxes.push(box);
+            } else if (name.includes('floor_')) {
+                child.userData.id = 'env_floor_' + child.uuid;
+                preciseColliders.push(child);
+            }
+        }
+    });
+    console.log("Environment map loaded successfully.");
+}, undefined, (error) => {
+    console.warn("Notice: No default map found or error loading map.glb");
+});
+
 // --- Animation Manager ---
 function applyCharacterColor(model, color) {
     if (!model) return;
