@@ -999,6 +999,24 @@ window.addEventListener('contextmenu', (event) => {
 
         // Prioritize interactive objects over ground
         for (const intersect of intersects) {
+            let isPlayerOrGhost = false;
+            let isEnvMap = false;
+            
+            let tempRoot = intersect.object;
+            while (tempRoot && tempRoot !== scene) {
+                if (tempRoot === playerGroup || (tempRoot.userData && tempRoot.userData.isOptimistic) || tempRoot === cursorMarker) isPlayerOrGhost = true;
+                if (tempRoot.userData && tempRoot.userData.id && tempRoot.userData.id.toString().includes('env_')) isEnvMap = true;
+                tempRoot = tempRoot.parent;
+            }
+
+            if (isPlayerOrGhost) continue; // Ignore player and cursor
+
+            // Ignore map walls! Only accept map floors or custom ground!
+            if (isEnvMap) {
+                let isFloor = intersect.face && intersect.face.normal.y > 0.5;
+                if (!isFloor) continue;
+            }
+
             let root = intersect.object;
             while (root && root !== scene) {
                 if (root.userData && root.userData.id) {
