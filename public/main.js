@@ -1552,6 +1552,8 @@ window.addEventListener('resize', () => {
 // --- Movement Logic ---
 let moveSpeed = 0.05; 
 let currentSurfaceHeight = 0;
+let autoWalkStuckTimer = 0;
+const lastStoredPosition = new THREE.Vector3();
 
 function checkCollision(targetPosition) {
     // COMPACT COLLISION: Use a fixed small box for the player (0.4 units wide)
@@ -1668,6 +1670,18 @@ function updatePlayer(delta) {
             dir.normalize();
             moveX = dir.x * moveSpeed;
             moveZ = dir.z * moveSpeed;
+            
+            // Stuck detection (dynamic objects blocking navmesh path)
+            if (lastStoredPosition.distanceToSquared(playerGroup.position) < 0.0001) {
+                autoWalkStuckTimer += delta;
+                if (autoWalkStuckTimer > 0.5) { 
+                    localPlayerPath = null;
+                    autoWalkStuckTimer = 0;
+                }
+            } else {
+                autoWalkStuckTimer = 0;
+                lastStoredPosition.copy(playerGroup.position);
+            }
         }
     } else {
         // Traditional WASD
