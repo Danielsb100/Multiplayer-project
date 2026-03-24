@@ -42,6 +42,10 @@ let placementBasePoint = new THREE.Vector3();
 let previewCube = null;
 let lastMouseY = 0;
 const MAX_CUBE_HEIGHT = 8; 
+console.log("GAME_LOADED: Version 1.2.6 - FIX_CONSTRUCTION_RACE");
+
+let lastStateChangeTime = 0;
+const STATE_CHANGE_DEBOUNCE = 300; // ms
 
 // User Color Logic
 const LOGIN_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ffffff', '#94a3b8'];
@@ -466,10 +470,18 @@ function renderCatalog(type, onSelect) {
             <img src="${item.icon}" onerror="this.src='assets/default.png'">
             <span>${item.name}</span>
         `;
-        div.onclick = () => {
-            onSelect(item); 
-            catalogOverlay.classList.add('hidden');
-            closeContextMenu(); // Ensure context menu also closes
+        div.onclick = (e) => {
+            e.stopPropagation();
+            console.log("Catalog Item Selected:", item.name);
+            try {
+                onSelect(item); 
+                catalogOverlay.classList.add('hidden');
+                closeContextMenu();
+            } catch (err) {
+                console.error("Error in catalog onSelect:", err);
+                catalogOverlay.classList.add('hidden');
+                closeContextMenu();
+            }
         };
         catalogGrid.appendChild(div);
     });
@@ -1145,6 +1157,7 @@ window.addEventListener('contextmenu', (event) => {
 });
 
 document.getElementById('menu-create-block').addEventListener('click', () => {
+    lastStateChangeTime = Date.now();
     currentPlacementState = PlacementState.BASE;
     placementStartPoint.copy(contextMenuPoint);
     
@@ -1376,110 +1389,100 @@ document.querySelectorAll('.color-option').forEach(opt => {
 
 window.addEventListener('mousedown', (event) => {
     if (localUsername === '' || document.activeElement === chatInput || isMenuOpen || isOverUI(event)) return;
-    if (event.button !== 0) return; // Only left click
+    if (event.button !== 0) return; // Only left-click
 
-    if (currentPlacementState === PlacementState.NONE) {
-        // --- Pathfinding Interaction ---
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        
-        const intersects = raycaster.intersectObjects(scene.children, true);
-        if (intersects.length > 0) {
-            let hitPoint = null;
-            for (const hit of intersects) {
-                let isPlayerOrGhost = false;
-                let root = hit.object;
-                while (root && root !== scene) {
-                    if (root === playerGroup || (root.userData && root.userData.isOptimistic)) isPlayerOrGhost = true;
-                    root = root.parent;
+    try {
+        if (currentPlacementState === PlacementState.NONE) {
+            // --- Pathfinding Interaction ---
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            if (intersects.length > 0) {
+                let hitPoint = null;
+                for (const hit of intersects) {
+                    let isPlayerOrGhost = false;
+                    let root = hit.object;
+                    while (root && root !== scene) {
+                        if (root === playerGroup || (root.userData && root.userData.isOptimistic)) isPlayerOrGhost = true;
+                        root = root.parent;
+                    }
+                    if (!isPlayerOrGhost) {
+                        hitPoint = hit.point;
+                        break;
+                    }
                 }
-                if (!isPlayerOrGhost) {
-                    hitPoint = hit.point;
-                    break;
-                }
-            }
-            if (hitPoint) {
-                const startPos = playerGroup.position.clone();
-                try {
-                    const zoneData = _pathfinding.zones[_navmeshZone];
-                    let groupID = 0;
-                    let closestStart = null;
-                    
-                    if (zoneData && zoneData.groups) {
-                        let minDist = Infinity;
-                        for (let g = 0; g < zoneData.groups.length; g++) {
-                            const node = _pathfinding.getClosestNode(startPos, _navmeshZone, g);
-                            if (node) {
-                                const dist = node.centroid.distanceToSquared(startPos);
-                                if (dist < minDist) {
-                                    minDist = dist;
-                                    closestStart = node;
-                                    groupID = g;
+                if (hitPoint) {
+                    const startPos = playerGroup.position.clone();
+                    try {
+                        const zoneData = _pathfinding.zones[_navmeshZone];
+                        let groupID = 0;
+                        if (zoneData && zoneData.groups) {
+                            let minDist = Infinity;
+                            for (let g = 0; g < zoneData.groups.length; g++) {
+                                const node = _pathfinding.getClosestNode(startPos, _navmeshZone, g);
+                                if (node) {
+                                    const dist = node.centroid.distanceToSquared(startPos);
+                                    if (dist < minDist) {
+                                        minDist = dist;
+                                        groupID = g;
+                                    }
                                 }
                             }
+                        } else {
+                            groupID = _pathfinding.getGroup(_navmeshZone, startPos) || 0;
                         }
-                    } else {
-                        groupID = _pathfinding.getGroup(_navmeshZone, startPos) || 0;
-                        closestStart = _pathfinding.getClosestNode(startPos, _navmeshZone, groupID);
-                    }
 
-                    const closestEnd = _pathfinding.getClosestNode(hitPoint, _navmeshZone, groupID);
-
-                    if (closestStart && closestEnd) {
                         const path = _pathfinding.findPath(startPos, hitPoint, _navmeshZone, groupID);
-                        if (path && path.length > 0) {
-                            localPlayerPath = path;
-                        } else { 
-                            localPlayerPath = [hitPoint];
-                        }
-                    } else {
+                        localPlayerPath = (path && path.length > 0) ? path : [hitPoint];
+                    } catch(e) {
+                        console.error("Pathfinding error:", e);
                         localPlayerPath = [hitPoint];
                     }
-                } catch(e) {
-                    console.error("Pathfinding error:", e);
-                    localPlayerPath = [hitPoint];
                 }
             }
-        }
-    } else if (currentPlacementState === PlacementState.HEIGHT) {
-        // Phase 3: Finalize
-        const previewBox = new THREE.Box3().setFromObject(previewCube);
-        // Important: Ignore previewCube itself during this check to avoid self-collision
-        if (checkGeneralCollision(previewBox, true)) {
-            alert("Cannot place cube here: Position occupied by player or object!");
-            cancelPlacement();
-        } else {
-            const size = {
-                w: Math.abs(previewCube.scale.x),
-                h: Math.abs(previewCube.scale.y),
-                d: Math.abs(previewCube.scale.z)
-            };
-            const pos = previewCube.position.clone();
-            if (socket) {
-                socket.emit('placeCube', {
-                    position: pos,
-                    size: size,
-                    color: localUserColor
-                });
+        } else if (currentPlacementState === PlacementState.HEIGHT) {
+            // Phase 3: Finalize
+            console.log("Finalizing placement...");
+            const previewBox = new THREE.Box3().setFromObject(previewCube);
+            if (checkGeneralCollision(previewBox, true)) {
+                alert("Cannot place here: Position occupied!");
+                cancelPlacement();
+            } else {
+                const size = {
+                    w: Math.abs(previewCube.scale.x),
+                    h: Math.abs(previewCube.scale.y),
+                    d: Math.abs(previewCube.scale.z)
+                };
+                const pos = previewCube.position.clone();
+                if (socket) {
+                    socket.emit('placeCube', {
+                        position: pos,
+                        size: size,
+                        color: localUserColor
+                    });
+                }
+                triggerInteract(playerAnims, contextMenuPoint);
+                didInteractThisFrame = true;
+                cancelPlacement();
+                event.stopImmediatePropagation();
+                event.preventDefault();
             }
-            // Cube will appear when server confirms via 'cubeAdded'
-            
-            // Trigger interact animation
-            triggerInteract(playerAnims, contextMenuPoint);
-            didInteractThisFrame = true;
-            interactionPointGlobal = contextMenuPoint.clone();
-            
-            cancelPlacement();
-            // Critical: Ensure no further logic runs this click
-            event.stopImmediatePropagation();
         }
+    } catch (err) {
+        console.error("Error in mousedown:", err);
     }
 });
 
+
 window.addEventListener('mouseup', (event) => {
+    if (isOverUI(event)) return;
+    if (Date.now() - lastStateChangeTime < STATE_CHANGE_DEBOUNCE) return;
+
     if (currentPlacementState === PlacementState.BASE) {
         // Phase 2: Start Height Definition
+        lastStateChangeTime = Date.now();
         currentPlacementState = PlacementState.HEIGHT;
         lastMouseY = event.clientY;
     }
