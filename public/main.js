@@ -1157,13 +1157,16 @@ window.addEventListener('contextmenu', (event) => {
 });
 
 document.getElementById('menu-create-block').addEventListener('click', () => {
+    cancelPlacement(); // Ensure previous state is cleared
     lastStateChangeTime = Date.now();
     currentPlacementState = PlacementState.BASE;
+    console.log("State -> BASE");
     placementStartPoint.copy(contextMenuPoint);
     
     const geo = new THREE.BoxGeometry(1, 1, 1);
     const mat = new THREE.MeshStandardMaterial({ color: localUserColor, transparent: true, opacity: 0.5 });
     previewCube = new THREE.Mesh(geo, mat);
+    previewCube.userData.isPreview = true; // Mark for aggressive cleanup
     previewCube.position.set(placementStartPoint.x, 0.5, placementStartPoint.z);
     scene.add(previewCube);
     
@@ -1392,6 +1395,7 @@ window.addEventListener('mousedown', (event) => {
     if (event.button !== 0) return; // Only left-click
 
     try {
+        console.log("Mousedown - Button:", event.button, "State:", currentPlacementState);
         if (currentPlacementState === PlacementState.NONE) {
             // --- Pathfinding Interaction ---
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -1568,9 +1572,22 @@ window.addEventListener('mousemove', (event) => {
 });
 
 function cancelPlacement() {
+    console.log("cancelPlacement called - Resetting to NONE");
     if (previewCube) {
         scene.remove(previewCube);
         previewCube = null;
+    }
+    // Aggressive cleanup: remove ANY orphan previews
+    try {
+        const toRemove = [];
+        scene.traverse(child => {
+            if (child.userData && child.userData.isPreview) {
+                toRemove.push(child);
+            }
+        });
+        toRemove.forEach(child => scene.remove(child));
+    } catch (err) {
+        console.error("Error in cancelPlacement:", err);
     }
     currentPlacementState = PlacementState.NONE;
 }
