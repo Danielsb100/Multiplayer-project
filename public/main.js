@@ -357,10 +357,9 @@ function setupSocketListeners() {
     socket.on('playerUpdated', (playerInfo) => {
         createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
         if (remotePlayers[playerInfo.id]) {
+            remotePlayers[playerInfo.id].name = playerInfo.name; // Keep name sync
+            remotePlayers[playerInfo.id].color = playerInfo.color;
             if (remotePlayers[playerInfo.id].mainMesh) {
-                if (remotePlayers[playerInfo.id].mainMesh.material) {
-                    remotePlayers[playerInfo.id].mainMesh.material.color.set(playerInfo.color);
-                }
                 applyCharacterColor(remotePlayers[playerInfo.id].mainMesh, playerInfo.color);
             }
         }
@@ -735,7 +734,16 @@ function updatePlayerList() {
     // 2. Add Others
     for (const id in remotePlayers) {
         const player = remotePlayers[id];
-        const name = player.name || 'Desconhecido';
+        let name = player.name || 'Desconhecido';
+        
+        // Final fallback: if state name is Guest or Desconhecido, check gametag
+        if ((!player.name || player.name.includes('Guest')) && gametags[id]) {
+            const tagText = gametags[id].element.innerText.replace('📞', '').replace('(sem voz)', '').trim();
+            if (tagText && !tagText.includes('Guest') && tagText !== 'Carregando...') {
+                 name = tagText;
+                 player.name = name; // Update state silently
+            }
+        }
         
         const playerDiv = document.createElement('div');
         playerDiv.className = 'player-item';
@@ -870,7 +878,7 @@ function addOtherPlayer(playerInfo) {
     avatarContainer.add(avatar.group);
     
     remotePlayers[playerInfo.id] = {
-        name: playerInfo.name,       // Store real name for API calls
+        name: playerInfo.name,       // Store real name or Guest
         group: anchorGroup,          // anchor: use this for position/rotation from network
         avatarContainer: avatarContainer, // visual container: use this for model loading
         mainMesh: avatar.bodyMesh,
@@ -2477,6 +2485,12 @@ btnViewAssets.addEventListener('click', () => {
 });
 
 async function showAssetModal(username) {
+    console.log("Attempting to fetch assets for username:", username);
+    if (!username || username === 'Desconhecido' || username.includes('Guest')) {
+        console.warn("Invalid username for asset fetch:", username);
+        // assetModalOverlay.classList.remove('hidden'); // Still show overlay but with error
+    }
+
     modalUsernameSpan.innerText = username;
     assetListBody.innerHTML = '<tr><td colspan="2">Carregando assets...</td></tr>';
     assetModalOverlay.classList.remove('hidden');
