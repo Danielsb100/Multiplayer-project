@@ -218,7 +218,7 @@ joinBtn.addEventListener('click', async () => {
         }
 
         const token = result.token;
-        localUsername = result.user?.name || email.split('@')[0];
+        localUsername = result.user?.username || email.split('@')[0];
 
         // Initialize socket with the received token
         // @ts-ignore
