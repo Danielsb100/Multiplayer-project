@@ -198,8 +198,19 @@ io.on('connection', (socket) => {
         if (players[socket.id]) {
             players[socket.id].position = movementData.position;
             players[socket.id].rotation = movementData.rotation;
-            players[socket.id].animation = movementData.animation || 'idle'; // Store animation
-            socket.broadcast.emit('playerMoved', players[socket.id]);
+            players[socket.id].animation = movementData.animation || 'idle';
+            
+            // Optimization: Broadcast only movement delta, excluding heavy data like modelData
+            socket.broadcast.emit('playerMoved', {
+                id: socket.id,
+                position: movementData.position,
+                rotation: movementData.rotation,
+                animation: movementData.animation,
+                isJumping: movementData.isJumping,
+                jumpAlpha: movementData.jumpAlpha,
+                didInteract: movementData.didInteract,
+                interactionPoint: movementData.interactionPoint
+            });
         }
     });
 

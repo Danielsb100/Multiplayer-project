@@ -320,16 +320,18 @@ function setupSocketListeners() {
 
     socket.on('playerMoved', (playerInfo) => {
         if (remotePlayers[playerInfo.id]) {
-            const pos = playerInfo.position;
-            remotePlayers[playerInfo.id].group.position.set(pos.x, pos.y, pos.z);
-            remotePlayers[playerInfo.id].group.rotation.set(
+            const p = remotePlayers[playerInfo.id];
+            
+            // Set targets instead of immediate position
+            p.targetPosition.set(playerInfo.position.x, playerInfo.position.y, playerInfo.position.z);
+            p.targetRotation.set(
                 playerInfo.rotation.x,
                 playerInfo.rotation.y,
                 playerInfo.rotation.z
             );
 
-            if (playerInfo.animation && remotePlayers[playerInfo.id].anims) {
-                handleAnimationState(remotePlayers[playerInfo.id].anims, playerInfo.animation);
+            if (playerInfo.animation && p.anims) {
+                handleAnimationState(p.anims, playerInfo.animation);
             }
 
             if (remotePlayers[playerInfo.id].anims) {
@@ -872,6 +874,9 @@ function addOtherPlayer(playerInfo) {
         avatarContainer: avatarContainer, // visual container: use this for model loading
         mainMesh: avatar.bodyMesh,
         color: playerInfo.color,
+        // --- Interpolation Targets ---
+        targetPosition: anchorGroup.position.clone(),
+        targetRotation: anchorGroup.rotation.clone(),
         anims: {
             mixer: null,
             actions: {},
@@ -1918,10 +1923,21 @@ function animate() {
         // Update local mixer
         if (playerAnims && playerAnims.mixer) playerAnims.mixer.update(delta);
         
-        // Update remote mixers
+        // Update remote players with interpolation (lers/slerp)
+        const LERP_SPEED = 0.2; 
         for (const id in remotePlayers) {
-            if (remotePlayers[id].anims && remotePlayers[id].anims.mixer) {
-                remotePlayers[id].anims.mixer.update(delta);
+            const p = remotePlayers[id];
+            
+            // Smooth Position
+            p.group.position.lerp(p.targetPosition, LERP_SPEED);
+            
+            // Smooth Rotation (Simple lerp for Y axis is usually enough for characters)
+            p.group.rotation.x = THREE.MathUtils.lerp(p.group.rotation.x, p.targetRotation.x, LERP_SPEED);
+            p.group.rotation.y = THREE.MathUtils.lerp(p.group.rotation.y, p.targetRotation.y, LERP_SPEED);
+            p.group.rotation.z = THREE.MathUtils.lerp(p.group.rotation.z, p.targetRotation.z, LERP_SPEED);
+
+            if (p.anims && p.anims.mixer) {
+                p.anims.mixer.update(delta);
             }
         }
 
