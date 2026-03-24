@@ -735,7 +735,7 @@ function updatePlayerList() {
     // 2. Add Others
     for (const id in remotePlayers) {
         const player = remotePlayers[id];
-        const name = gametags[id] ? (gametags[id].element.innerText.replace('📞', '').trim()) : 'Carregando...';
+        const name = player.name || 'Desconhecido';
         
         const playerDiv = document.createElement('div');
         playerDiv.className = 'player-item';
@@ -870,6 +870,7 @@ function addOtherPlayer(playerInfo) {
     avatarContainer.add(avatar.group);
     
     remotePlayers[playerInfo.id] = {
+        name: playerInfo.name,       // Store real name for API calls
         group: anchorGroup,          // anchor: use this for position/rotation from network
         avatarContainer: avatarContainer, // visual container: use this for model loading
         mainMesh: avatar.bodyMesh,
@@ -2481,7 +2482,7 @@ async function showAssetModal(username) {
     assetModalOverlay.classList.remove('hidden');
 
     try {
-        const response = await fetch(`${AUTH_API}/api/documents/user/${username}`);
+        const response = await fetch(`${AUTH_API}/api/documents/user/${encodeURIComponent(username)}`);
         const data = await response.json();
 
         if (!response.ok) throw new Error(data.error || 'Falha ao buscar assets');
