@@ -91,6 +91,40 @@ const placedModels = [];
 const chatHistory = []; // New: Stores the last 50 messages
 const MAX_CHAT_LOGS = 50;
 
+// Expose catalog data via HTTP so clients can fetch avatars before connecting socket
+app.get('/api/catalog', (req, res) => {
+    res.json({
+        characters: getCatalogItems('characters'),
+        models: getCatalogItems('models'),
+        structures: getCatalogItems('structures')
+    });
+});
+
+// Setup socket authentication middleware
+io.use(async (socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (!token) {
+        return next(new Error("Authentication error: No token provided"));
+    }
+    
+    try {
+        const response = await fetch('https://login-system-production-84c6.up.railway.app/auth/verify', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            return next(new Error("Authentication error: Invalid token"));
+        }
+        
+        const userData = await response.json();
+        socket.user = userData; // Attach user info to the socket instance
+        next();
+    } catch (err) {
+        return next(new Error("Authentication error: Verification request failed"));
+    }
+});
+
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
@@ -111,13 +145,6 @@ io.on('connection', (socket) => {
     socket.emit('initialCubes', placedCubes);
     socket.emit('initialModels', placedModels);
     socket.emit('initialChatHistory', chatHistory); // Sync chat history
-
-    // Send Catalog Data
-    socket.emit('catalogData', {
-        characters: getCatalogItems('characters'),
-        models: getCatalogItems('models'),
-        structures: getCatalogItems('structures')
-    });
 
     // Broadcast the new player
     socket.broadcast.emit('newPlayer', players[socket.id]);

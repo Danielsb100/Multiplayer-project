@@ -7,11 +7,14 @@ import { Pathfinding } from 'three-pathfinding';
 const _pathfinding = new Pathfinding();
 const _navmeshZone = 'level1';
 let localPlayerPath = null;// --- 0. Socket & Login ---
-const socket = io();
+// --- 0. Socket & Login ---
+let socket = null; 
 let localUsername = '';
 const loginScreen = document.getElementById('login-screen');
 const joinBtn = document.getElementById('join-btn');
-const usernameInput = document.getElementById('username-input');
+const emailInput = document.getElementById('email-input');
+const passwordInput = document.getElementById('password-input');
+const loginError = document.getElementById('login-error');
 
 // Map to track object IDs to Three.js UUIDs
 const idToUuid = {};
@@ -22,7 +25,6 @@ window.addEventListener('mousemove', (e) => {
     customCursor.style.left = e.clientX + 'px';
     customCursor.style.top = e.clientY + 'px';
 });
-
 window.addEventListener('mousedown', () => customCursor.classList.add('clicking'));
 window.addEventListener('mouseup', () => customCursor.classList.remove('clicking'));
 
@@ -38,7 +40,7 @@ let placementStartPoint = new THREE.Vector3();
 let placementBasePoint = new THREE.Vector3();
 let previewCube = null;
 let lastMouseY = 0;
-const MAX_CUBE_HEIGHT = 8; // Height limit as requested
+const MAX_CUBE_HEIGHT = 8; 
 
 // User Color Logic
 const LOGIN_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ffffff', '#94a3b8'];
@@ -50,7 +52,6 @@ const loginColorOptions = document.querySelectorAll('.login-color-option');
 loginColorOptions.forEach(opt => {
     const color = opt.dataset.color;
     if (color === localUserColor) opt.classList.add('active');
-    
     opt.addEventListener('click', () => {
         loginColorOptions.forEach(o => o.classList.remove('active'));
         opt.classList.add('active');
@@ -67,7 +68,6 @@ let contextMenuPoint = new THREE.Vector3();
 const wallBoxes = [];
 const preciseColliders = [];
 const GRID_SIZE = 1.0; 
-
 const activeLoads = new Set();
 const abortedLoads = new Set();
 
@@ -79,6 +79,7 @@ function snapToGrid(v) {
         Math.round(v.z / GRID_SIZE) * GRID_SIZE
     );
 }
+
 const contextMenu = document.getElementById('context-menu');
 const menuGroundSection = document.getElementById('menu-ground-section');
 const menuCubeSection = document.getElementById('menu-cube-section');
@@ -86,15 +87,21 @@ const menuModelSection = document.getElementById('menu-model-section');
 const contextGlbUpload = document.getElementById('context-glb-upload');
 
 // Catalog State & UI
-let catalogData = { characters: [], models: [] };
+let catalogData = { characters: [], models: [], structures: [] };
 let selectedCatalogModelUrl = null;
-let selectedCatalogAnims = null; // New
+let selectedCatalogAnims = null; 
 const catalogOverlay = document.getElementById('catalog-overlay');
 const catalogGrid = document.getElementById('catalog-grid');
 const catalogTitle = document.getElementById('catalog-title');
 const closeCatalogBtn = document.getElementById('close-catalog');
 const catalogCharBtn = document.getElementById('catalog-char-btn');
 const menuCatalogModels = document.getElementById('menu-catalog-models');
+
+// Fetch catalog data immediately via HTTP
+fetch('/api/catalog')
+    .then(res => res.json())
+    .then(data => { catalogData = data; })
+    .catch(err => console.error("Error fetching catalog:", err));
 
 // --- Animation State ---
 const playerAnims = {
@@ -103,7 +110,7 @@ const playerAnims = {
     currentState: null,
     currentAction: null
 };
-let playerState = 'idle'; // idle, walk, jump, interact
+let playerState = 'idle'; 
 let jumpVelocity = 0;
 const GRAVITY = -0.01;
 const JUMP_FORCE = 0.2;
@@ -112,14 +119,14 @@ let isGrounded = true;
 // Parabolic Jump State
 let isJumping = false;
 let jumpTime = 0;
-const JUMP_DURATION = 0.6; // Seconds
+const JUMP_DURATION = 0.6; 
 const JUMP_HEIGHT = 1.5;
 
 // PeerJS & Audio State
 let peer = null;
 let localStream = null;
 let currentCall = null;
-const peerIdToName = {}; // Map peerId -> name
+const peerIdToName = {}; 
 let callDurationInterval = null;
 let secondsElapsed = 0;
 let audioContext = null;
@@ -147,10 +154,6 @@ function isOverUI(event) {
     return event.target.closest('.ui-layer') || event.target.closest('.context-menu');
 }
 
-socket.on('catalogData', (data) => {
-    catalogData = data;
-});
-
 loginGlbUpload.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -163,11 +166,47 @@ loginGlbUpload.addEventListener('change', (e) => {
     }
 });
 
-joinBtn.addEventListener('click', () => {
-    const name = usernameInput.value.trim();
-    if (name) {
-        localUsername = name;
-        socket.emit('setName', { name, color: localUserColor });
+joinBtn.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value.trim();
+
+    if (!email || !password) {
+        loginError.innerText = "Please enter email and password";
+        loginError.classList.remove('hidden');
+        return;
+    }
+
+    joinBtn.disabled = true;
+    joinBtn.innerText = "Connecting...";
+    loginError.classList.add('hidden');
+
+    try {
+        const response = await fetch('https://login-system-production-84c6.up.railway.app/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || "Login failed");
+        }
+
+        const token = result.token;
+        localUsername = result.user?.name || email.split('@')[0];
+
+        // Initialize socket with the received token
+        // @ts-ignore
+        socket = io({
+            auth: { token }
+        });
+
+        // Setup socket listeners
+        setupSocketListeners();
+
+        // Emit initial user data
+        socket.emit('setName', { name: localUsername, color: localUserColor });
         
         if (selectedModelBuffer) {
             socket.emit('modelUpdate', { buffer: selectedModelBuffer });
@@ -188,7 +227,6 @@ joinBtn.addEventListener('click', () => {
                 interact: 'assets/characters/default/interact.glb'
             };
             
-            // Check if it exists via a fetch (simplified check)
             fetch(defaultModelPath, { method: 'HEAD' })
                 .then(res => {
                     if (res.ok) {
@@ -198,7 +236,6 @@ joinBtn.addEventListener('click', () => {
                         });
                         loadModelByUrl(defaultModelPath, defaultModelAnims);
                     } else {
-                        // Fallback to cube if default.glb is not found
                         if (characterMesh && characterMesh.material) {
                             characterMesh.material.color.set(localUserColor);
                         }
@@ -213,15 +250,190 @@ joinBtn.addEventListener('click', () => {
 
         playerGroup.visible = true;
         loginScreen.classList.add('hidden');
-        createGametag(socket.id, name, localUserColor, true);
+        createGametag(socket.id, localUsername, localUserColor, true);
 
         // Initialize PeerJS for audio calls
         initPeer();
         
         playerListContainer.classList.remove('hidden');
         updatePlayerList();
+
+    } catch (err) {
+        console.error("Login error:", err);
+        loginError.innerText = err.message;
+        loginError.classList.remove('hidden');
+        joinBtn.disabled = false;
+        joinBtn.innerText = "Entrar no Mundo";
     }
 });
+
+function setupSocketListeners() {
+    socket.on('connect_error', (err) => {
+        console.error("Socket connection error:", err.message);
+        loginError.innerText = "Connection failed: " + err.message;
+        loginError.classList.remove('hidden');
+        
+        // Show login screen again if connection was rejected
+        loginScreen.classList.remove('hidden');
+        playerGroup.visible = false;
+        joinBtn.disabled = false;
+        joinBtn.innerText = "Entrar no Mundo";
+    });
+
+    socket.on('currentPlayers', (players) => {
+        Object.keys(players).forEach((id) => {
+            if (id === socket.id) return;
+            addOtherPlayer(players[id]);
+            if (players[id].peerId) peerIdToName[players[id].peerId] = players[id].name;
+        });
+        updatePlayerList();
+    });
+
+    socket.on('newPlayer', (playerInfo) => {
+        addOtherPlayer(playerInfo);
+        updatePlayerList();
+    });
+
+    socket.on('playerMoved', (playerInfo) => {
+        if (remotePlayers[playerInfo.id]) {
+            remotePlayers[playerInfo.id].group.position.copy(playerInfo.position);
+            remotePlayers[playerInfo.id].group.rotation.set(
+                playerInfo.rotation.x,
+                playerInfo.rotation.y,
+                playerInfo.rotation.z
+            );
+
+            if (playerInfo.animation && remotePlayers[playerInfo.id].anims) {
+                handleAnimationState(remotePlayers[playerInfo.id].anims, playerInfo.animation);
+            }
+
+            if (remotePlayers[playerInfo.id].anims) {
+                const rAnims = remotePlayers[playerInfo.id].anims;
+                if (playerInfo.isJumping) {
+                    if (rAnims.actions['jump']) {
+                        rAnims.actions['jump'].setEffectiveWeight(playerInfo.jumpAlpha || 0);
+                        rAnims.actions['jump'].play();
+                    }
+                } else {
+                    if (rAnims.actions['jump']) {
+                        if (rAnims.actions['jump'].isRunning()) rAnims.actions['jump'].fadeOut(0.2);
+                    }
+                }
+
+                if (playerInfo.didInteract) {
+                    triggerInteract(rAnims, playerInfo.interactionPoint);
+                }
+            }
+        }
+    });
+
+    socket.on('playerUpdated', (playerInfo) => {
+        createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
+        if (remotePlayers[playerInfo.id]) {
+            if (remotePlayers[playerInfo.id].mainMesh) {
+                if (remotePlayers[playerInfo.id].mainMesh.material) {
+                    remotePlayers[playerInfo.id].mainMesh.material.color.set(playerInfo.color);
+                }
+                applyCharacterColor(remotePlayers[playerInfo.id].mainMesh, playerInfo.color);
+            }
+        }
+        updatePlayerList();
+    });
+
+    socket.on('playerDisconnected', (id) => {
+        if (remotePlayers[id]) {
+            scene.remove(remotePlayers[id].group);
+            delete remotePlayers[id];
+        }
+        removeGametag(id);
+        updatePlayerList();
+    });
+
+    socket.on('playerPeerUpdated', (data) => {
+        if (remotePlayers[data.id]) {
+            remotePlayers[data.id].peerId = data.peerId;
+            peerIdToName[data.peerId] = remotePlayers[data.id].name || 'Player';
+            updatePlayerList();
+        }
+    });
+
+    socket.on('playerModelUpdated', (data) => {
+        if (remotePlayers[data.id]) {
+            const mData = data.modelData;
+            if (mData) {
+                if (mData.buffer) {
+                    loadModelFromBuffer(mData.buffer, remotePlayers[data.id], data.color);
+                } else if (mData.path) {
+                    updateRemotePlayerModelByUrl(data.id, mData.path, mData.animations, data.color);
+                }
+            }
+        }
+    });
+
+    socket.on('initialCubes', (cubes) => {
+        if (cubes) cubes.forEach(cube => createCube(cube));
+    });
+
+    socket.on('initialModels', (models) => {
+        if (models) models.forEach(model => createPlacedModel(model));
+    });
+
+    socket.on('cubeAdded', (cube) => {
+        createCube(cube);
+    });
+
+    socket.on('modelAdded', (model) => {
+        createPlacedModel(model);
+    });
+
+    socket.on('objectDeleted', (id) => {
+        const uuid = idToUuid[id];
+        if (uuid) {
+            const obj = scene.getObjectByProperty('uuid', uuid);
+            if (obj) scene.remove(obj);
+        }
+        for (let i = wallBoxes.length - 1; i >= 0; i--) {
+            if (wallBoxes[i].relatedId == id) wallBoxes.splice(i, 1);
+        }
+        for (let i = preciseColliders.length - 1; i >= 0; i--) {
+            if (preciseColliders[i].userData && preciseColliders[i].userData.id == id) {
+                preciseColliders.splice(i, 1);
+            }
+        }
+        delete idToUuid[id];
+    });
+
+    socket.on('objectUpdated', (data) => {
+        const obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
+        if (obj) {
+            if (data.color) {
+                if (obj.material) obj.material.color.set(data.color);
+                else {
+                    obj.traverse(child => {
+                        if (child.isMesh && child.material && !child.name.toLowerCase().includes('collision')) {
+                            child.material.color.set(data.color);
+                        }
+                    });
+                }
+            }
+            if (data.rotation) {
+                obj.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+                obj.updateMatrixWorld(true);
+                for (const box of wallBoxes) {
+                    if (box.relatedId == data.id) box.setFromObject(obj);
+                }
+            }
+        }
+    });
+
+    socket.on('chatMessage', (data) => {
+        addMessageToChat(data);
+    });
+
+    socket.on('initialChatHistory', (history) => {
+        if (history) history.forEach(msg => addMessageToChat(msg));
+    });
+}
 
 catalogCharBtn.addEventListener('click', () => {
     openCatalog('characters', (item) => {
@@ -552,118 +764,21 @@ function updateGametags() {
 }
 
 // --- Socket Events ---
-socket.on('currentPlayers', (players) => {
-    Object.keys(players).forEach((id) => {
-        if (id === socket.id) return;
-        addOtherPlayer(players[id]);
-        if (players[id].peerId) peerIdToName[players[id].peerId] = players[id].name;
-    });
-    updatePlayerList();
-});
-
-socket.on('newPlayer', (playerInfo) => {
-    addOtherPlayer(playerInfo);
-    updatePlayerList();
-});
-
-socket.on('playerMoved', (playerInfo) => {
-    if (remotePlayers[playerInfo.id]) {
-        // Copy full position (x, y, z) to the anchor group — Y is always replicated
-        remotePlayers[playerInfo.id].group.position.copy(playerInfo.position);
-        remotePlayers[playerInfo.id].group.rotation.set(
-            playerInfo.rotation.x,
-            playerInfo.rotation.y,
-            playerInfo.rotation.z
-        );
-
-        // Update remote base animation
-        if (playerInfo.animation && remotePlayers[playerInfo.id].anims) {
-            handleAnimationState(remotePlayers[playerInfo.id].anims, playerInfo.animation);
-        }
-
-        // Handle remote jump/interact overlays
-        if (remotePlayers[playerInfo.id].anims) {
-            const rAnims = remotePlayers[playerInfo.id].anims;
-            if (playerInfo.isJumping) {
-                if (rAnims.actions['jump']) {
-                    rAnims.actions['jump'].setEffectiveWeight(playerInfo.jumpAlpha || 0);
-                    rAnims.actions['jump'].play();
-                }
-            } else {
-                if (rAnims.actions['jump']) {
-                    if (rAnims.actions['jump'].isRunning()) rAnims.actions['jump'].fadeOut(0.2);
-                }
-            }
-
-            if (playerInfo.didInteract) {
-                triggerInteract(rAnims, playerInfo.interactionPoint);
-            }
-        }
+// (This area will have socket calls, so ensure 'socket' is checked before use)
+function sendMovement(pos, rot, anim) {
+    if (socket) {
+        socket.emit('playerMovement', {
+            position: pos,
+            rotation: rot,
+            animation: anim,
+            isJumping: isJumping,
+            jumpAlpha: jumpTime / JUMP_DURATION,
+            didInteract: didInteractThisFrame,
+            interactionPoint: interactionPointGlobal
+        });
+        didInteractThisFrame = false;
     }
-});
-
-let didInteractThisFrame = false; // New flag
-
-socket.on('playerUpdated', (playerInfo) => {
-    createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
-    if (remotePlayers[playerInfo.id]) {
-        if (remotePlayers[playerInfo.id].mainMesh) {
-            // Apply color to material if it's the default cube or has 'clothes' material
-            if (remotePlayers[playerInfo.id].mainMesh.material) {
-                remotePlayers[playerInfo.id].mainMesh.material.color.set(playerInfo.color);
-            }
-            applyCharacterColor(remotePlayers[playerInfo.id].mainMesh, playerInfo.color);
-        }
-    }
-    updatePlayerList();
-});
-
-socket.on('playerDisconnected', (id) => {
-    if (remotePlayers[id]) {
-        scene.remove(remotePlayers[id].group);
-        delete remotePlayers[id];
-    }
-    removeGametag(id);
-    updatePlayerList();
-});
-
-socket.on('playerPeerUpdated', (data) => {
-    if (remotePlayers[data.id]) {
-        remotePlayers[data.id].peerId = data.peerId;
-        peerIdToName[data.peerId] = remotePlayers[data.id].name || 'Player';
-        console.log(`Remote player ${data.id} has PeerID: ${data.peerId}`);
-        updatePlayerList();
-    }
-});
-
-socket.on('playerModelUpdated', (data) => {
-    if (remotePlayers[data.id]) {
-        const mData = data.modelData;
-        if (mData) {
-            if (mData.buffer) {
-                loadModelFromBuffer(mData.buffer, remotePlayers[data.id], data.color);
-            } else if (mData.path) {
-                updateRemotePlayerModelByUrl(data.id, mData.path, mData.animations, data.color);
-            }
-        }
-    }
-});
-
-socket.on('initialCubes', (cubes) => {
-    if (cubes) cubes.forEach(cube => createCube(cube));
-});
-
-socket.on('initialModels', (models) => {
-    if (models) models.forEach(model => createPlacedModel(model));
-});
-
-socket.on('cubeAdded', (cube) => {
-    createCube(cube);
-});
-
-socket.on('modelAdded', (model) => {
-    createPlacedModel(model);
-});
+}
 
 function cleanupByPosition(pos) {
     const targets = [];
@@ -759,13 +874,8 @@ socket.on('objectUpdated', (data) => {
     }
 });
 
-socket.on('chatMessage', (data) => {
-    addMessageToChat(data);
-});
-
-socket.on('initialChatHistory', (history) => {
-    if (history) history.forEach(msg => addMessageToChat(msg));
-});
+// (Removed redundant sync area - already in setupSocketListeners)
+function syncChatHistory(history) {}
 
 function addOtherPlayer(playerInfo) {
     // Anchor group: holds only network position/rotation — never touched visually
@@ -1091,11 +1201,13 @@ document.getElementById('menu-create-block').addEventListener('click', () => {
 
 document.getElementById('menu-catalog-models').addEventListener('click', () => {
     openCatalog('models', (item) => {
-        socket.emit('placeModel', {
-            modelPath: item.model,
-            position: contextMenuPoint.clone(),
-            isStructure: false
-        });
+        if (socket) {
+            socket.emit('placeModel', {
+                modelPath: item.model,
+                position: contextMenuPoint.clone(),
+                isStructure: false
+            });
+        }
         
         // Trigger interact animation
         triggerInteract(playerAnims, contextMenuPoint);
@@ -1113,11 +1225,13 @@ document.getElementById('menu-ground-section').appendChild(menuCatalogStructs);
 
 menuCatalogStructs.onclick = () => {
     openCatalog('structures', (item) => {
-        socket.emit('placeModel', {
-            modelPath: item.model,
-            position: contextMenuPoint.clone(),
-            isStructure: true
-        });
+        if (socket) {
+            socket.emit('placeModel', {
+                modelPath: item.model,
+                position: contextMenuPoint.clone(),
+                isStructure: true
+            });
+        }
         
         triggerInteract(playerAnims, contextMenuPoint);
         didInteractThisFrame = true;
@@ -1150,10 +1264,12 @@ contextGlbUpload.addEventListener('change', (e) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             const buffer = event.target.result;
-            socket.emit('placeModel', {
-                modelBuffer: buffer,
-                position: contextMenuPoint.clone()
-            });
+            if (socket) {
+                socket.emit('placeModel', {
+                    modelBuffer: buffer,
+                    position: contextMenuPoint.clone()
+                });
+            }
             // Object will appear when server confirms via 'modelAdded'
             triggerInteract(playerAnims, contextMenuPoint);
             didInteractThisFrame = true;
@@ -1192,14 +1308,14 @@ function checkGeneralCollision(box, ignorePreview = false) {
 }
 
 document.getElementById('menu-delete-cube').addEventListener('click', () => {
-    if (contextMenuTarget && contextMenuTarget.userData.id) {
+    if (contextMenuTarget && contextMenuTarget.userData.id && socket) {
         socket.emit('deleteObject', contextMenuTarget.userData.id);
     }
     closeContextMenu();
 });
 
 document.getElementById('menu-delete-model').addEventListener('click', () => {
-    if (contextMenuTarget && contextMenuTarget.userData.id) {
+    if (contextMenuTarget && contextMenuTarget.userData.id && socket) {
         socket.emit('deleteObject', contextMenuTarget.userData.id);
     }
     closeContextMenu();
@@ -1279,15 +1395,17 @@ function rotateObject(target, angle) {
         }
     }
     
-    socket.emit('updateObjectRotation', {
-        id: target.userData.id,
-        rotation: { x: target.rotation.x, y: target.rotation.y, z: target.rotation.z }
-    });
+    if (socket) {
+        socket.emit('updateObjectRotation', {
+            id: target.userData.id,
+            rotation: { x: target.rotation.x, y: target.rotation.y, z: target.rotation.z }
+        });
+    }
 }
 
 document.querySelectorAll('.color-option').forEach(opt => {
     opt.addEventListener('click', () => {
-        if (contextMenuTarget && contextMenuTarget.userData.id) {
+        if (contextMenuTarget && contextMenuTarget.userData.id && socket) {
             socket.emit('updateObjectColor', {
                 id: contextMenuTarget.userData.id,
                 color: opt.dataset.color
@@ -1379,12 +1497,13 @@ window.addEventListener('mousedown', (event) => {
                 d: Math.abs(previewCube.scale.z)
             };
             const pos = previewCube.position.clone();
-
-            socket.emit('placeCube', {
-                position: pos,
-                size: size,
-                color: localUserColor
-            });
+            if (socket) {
+                socket.emit('placeCube', {
+                    position: pos,
+                    size: size,
+                    color: localUserColor
+                });
+            }
             // Cube will appear when server confirms via 'cubeAdded'
             
             // Trigger interact animation
@@ -1719,15 +1838,17 @@ function updatePlayer(delta) {
 }
 
 function broadcastMovement() {
-    socket.emit('playerMovement', {
-        position: playerGroup.position,
-        rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
-        animation: playerAnims.currentState,
-        isJumping: isJumping,
-        jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
-        didInteract: didInteractThisFrame,
-        interactionPoint: interactionPointGlobal
-    });
+    if (socket) {
+        socket.emit('playerMovement', {
+            position: playerGroup.position,
+            rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
+            animation: playerAnims.currentState,
+            isJumping: isJumping,
+            jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
+            didInteract: didInteractThisFrame,
+            interactionPoint: interactionPointGlobal
+        });
+    }
     didInteractThisFrame = false; // Reset for next emit
 }
 

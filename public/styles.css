@@ -266,8 +266,10 @@ input[type="file"] {
     font-size: 0.95rem;
 }
 
-/* Estilo do input de texto (nome de usuário) */
-.login-box input {
+/* Estilo do input de texto (nome de usuário e credenciais) */
+.login-box input[type="text"],
+.login-box input[type="email"],
+.login-box input[type="password"] {
     width: 100%;
     padding: 1rem 1.25rem;
     background: rgba(0,0,0,0.2);
