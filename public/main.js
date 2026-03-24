@@ -16,6 +16,7 @@ const joinBtn = document.getElementById('join-btn');
 const emailInput = document.getElementById('email-input');
 const passwordInput = document.getElementById('password-input');
 const loginError = document.getElementById('login-error');
+const AUTH_API = 'https://login-system-production-84c6.up.railway.app';
 
 // Map to track object IDs to Three.js UUIDs
 const idToUuid = {};
@@ -99,6 +100,20 @@ const catalogOverlay = document.getElementById('catalog-overlay');
 const catalogGrid = document.getElementById('catalog-grid');
 const catalogTitle = document.getElementById('catalog-title');
 const closeCatalogBtn = document.getElementById('close-catalog');
+
+// Player Interaction UI
+const playerActionMenu = document.getElementById('player-action-menu');
+const actionMenuName = document.getElementById('action-menu-name');
+const btnCallPlayer = document.getElementById('btn-call-player');
+const btnViewAssets = document.getElementById('btn-view-assets');
+
+const assetModalOverlay = document.getElementById('asset-modal-overlay');
+const modalUsernameSpan = document.getElementById('modal-username');
+const assetListBody = document.getElementById('asset-list-body');
+const closeAssetModalBtn = document.getElementById('close-asset-modal');
+
+let selectedPlayerForAction = null;
+let selectedPlayerPeerId = null;
 const catalogCharBtn = document.getElementById('catalog-char-btn');
 const menuCatalogModels = document.getElementById('menu-catalog-models');
 
@@ -725,30 +740,20 @@ function updatePlayerList() {
         
         const infoDiv = document.createElement('div');
         infoDiv.className = 'player-info';
+        infoDiv.style.cursor = 'pointer';
         infoDiv.innerHTML = `
-            <div class="player-status-dot"></div>
+            <div class="player-status-dot" style="background: ${player.peerId ? '#10b981' : '#64748b'}"></div>
             <span class="player-name">${name}</span>
+            ${!player.peerId ? '<span style="font-size: 0.7rem; color: #94a3b8; margin-left: 5px;">(sem voz)</span>' : ''}
         `;
         
-        const callBtn = document.createElement('button');
-        callBtn.className = 'call-icon-btn';
-        callBtn.innerHTML = '📞';
-        
-        if (!player.peerId) {
-            callBtn.classList.add('disabled');
-            callBtn.title = 'Voz não disponível';
-        }
-
-        callBtn.onclick = () => {
-            if (player.peerId) {
-                makeCall(player.peerId, name);
-            } else {
-                alert('Este jogador ainda não configurou o canal de voz.');
-            }
-        };
+        infoDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectedPlayerPeerId = player.peerId; // Track peerId for the menu
+            showPlayerActionMenu(name, e);
+        });
 
         playerDiv.appendChild(infoDiv);
-        playerDiv.appendChild(callBtn);
         playerListContent.appendChild(playerDiv);
     }
 }
@@ -1392,6 +1397,15 @@ document.querySelectorAll('.color-option').forEach(opt => {
 
 window.addEventListener('mousedown', (event) => {
     if (localUsername === '' || document.activeElement === chatInput || isMenuOpen || isOverUI(event)) return;
+    
+    // Feature: Cancel with RIGHT click immediately
+    if (event.button === 2 && currentPlacementState !== PlacementState.NONE) {
+        cancelPlacement();
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+    }
+
     if (event.button !== 0) return; // Only left-click
 
     try {
@@ -1481,6 +1495,7 @@ window.addEventListener('mousedown', (event) => {
 
 
 window.addEventListener('mouseup', (event) => {
+    if (event.button !== 0) return; // ONLY LEFT CLICK
     if (isOverUI(event)) return;
     if (Date.now() - lastStateChangeTime < STATE_CHANGE_DEBOUNCE) return;
 
@@ -2414,3 +2429,90 @@ btnMute.onclick = () => {
     }
 };
 
+// --- Player Interaction Menu & Asset Modal ---
+
+function showPlayerActionMenu(username, event) {
+    selectedPlayerForAction = username;
+    actionMenuName.innerText = username;
+    
+    playerActionMenu.style.left = event.clientX + 'px';
+    playerActionMenu.style.top = event.clientY + 'px';
+    playerActionMenu.classList.remove('hidden');
+    
+    // Auto-close when clicking elsewhere
+    const closeMenu = () => {
+        playerActionMenu.classList.add('hidden');
+        window.removeEventListener('click', closeMenu);
+    };
+    setTimeout(() => window.addEventListener('click', closeMenu), 10);
+}
+
+btnCallPlayer.addEventListener('click', () => {
+    if (selectedPlayerPeerId) {
+        makeCall(selectedPlayerPeerId, selectedPlayerForAction);
+    } else {
+        alert('Este jogador ainda não configurou o canal de voz.');
+    }
+});
+
+btnViewAssets.addEventListener('click', () => {
+    showAssetModal(selectedPlayerForAction);
+});
+
+async function showAssetModal(username) {
+    modalUsernameSpan.innerText = username;
+    assetListBody.innerHTML = '<tr><td colspan="2">Carregando assets...</td></tr>';
+    assetModalOverlay.classList.remove('hidden');
+
+    try {
+        const response = await fetch(`${AUTH_API}/api/documents/user/${username}`);
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.error || 'Falha ao buscar assets');
+
+        if (!data.documents || data.documents.length === 0) {
+            assetListBody.innerHTML = '<tr><td colspan="2" style="text-align: center;">Nenhum asset compartilhado.</td></tr>';
+            return;
+        }
+
+        assetListBody.innerHTML = '';
+        data.documents.forEach(doc => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${doc.name}</strong></td>
+                <td><button class="secondary-btn btn-sm" onclick="downloadSharedAsset(${doc.id}, '${doc.name}')">Download</button></td>
+            `;
+            assetListBody.appendChild(tr);
+        });
+    } catch (err) {
+        assetListBody.innerHTML = `<tr><td colspan="2" style="color: #ef4444;">Erro: ${err.message}</td></tr>`;
+    }
+}
+
+// Global download function for the modal
+window.downloadSharedAsset = async (id, name) => {
+    try {
+        const response = await fetch(`${AUTH_API}/api/documents/download/${id}`);
+        if (!response.ok) throw new Error('Download falhou');
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (err) {
+        alert('Erro ao baixar arquivo: ' + err.message);
+    }
+};
+
+closeAssetModalBtn.addEventListener('click', () => {
+    assetModalOverlay.classList.add('hidden');
+});
+
+assetModalOverlay.addEventListener('click', (e) => {
+    if (e.target === assetModalOverlay) assetModalOverlay.classList.add('hidden');
+});

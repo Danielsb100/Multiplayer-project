@@ -934,3 +934,107 @@ input[type="file"] {
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: white;
 }
+/* --- Player Interaction & Asset Sharing --- */
+
+#player-action-menu {
+    min-width: 150px;
+}
+
+.menu-header {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 6px 14px;
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    border-radius: 8px 8px 0 0;
+    margin-bottom: 4px;
+}
+
+/* Modal de Assets */
+.asset-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(8px);
+    z-index: 100001;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.asset-modal {
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 24px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    animation: modalPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modalPop {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.modal-header h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, #ffffff, #94a3b8);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 2rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.asset-list-container {
+    overflow-y: auto;
+    max-height: 50vh;
+}
+
+.asset-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.asset-table th {
+    text-align: left;
+    padding: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--panel-border);
+}
+
+.asset-table td {
+    padding: 1rem 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.asset-table .btn {
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+}

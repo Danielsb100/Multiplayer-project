@@ -12,6 +12,38 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     
     <!-- Import map for Three.js without a build tool -->
+    <!-- Player Action Menu (Small popup for Call / View Assets) -->
+    <div id="player-action-menu" class="context-menu hidden ui-layer">
+        <div class="menu-header">
+            <span id="action-menu-name">Username</span>
+        </div>
+        <div class="menu-item" id="btn-call-player">📞 Ligar</div>
+        <div class="menu-item" id="btn-view-assets">📁 Ver Assets</div>
+    </div>
+
+    <!-- Assets Modal (Download shared documents) -->
+    <div id="asset-modal-overlay" class="asset-modal-overlay hidden ui-layer">
+        <div class="asset-modal glassmorphism">
+            <div class="modal-header">
+                <h2>Shared Assets - <span id="modal-username">User</span></h2>
+                <button id="close-asset-modal" class="close-btn">&times;</button>
+            </div>
+            <div class="asset-list-container">
+                <table class="asset-table">
+                    <thead>
+                        <tr>
+                            <th>Arquivo</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="asset-list-body">
+                        <!-- List populated via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <script type="importmap">
         {
             "imports": {
