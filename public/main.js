@@ -467,8 +467,9 @@ function renderCatalog(type, onSelect) {
             <span>${item.name}</span>
         `;
         div.onclick = () => {
-            onSelect(item); // Pass full item instead of just model URL
+            onSelect(item); 
             catalogOverlay.classList.add('hidden');
+            closeContextMenu(); // Ensure context menu also closes
         };
         catalogGrid.appendChild(div);
     });
@@ -1192,7 +1193,8 @@ menuCatalogStructs.onclick = () => {
         
         triggerInteract(playerAnims, contextMenuPoint);
         didInteractThisFrame = true;
-        // Object will appear when server confirms via 'modelAdded'
+        catalogOverlay.classList.add('hidden'); // Explicitly hide after selection
+        closeContextMenu();
     });
     closeContextMenu();
 };
@@ -1469,6 +1471,8 @@ window.addEventListener('mousedown', (event) => {
             interactionPointGlobal = contextMenuPoint.clone();
             
             cancelPlacement();
+            // Critical: Ensure no further logic runs this click
+            event.stopImmediatePropagation();
         }
     }
 });
