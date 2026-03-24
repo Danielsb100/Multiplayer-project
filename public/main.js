@@ -168,6 +168,10 @@ loginGlbUpload.addEventListener('change', (e) => {
 });
 
 joinBtn.addEventListener('click', async () => {
+    if (socket && socket.connected) {
+        console.warn("Socket already connected, skipping join logic.");
+        return;
+    }
     const email = emailInput.value.trim();
     const password = passwordInput.value.trim();
 
@@ -297,7 +301,8 @@ function setupSocketListeners() {
 
     socket.on('playerMoved', (playerInfo) => {
         if (remotePlayers[playerInfo.id]) {
-            remotePlayers[playerInfo.id].group.position.copy(playerInfo.position);
+            const pos = playerInfo.position;
+            remotePlayers[playerInfo.id].group.position.set(pos.x, pos.y, pos.z);
             remotePlayers[playerInfo.id].group.rotation.set(
                 playerInfo.rotation.x,
                 playerInfo.rotation.y,
@@ -1789,8 +1794,15 @@ function updatePlayer(delta) {
     controls.target.set(playerGroup.position.x, playerGroup.position.y, playerGroup.position.z);
 }
 
+let lastBroadcastTime = 0;
+const BROADCAST_INTERVAL = 1000 / 20; // 20Hz
+
 function broadcastMovement() {
     if (!socket) return;
+    const now = Date.now();
+    if (now - lastBroadcastTime < BROADCAST_INTERVAL) return;
+    lastBroadcastTime = now;
+
     if (socket) {
         socket.emit('playerMovement', {
             position: playerGroup.position,
@@ -1857,28 +1869,32 @@ function updateOcclusion() {
 
 function animate() {
     requestAnimationFrame(animate);
-    const delta = clock.getDelta();
     
-    // CRITICAL: Update ALL world matrices FIRST, before any collision/game logic.
-    // renderer.render() would do this later, but checkCollision and getSurfaceHeight
-    // need current matrices. Without this, rotated collision meshes appear stale.
-    scene.updateMatrixWorld(true);
-    
-    // Update local mixer
-    if (playerAnims.mixer) playerAnims.mixer.update(delta);
-    
-    // Update remote mixers
-    for (const id in remotePlayers) {
-        if (remotePlayers[id].anims && remotePlayers[id].anims.mixer) {
-            remotePlayers[id].anims.mixer.update(delta);
+    try {
+        const delta = clock.getDelta();
+        
+        // Update matrices first
+        scene.updateMatrixWorld(true);
+        
+        // Update local mixer
+        if (playerAnims && playerAnims.mixer) playerAnims.mixer.update(delta);
+        
+        // Update remote mixers
+        for (const id in remotePlayers) {
+            if (remotePlayers[id].anims && remotePlayers[id].anims.mixer) {
+                remotePlayers[id].anims.mixer.update(delta);
+            }
         }
-    }
 
-    updatePlayer(delta);
-    updateOcclusion(); // Check for blocked view
-    updateGametags();
-    controls.update();
-    renderer.render(scene, camera);
+        updatePlayer(delta);
+        updateOcclusion();
+        updateGametags();
+        
+        if (controls) controls.update();
+        renderer.render(scene, camera);
+    } catch (err) {
+        console.error("Error in animate loop:", err);
+    }
 }
 animate();
 

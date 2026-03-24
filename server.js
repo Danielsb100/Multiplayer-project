@@ -101,28 +101,47 @@ app.get('/api/catalog', (req, res) => {
 });
 
 // Setup socket authentication middleware
+// --- Auth Caching ---
+const tokenCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 io.use(async (socket, next) => {
-    const token = socket.handshake.auth.token;
-    if (!token) {
-        return next(new Error("Authentication error: No token provided"));
+  const token = socket.handshake.auth.token;
+  if (!token) return next(new Error('Authentication required'));
+
+  // Check cache first
+  const cached = tokenCache.get(token);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    socket.decoded = cached.data;
+    return next();
+  }
+
+  try {
+    const response = await fetch('https://login-system-production-84c6.up.railway.app/auth/verify', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return next(new Error('Invalid token'));
     }
-    
-    try {
-        const response = await fetch('https://login-system-production-84c6.up.railway.app/auth/verify', {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (!response.ok) {
-            return next(new Error("Authentication error: Invalid token"));
-        }
-        
-        const userData = await response.json();
-        socket.user = userData; // Attach user info to the socket instance
-        next();
-    } catch (err) {
-        return next(new Error("Authentication error: Verification request failed"));
-    }
+
+    // Cache the result
+    tokenCache.set(token, {
+      data: result,
+      timestamp: Date.now()
+    });
+
+    socket.decoded = result;
+    next();
+  } catch (err) {
+    console.error('Auth verification error:', err);
+    next(new Error('Authentication service unreachable'));
+  }
 });
 
 io.on('connection', (socket) => {
