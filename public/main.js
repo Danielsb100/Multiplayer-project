@@ -6,7 +6,8 @@ import { Pathfinding } from 'three-pathfinding';
 // Global variables for pathfinding
 const _pathfinding = new Pathfinding();
 const _navmeshZone = 'level1';
-let localPlayerPath = null;// --- 0. Socket & Login ---
+let localPlayerPath = null;
+
 // --- 0. Socket & Login ---
 let socket = null; 
 let localUsername = '';
@@ -736,6 +737,7 @@ function updatePlayerList() {
 
 // Update gametags screen positions
 function updateGametags() {
+    if (!socket || !socket.id) return;
     const tempV = new THREE.Vector3();
     
     // Update local config
@@ -821,58 +823,8 @@ function removeOptimisticObject(id) {
     });
 }
 
-socket.on('objectDeleted', (id) => {
-    // 1. Remove from scene using ID-to-UUID map
-    const uuid = idToUuid[id];
-    if (uuid) {
-        const obj = scene.getObjectByProperty('uuid', uuid);
-        if (obj) scene.remove(obj);
-    }
-    
-    // 2. THOROUGH cleanup: remove the specific box from collisions
-    for (let i = wallBoxes.length - 1; i >= 0; i--) {
-        if (wallBoxes[i].relatedId == id) wallBoxes.splice(i, 1);
-    }
+// Redundant listeners removed, they are correctly handled in setupSocketListeners()
 
-    // 3. Cleanup preciseColliders
-    for (let i = preciseColliders.length - 1; i >= 0; i--) {
-        if (preciseColliders[i].userData && preciseColliders[i].userData.id == id) {
-            preciseColliders.splice(i, 1);
-        }
-    }
-    
-    // 4. Clean up the mapping
-    delete idToUuid[id];
-});
-
-socket.on('objectUpdated', (data) => {
-    const obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
-    if (obj) {
-        if (data.color) {
-            // Support both cubes (simple mat) and models (traversal)
-            if (obj.material) {
-                obj.material.color.set(data.color);
-            } else {
-                obj.traverse(child => {
-                    if (child.isMesh && child.material && !child.name.toLowerCase().includes('collision')) {
-                        child.material.color.set(data.color);
-                    }
-                });
-            }
-        }
-        if (data.rotation) {
-            obj.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
-            obj.updateMatrixWorld(true);
-            
-            // Sync wallBoxes for the remote object too
-            for (const box of wallBoxes) {
-                if (box.relatedId == data.id) {
-                    box.setFromObject(obj);
-                }
-            }
-        }
-    }
-});
 
 // (Removed redundant sync area - already in setupSocketListeners)
 function syncChatHistory(history) {}
@@ -989,7 +941,7 @@ const chatInput = document.getElementById('chat-input');
 const chatHistory = document.getElementById('chat-history');
 
 window.addEventListener('keydown', (e) => {
-    if (document.activeElement === usernameInput) return;
+    if (document.activeElement === emailInput || document.activeElement === passwordInput) return;
     if (document.activeElement === chatInput) {
         if (e.key === 'Enter') {
             const msg = chatInput.value.trim();
@@ -1029,7 +981,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 window.addEventListener('keyup', (e) => {
-    if (document.activeElement === usernameInput || document.activeElement === chatInput) return;
+    if (document.activeElement === emailInput || document.activeElement === passwordInput || document.activeElement === chatInput) return;
     const key = e.key.toLowerCase();
     if (keys.hasOwnProperty(key)) keys[key] = false;
     if (e.code === 'Space') keys[' '] = false;
@@ -1838,6 +1790,7 @@ function updatePlayer(delta) {
 }
 
 function broadcastMovement() {
+    if (!socket) return;
     if (socket) {
         socket.emit('playerMovement', {
             position: playerGroup.position,
