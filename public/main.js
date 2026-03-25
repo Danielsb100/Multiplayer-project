@@ -111,10 +111,18 @@ const btnViewAssets = document.getElementById('btn-view-assets');
 const assetModalOverlay = document.getElementById('asset-modal-overlay');
 const modalUsernameSpan = document.getElementById('modal-username');
 const assetListBody = document.getElementById('asset-list-body');
-const closeAssetModalBtn = document.getElementById('close-asset-modal');
-const btnUploadAsset = document.getElementById('btn-upload-asset');
-const selfAssetUploadInput = document.getElementById('self-asset-upload');
 const assetThDate = document.getElementById('asset-th-date');
+const assetGridContainer = document.getElementById('asset-grid-container');
+const assetListTable = document.querySelector('.asset-list-container');
+const previewModal = document.getElementById('media-preview-modal');
+const previewContent = document.getElementById('preview-content');
+const closePreviewBtn = document.getElementById('close-media-preview');
+const btnDownloadPreview = document.getElementById('btn-download-preview');
+const tabBtns = document.querySelectorAll('.tab-btn');
+
+let currentAssetTab = 'image';
+let currentLoadedAssets = [];
+let isSelfModal = false;
 
 let selectedPlayerForAction = null;
 let selectedPlayerPeerId = null;
@@ -2499,14 +2507,16 @@ btnViewAssets.addEventListener('click', () => {
 
 async function showAssetModal(username) {
     console.log("Attempting to fetch assets for username:", username);
-    if (!username || username === 'Desconhecido' || username.includes('Guest')) {
-        console.warn("Invalid username for asset fetch:", username);
-        // assetModalOverlay.classList.remove('hidden'); // Still show overlay but with error
-    }
-
     modalUsernameSpan.innerText = username;
+    isSelfModal = false;
+    currentAssetTab = 'image'; // Default to image tab
+    
+    // UI Setup
+    updateTabUI();
     assetListBody.innerHTML = '<tr><td colspan="2">Carregando assets...</td></tr>';
+    assetGridContainer.innerHTML = 'Carregando...';
     assetModalOverlay.classList.remove('hidden');
+    btnUploadAsset.classList.add('hidden');
 
     try {
         const response = await fetch(`${AUTH_API}/api/documents/user/${encodeURIComponent(username)}`);
@@ -2514,25 +2524,11 @@ async function showAssetModal(username) {
 
         if (!response.ok) throw new Error(data.error || 'Falha ao buscar assets');
 
-        if (!data.documents || data.documents.length === 0) {
-            assetListBody.innerHTML = '<tr><td colspan="2" style="text-align: center;">Nenhum asset compartilhado.</td></tr>';
-            return;
-        }
-
-        btnUploadAsset.classList.add('hidden');
-        assetThDate.classList.add('hidden');
-
-        assetListBody.innerHTML = '';
-        data.documents.forEach(doc => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${doc.name}</strong></td>
-                <td><button class="secondary-btn btn-sm" onclick="downloadSharedAsset(${doc.id}, '${doc.name}')">Download</button></td>
-            `;
-            assetListBody.appendChild(tr);
-        });
+        currentLoadedAssets = data.documents || [];
+        renderCurrentTab();
     } catch (err) {
         assetListBody.innerHTML = `<tr><td colspan="2" style="color: #ef4444;">Erro: ${err.message}</td></tr>`;
+        assetGridContainer.innerHTML = `<div style="color: #ef4444; padding: 2rem;">Erro: ${err.message}</div>`;
     }
 }
 
@@ -2568,18 +2564,38 @@ assetModalOverlay.addEventListener('click', (e) => {
     }
 });
 
-// --- Self Asset Management ---
+// --- Advanced Asset Management ---
+
+function updateTabUI() {
+    tabBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === currentAssetTab);
+    });
+}
+
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentAssetTab = btn.dataset.tab;
+        updateTabUI();
+        renderCurrentTab();
+    });
+});
 
 async function showSelfAssetModal() {
     modalUsernameSpan.innerText = `${localUsername} (Meu Perfil)`;
+    isSelfModal = true;
+    currentAssetTab = 'image';
+    
+    updateTabUI();
     btnUploadAsset.classList.remove('hidden');
-    assetThDate.classList.remove('hidden');
-    assetListBody.innerHTML = '<tr><td colspan="3">Carregando seus arquivos...</td></tr>';
     assetModalOverlay.classList.remove('hidden');
+    
     loadSelfAssets();
 }
 
 async function loadSelfAssets() {
+    assetListBody.innerHTML = '<tr><td colspan="3">Carregando seus arquivos...</td></tr>';
+    assetGridContainer.innerHTML = 'Carregando...';
+    
     try {
         const response = await fetch(`${AUTH_API}/api/documents`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
@@ -2588,15 +2604,46 @@ async function loadSelfAssets() {
 
         if (!response.ok) throw new Error(data.error || 'Erro ao carregar arquivos');
 
-        if (!data.documents || data.documents.length === 0) {
-            assetListBody.innerHTML = '<tr><td colspan="3" style="text-align: center;">Você ainda não compartilhou nenhum arquivo.</td></tr>';
-            return;
-        }
+        currentLoadedAssets = data.documents || [];
+        renderCurrentTab();
+    } catch (err) {
+        assetListBody.innerHTML = `<tr><td colspan="3" style="color: #ef4444;">Erro: ${err.message}</td></tr>`;
+        assetGridContainer.innerHTML = `<div style="color: #ef4444; padding: 2rem;">Erro: ${err.message}</div>`;
+    }
+}
 
-        assetListBody.innerHTML = '';
-        data.documents.forEach(doc => {
-            const date = new Date(doc.createdAt).toLocaleDateString();
-            const tr = document.createElement('tr');
+function renderCurrentTab() {
+    const filtered = currentLoadedAssets.filter(doc => {
+        const type = doc.type.toLowerCase();
+        if (currentAssetTab === 'image') return type.startsWith('image/');
+        if (currentAssetTab === 'video') return type.startsWith('video/');
+        if (currentAssetTab === 'pdf') return type === 'application/pdf';
+        if (currentAssetTab === 'word') return type.includes('msword') || type.includes('officedocument.wordprocessingml');
+        return false;
+    });
+
+    if (currentAssetTab === 'image' || currentAssetTab === 'video') {
+        assetListTable.classList.add('hidden');
+        assetGridContainer.classList.remove('hidden');
+        renderGrid(filtered);
+    } else {
+        assetListTable.classList.remove('hidden');
+        assetGridContainer.classList.add('hidden');
+        renderTable(filtered);
+    }
+}
+
+function renderTable(assets) {
+    if (assets.length === 0) {
+        assetListBody.innerHTML = `<tr><td colspan="${isSelfModal ? 3 : 2}" style="text-align: center; padding: 2rem;">Nenhum arquivo nesta categoria.</td></tr>`;
+        return;
+    }
+
+    assetListBody.innerHTML = '';
+    assets.forEach(doc => {
+        const date = new Date(doc.createdAt).toLocaleDateString();
+        const tr = document.createElement('tr');
+        if (isSelfModal) {
             tr.innerHTML = `
                 <td><strong>${doc.name}</strong></td>
                 <td>${date}</td>
@@ -2605,12 +2652,124 @@ async function loadSelfAssets() {
                     <button class="secondary-btn btn-sm btn-danger" onclick="deleteSelfAsset(${doc.id})">Deletar</button>
                 </td>
             `;
-            assetListBody.appendChild(tr);
-        });
-    } catch (err) {
-        assetListBody.innerHTML = `<tr><td colspan="3" style="color: #ef4444;">Erro: ${err.message}</td></tr>`;
-    }
+        } else {
+            tr.innerHTML = `
+                <td><strong>${doc.name}</strong></td>
+                <td>
+                    <button class="secondary-btn btn-sm" onclick="downloadSharedAsset(${doc.id}, '${doc.name}')">Download</button>
+                </td>
+            `;
+        }
+        assetListBody.appendChild(tr);
+    });
+    
+    // Show/hide date col
+    if (isSelfModal) assetThDate.classList.remove('hidden');
+    else assetThDate.classList.add('hidden');
 }
+
+async function renderGrid(assets) {
+    if (assets.length === 0) {
+        assetGridContainer.innerHTML = `<div style="text-align: center; width: 100%; padding: 3rem; color: var(--text-secondary);">Nenhum arquivo nesta categoria.</div>`;
+        return;
+    }
+
+    assetGridContainer.innerHTML = '';
+    assets.forEach(async doc => {
+        const card = document.createElement('div');
+        card.className = 'asset-card';
+        card.onclick = () => openPreview(doc);
+
+        const thumb = document.createElement('div');
+        thumb.className = 'thumbnail-container';
+        
+        if (doc.type.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = `${AUTH_API}/api/documents/download/${doc.id}`;
+            img.loading = 'lazy';
+            thumb.appendChild(img);
+        } else if (doc.type.startsWith('video/')) {
+            const videoThumb = await createVideoThumbnail(`${AUTH_API}/api/documents/download/${doc.id}`);
+            thumb.appendChild(videoThumb);
+            const playIcon = document.createElement('div');
+            playIcon.innerHTML = '▶';
+            playIcon.style.cssText = 'position: absolute; color: white; font-size: 1.5rem; text-shadow: 0 0 10px rgba(0,0,0,0.5);';
+            thumb.appendChild(playIcon);
+        }
+
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.innerText = doc.name;
+
+        card.appendChild(thumb);
+        card.appendChild(name);
+        assetGridContainer.appendChild(card);
+    });
+}
+
+function createVideoThumbnail(url) {
+    return new Promise((resolve) => {
+        const video = document.createElement('video');
+        video.src = url;
+        video.crossOrigin = 'anonymous';
+        video.muted = true;
+        video.playsInline = true;
+        video.currentTime = 0.5; // Seek a bit to avoid black screen
+
+        video.onloadeddata = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 160;
+            canvas.height = 160;
+            const ctx = canvas.getContext('2d');
+            
+            // Wait slightly for seek
+            setTimeout(() => {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                resolve(canvas);
+                video.src = ''; // Cleanup
+            }, 200);
+        };
+        video.onerror = () => {
+             const div = document.createElement('div');
+             div.innerText = '🎬';
+             div.style.fontSize = '2rem';
+             resolve(div);
+        };
+    });
+}
+
+// --- Preview Logic ---
+
+function openPreview(doc) {
+    previewContent.innerHTML = '';
+    btnDownloadPreview.onclick = () => downloadSharedAsset(doc.id, doc.name);
+
+    if (doc.type.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = `${AUTH_API}/api/documents/download/${doc.id}`;
+        previewContent.appendChild(img);
+    } else if (doc.type.startsWith('video/')) {
+        const video = document.createElement('video');
+        video.src = `${AUTH_API}/api/documents/download/${doc.id}`;
+        video.controls = true; // User might want to play in preview too
+        video.autoplay = true;
+        previewContent.appendChild(video);
+    }
+
+    previewModal.classList.remove('hidden');
+}
+
+closePreviewBtn.onclick = () => {
+    previewModal.classList.add('hidden');
+    previewContent.innerHTML = '';
+};
+
+previewModal.onclick = (e) => {
+    if (e.target === previewModal) {
+        previewModal.classList.add('hidden');
+        previewContent.innerHTML = '';
+    }
+};
 
 btnUploadAsset.onclick = () => selfAssetUploadInput.click();
 
@@ -2618,8 +2777,12 @@ selfAssetUploadInput.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf') {
-        alert('Por favor, selecione apenas arquivos PDF.');
+    // Validate type
+    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/');
+    
+    if (!validTypes.includes(file.type) && !isMedia) {
+        alert('Tipo de arquivo não suportado. Use PDF, Word, Imagens ou Vídeos.');
         return;
     }
 
@@ -2644,7 +2807,7 @@ selfAssetUploadInput.onchange = async (e) => {
         alert('Erro ao enviar: ' + err.message);
     } finally {
         btnUploadAsset.disabled = false;
-        btnUploadAsset.innerText = 'Upload PDF';
+        btnUploadAsset.innerText = 'Upload File';
         selfAssetUploadInput.value = ''; // Reset
     }
 };
@@ -2673,4 +2836,6 @@ window.deleteSelfAsset = async (id) => {
 closeAssetModalBtn.addEventListener('click', () => {
     btnUploadAsset.classList.add('hidden');
     assetThDate.classList.add('hidden');
+    assetGridContainer.classList.add('hidden');
+    assetListTable.classList.remove('hidden');
 });

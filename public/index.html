@@ -27,13 +27,20 @@
             <div class="modal-header">
                 <h2>Shared Assets - <span id="modal-username">User</span></h2>
                 <div class="header-actions">
-                    <input type="file" id="self-asset-upload" accept=".pdf" class="hidden">
+                    <input type="file" id="self-asset-upload" accept=".pdf,.doc,.docx,image/*,video/*" class="hidden">
                     <button id="btn-upload-asset" class="upload-btn hidden" style="padding: 0.5rem 1rem; font-size: 0.8rem; width: auto; margin-right: 1rem;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                        Upload PDF
+                        Upload File
                     </button>
                     <button id="close-asset-modal" class="close-btn">&times;</button>
                 </div>
+            </div>
+            </div>
+            <div class="asset-tabs">
+                <button class="tab-btn active" data-tab="image">Imagens</button>
+                <button class="tab-btn" data-tab="video">Vídeos</button>
+                <button class="tab-btn" data-tab="pdf">PDF</button>
+                <button class="tab-btn" data-tab="word">Word</button>
             </div>
             <div class="asset-list-container">
                 <table class="asset-table">
@@ -48,6 +55,22 @@
                         <!-- List populated via JS -->
                     </tbody>
                 </table>
+            </div>
+            <div id="asset-grid-container" class="asset-grid hidden">
+                <!-- Grid populated via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Media Preview Modal -->
+    <div id="media-preview-modal" class="media-preview-overlay hidden ui-layer">
+        <div class="media-preview-card glassmorphism">
+            <button id="close-media-preview" class="close-btn preview-close">&times;</button>
+            <div id="preview-content" class="preview-content">
+                <!-- Image or Video frame here -->
+            </div>
+            <div class="preview-footer">
+                <button id="btn-download-preview" class="upload-btn" style="width: auto; padding: 0.75rem 2rem;">Download</button>
             </div>
         </div>
     </div>
