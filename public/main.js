@@ -11,6 +11,7 @@ let localPlayerPath = null;
 // --- 0. Socket & Login ---
 let socket = null; 
 let localUsername = '';
+let authToken = '';
 const loginScreen = document.getElementById('login-screen');
 const joinBtn = document.getElementById('join-btn');
 const emailInput = document.getElementById('email-input');
@@ -111,6 +112,9 @@ const assetModalOverlay = document.getElementById('asset-modal-overlay');
 const modalUsernameSpan = document.getElementById('modal-username');
 const assetListBody = document.getElementById('asset-list-body');
 const closeAssetModalBtn = document.getElementById('close-asset-modal');
+const btnUploadAsset = document.getElementById('btn-upload-asset');
+const selfAssetUploadInput = document.getElementById('self-asset-upload');
+const assetThDate = document.getElementById('asset-th-date');
 
 let selectedPlayerForAction = null;
 let selectedPlayerPeerId = null;
@@ -218,6 +222,7 @@ joinBtn.addEventListener('click', async () => {
         }
 
         const token = result.token;
+        authToken = token; // Store globally
         localUsername = result.user?.username || email.split('@')[0];
 
         // Initialize socket with the received token
@@ -722,13 +727,21 @@ function updatePlayerList() {
     // 1. Add Me
     const meDiv = document.createElement('div');
     meDiv.className = 'player-item';
-    meDiv.innerHTML = `
-        <div class="player-info">
-            <div class="player-status-dot"></div>
-            <span class="player-name">${localUsername}</span>
-            <span class="is-me">VOCÊ</span>
-        </div>
+    
+    const meInfoDiv = document.createElement('div');
+    meInfoDiv.className = 'player-info player-name-container';
+    meInfoDiv.innerHTML = `
+        <div class="player-status-dot"></div>
+        <span class="player-name">${localUsername}</span>
+        <span class="is-me">VOCÊ</span>
     `;
+    
+    meInfoDiv.onclick = (e) => {
+        e.stopPropagation();
+        showSelfAssetModal();
+    };
+
+    meDiv.appendChild(meInfoDiv);
     playerListContent.appendChild(meDiv);
 
     // 2. Add Others
@@ -2506,6 +2519,9 @@ async function showAssetModal(username) {
             return;
         }
 
+        btnUploadAsset.classList.add('hidden');
+        assetThDate.classList.add('hidden');
+
         assetListBody.innerHTML = '';
         data.documents.forEach(doc => {
             const tr = document.createElement('tr');
@@ -2545,5 +2561,116 @@ closeAssetModalBtn.addEventListener('click', () => {
 });
 
 assetModalOverlay.addEventListener('click', (e) => {
-    if (e.target === assetModalOverlay) assetModalOverlay.classList.add('hidden');
+    if (e.target === assetModalOverlay) {
+        assetModalOverlay.classList.add('hidden');
+        btnUploadAsset.classList.add('hidden');
+        assetThDate.classList.add('hidden');
+    }
+});
+
+// --- Self Asset Management ---
+
+async function showSelfAssetModal() {
+    modalUsernameSpan.innerText = `${localUsername} (Meu Perfil)`;
+    btnUploadAsset.classList.remove('hidden');
+    assetThDate.classList.remove('hidden');
+    assetListBody.innerHTML = '<tr><td colspan="3">Carregando seus arquivos...</td></tr>';
+    assetModalOverlay.classList.remove('hidden');
+    loadSelfAssets();
+}
+
+async function loadSelfAssets() {
+    try {
+        const response = await fetch(`${AUTH_API}/api/documents`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.error || 'Erro ao carregar arquivos');
+
+        if (!data.documents || data.documents.length === 0) {
+            assetListBody.innerHTML = '<tr><td colspan="3" style="text-align: center;">Você ainda não compartilhou nenhum arquivo.</td></tr>';
+            return;
+        }
+
+        assetListBody.innerHTML = '';
+        data.documents.forEach(doc => {
+            const date = new Date(doc.createdAt).toLocaleDateString();
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${doc.name}</strong></td>
+                <td>${date}</td>
+                <td>
+                    <button class="secondary-btn btn-sm" onclick="downloadSharedAsset(${doc.id}, '${doc.name}')">Download</button>
+                    <button class="secondary-btn btn-sm btn-danger" onclick="deleteSelfAsset(${doc.id})">Deletar</button>
+                </td>
+            `;
+            assetListBody.appendChild(tr);
+        });
+    } catch (err) {
+        assetListBody.innerHTML = `<tr><td colspan="3" style="color: #ef4444;">Erro: ${err.message}</td></tr>`;
+    }
+}
+
+btnUploadAsset.onclick = () => selfAssetUploadInput.click();
+
+selfAssetUploadInput.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+        alert('Por favor, selecione apenas arquivos PDF.');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('document', file);
+
+    try {
+        btnUploadAsset.disabled = true;
+        btnUploadAsset.innerText = 'Enviando...';
+
+        const response = await fetch(`${AUTH_API}/api/documents/upload`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            body: formData
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Erro no upload');
+
+        loadSelfAssets();
+    } catch (err) {
+        alert('Erro ao enviar: ' + err.message);
+    } finally {
+        btnUploadAsset.disabled = false;
+        btnUploadAsset.innerText = 'Upload PDF';
+        selfAssetUploadInput.value = ''; // Reset
+    }
+};
+
+window.deleteSelfAsset = async (id) => {
+    if (!confirm('Tem certeza que deseja deletar este arquivo?')) return;
+
+    try {
+        const response = await fetch(`${AUTH_API}/api/documents/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Erro ao deletar');
+        }
+
+        loadSelfAssets();
+    } catch (err) {
+        alert('Erro ao deletar: ' + err.message);
+    }
+};
+
+// Reset modal state when closing
+closeAssetModalBtn.addEventListener('click', () => {
+    btnUploadAsset.classList.add('hidden');
+    assetThDate.classList.add('hidden');
 });

@@ -26,13 +26,21 @@
         <div class="asset-modal glassmorphism">
             <div class="modal-header">
                 <h2>Shared Assets - <span id="modal-username">User</span></h2>
-                <button id="close-asset-modal" class="close-btn">&times;</button>
+                <div class="header-actions">
+                    <input type="file" id="self-asset-upload" accept=".pdf" class="hidden">
+                    <button id="btn-upload-asset" class="upload-btn hidden" style="padding: 0.5rem 1rem; font-size: 0.8rem; width: auto; margin-right: 1rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        Upload PDF
+                    </button>
+                    <button id="close-asset-modal" class="close-btn">&times;</button>
+                </div>
             </div>
             <div class="asset-list-container">
                 <table class="asset-table">
                     <thead>
                         <tr>
                             <th>Arquivo</th>
+                            <th id="asset-th-date" class="hidden">Data</th>
                             <th>Ação</th>
                         </tr>
                     </thead>

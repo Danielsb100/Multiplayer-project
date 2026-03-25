@@ -1008,6 +1008,11 @@ input[type="file"] {
     font-size: 2rem;
     cursor: pointer;
     line-height: 1;
+    transition: color 0.2s;
+}
+
+.close-btn:hover {
+    color: var(--text-primary);
 }
 
 .asset-list-container {
@@ -1031,6 +1036,38 @@ input[type="file"] {
 .asset-table td {
     padding: 1rem 0.75rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.asset-table .btn-sm {
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--panel-border);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.asset-table .btn-sm:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.asset-table .btn-danger {
+    color: #ef4444 !important;
+    border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+/* User item in player list as clickable */
+.player-name-container {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    gap: 0.25rem;
+}
+
+.player-name-container:hover .player-name {
+    color: var(--accent-color);
 }
 
 .asset-table .btn {
