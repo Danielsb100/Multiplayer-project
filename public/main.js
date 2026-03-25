@@ -631,6 +631,7 @@ container.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
+controls.zoomSpeed = 0.8; // More gradual zoom for mouse side-buttons
 controls.minZoom = 0.001; // Guard against scene disappearance
 controls.target.set(0, 0, 0);
 controls.enableRotate = false; // Keep isometric view
@@ -2059,9 +2060,15 @@ function animate() {
         updateOcclusion();
         updateGametags();
         
+        // Performance-optimized Resolution & Zoom checks
+        if (renderer.getPixelRatio() !== window.devicePixelRatio) {
+            renderer.setPixelRatio(window.devicePixelRatio);
+        }
+
         if (controls) {
-            controls.update();
-            camera.updateProjectionMatrix(); // Ensure zoom is reflected to prevent disappearance
+            if (controls.update()) {
+                camera.updateProjectionMatrix(); // Only recalculate when zoom/movement happens
+            }
         }
         renderer.render(scene, camera);
     } catch (err) {
