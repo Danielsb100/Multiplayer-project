@@ -119,6 +119,9 @@ const previewContent = document.getElementById('preview-content');
 const closePreviewBtn = document.getElementById('close-media-preview');
 const btnDownloadPreview = document.getElementById('btn-download-preview');
 const tabBtns = document.querySelectorAll('.tab-btn');
+const closeAssetModalBtn = document.getElementById('close-asset-modal');
+const btnUploadAsset = document.getElementById('btn-upload-asset');
+const selfAssetUploadInput = document.getElementById('self-asset-upload');
 
 let currentAssetTab = 'image';
 let currentLoadedAssets = [];
@@ -2516,19 +2519,27 @@ async function showAssetModal(username) {
     assetListBody.innerHTML = '<tr><td colspan="2">Carregando assets...</td></tr>';
     assetGridContainer.innerHTML = 'Carregando...';
     assetModalOverlay.classList.remove('hidden');
-    btnUploadAsset.classList.add('hidden'); // Hide upload button for other users
-    btnUploadAsset.style.display = 'none'; // Ensure it's hidden
+    if (btnUploadAsset) {
+        btnUploadAsset.classList.add('hidden'); // Hide upload button for other users
+        btnUploadAsset.style.display = 'none'; // Ensure it's hidden
+    }
 
     try {
         const response = await fetch(`${AUTH_API}/api/documents/user/${encodeURIComponent(username)}`);
+        if (!response.ok) throw new Error('Não foi possível carregar os arquivos.');
+        
         const data = await response.json();
+        currentLoadedAssets = data.documents || []; // Use currentLoadedAssets
 
-        if (!response.ok) throw new Error(data.error || 'Falha ao buscar assets');
-
-        currentLoadedAssets = data.documents || [];
-        renderCurrentTab();
+        if (currentLoadedAssets.length === 0) {
+            assetListBody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px;">Nenhum arquivo compartilhado.</td></tr>';
+            assetGridContainer.innerHTML = '<div style="text-align: center; width: 100%; padding: 3rem; color: var(--text-secondary);">Nenhum arquivo nesta categoria.</div>';
+        } else {
+            renderCurrentTab();
+        }
     } catch (err) {
-        assetListBody.innerHTML = `<tr><td colspan="2" style="color: #ef4444;">Erro: ${err.message}</td></tr>`;
+        console.error("Error fetching assets:", err);
+        assetListBody.innerHTML = `<tr><td colspan="2" style="color: #ef4444; text-align:center; padding:20px;">Erro: ${err.message}</td></tr>`;
         assetGridContainer.innerHTML = `<div style="color: #ef4444; padding: 2rem;">Erro: ${err.message}</div>`;
     }
 }
@@ -2878,14 +2889,18 @@ window.deleteSelfAsset = async (id) => {
 };
 
 // Reset modal state when closing
-closeAssetModalBtn.addEventListener('click', () => {
-    assetModalOverlay.classList.add('hidden'); // CRITICAL FIX
-    btnUploadAsset.classList.add('hidden');
-    btnUploadAsset.style.display = 'none';
-    assetThDate.classList.add('hidden');
-    assetGridContainer.classList.add('hidden');
-    assetListTable.classList.remove('hidden');
-});
+if (closeAssetModalBtn) {
+    closeAssetModalBtn.addEventListener('click', () => {
+        assetModalOverlay.classList.add('hidden');
+        if (btnUploadAsset) {
+            btnUploadAsset.classList.add('hidden');
+            btnUploadAsset.style.display = 'none';
+        }
+        assetThDate.classList.add('hidden');
+        assetGridContainer.classList.add('hidden');
+        assetListTable.classList.remove('hidden');
+    });
+}
 
 // Close when clicking outside content
 assetModalOverlay.addEventListener('click', (e) => {
