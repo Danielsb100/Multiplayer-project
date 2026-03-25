@@ -56,7 +56,7 @@ let placementBasePoint = new THREE.Vector3();
 let previewCube = null;
 let lastMouseY = 0;
 const MAX_CUBE_HEIGHT = 8; 
-console.log("GAME_LOADED: Version 1.3.0 - PRODUCTION_TUNING_VERIFIED");
+console.log("GAME_LOADED: Version 1.3.1 - VIDEO_IDENTITY_FIXED");
 
 let lastStateChangeTime = 0;
 const STATE_CHANGE_DEBOUNCE = 300; // ms
@@ -1191,8 +1191,9 @@ window.addEventListener('contextmenu', (event) => {
 
     event.preventDefault();
 
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    const rect = container.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
 
     // Raycast against the whole scene
@@ -1532,8 +1533,9 @@ window.addEventListener('mousedown', (event) => {
         console.log("Mousedown - Button:", event.button, "State:", currentPlacementState);
         if (currentPlacementState === PlacementState.NONE) {
             // --- Pathfinding Interaction ---
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            const rect = container.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
             
             const intersects = raycaster.intersectObjects(scene.children, true);
@@ -1641,8 +1643,9 @@ window.addEventListener('mousemove', (event) => {
 
     // --- 3D Cursor Projection ---
     if (currentPlacementState === PlacementState.NONE) {
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
         
         let hitPoint = null;
@@ -1679,8 +1682,9 @@ window.addEventListener('mousemove', (event) => {
     }
 
     if (currentPlacementState === PlacementState.BASE) {
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObject(plane);
 
@@ -1767,17 +1771,19 @@ function getSurfaceHeight(xzPos) {
 }
 
 window.addEventListener('resize', () => {
-    const aspect = window.innerWidth / window.innerHeight;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const aspect = width / height;
+    
     camera.left = -frustumSize * aspect / 2;
     camera.right = frustumSize * aspect / 2;
     camera.top = frustumSize / 2;
     camera.bottom = -frustumSize / 2;
     camera.updateProjectionMatrix();
     
-    // Force renderer refresh to avoid blur
-    renderer.setPixelRatio(1);
+    // Force renderer refresh to avoid blur, using container dimensions
     renderer.setPixelRatio(window.devicePixelRatio || 1);
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(width, height);
 });
 
 // --- Movement Logic ---
@@ -2489,7 +2495,8 @@ function makeCall(targetPeerId, name) {
 function answerCall(call) {
     currentCall = call;
     currentCall.answer(localStream);
-    callingName.innerText = call.peer;
+    const callerName = peerIdToName[call.peer] || 'Conectado';
+    callingName.innerText = callerName;
     audioCallLayer.classList.remove('hidden');
 
     setupCallListeners(currentCall);
@@ -2624,7 +2631,14 @@ btnCamera.onclick = async () => {
         const enabled = videoTrack.enabled;
         videoTrack.enabled = !enabled;
         btnCamera.classList.toggle('active', !enabled);
-        videoContainer.classList.toggle('hidden', enabled);
+        
+        // Only hide the big container if BOTH people have cameras off
+        const remoteHasVideo = currentCall && currentCall.remoteStream && currentCall.remoteStream.getVideoTracks().some(t => t.enabled);
+        if (enabled && !remoteHasVideo) {
+            videoContainer.classList.add('hidden');
+        } else if (!enabled) {
+            videoContainer.classList.remove('hidden');
+        }
         
         if (enabled) {
             localVideo.pause();
