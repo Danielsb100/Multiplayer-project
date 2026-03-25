@@ -631,6 +631,8 @@ container.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
+controls.minZoom = 0.5;
+controls.maxZoom = 4.0;
 controls.target.set(0, 0, 0);
 controls.enableRotate = false; // Keep isometric view
 
@@ -1769,7 +1771,9 @@ window.addEventListener('resize', () => {
     camera.top = frustumSize / 2;
     camera.bottom = -frustumSize / 2;
     camera.updateProjectionMatrix();
+    
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
 });
 
 // --- Movement Logic ---
@@ -1942,11 +1946,9 @@ function updatePlayer(delta) {
         broadcastMovement();
     }
     
-    // Camera follow logic (moved back inside updatePlayer)
-    const cameraOffset = new THREE.Vector3(20, 20, 20);
-    const targetCamPos = playerGroup.position.clone().add(cameraOffset);
-    camera.position.lerp(targetCamPos, 0.1);
-    controls.target.set(playerGroup.position.x, playerGroup.position.y, playerGroup.position.z);
+    // Camera follow logic (Refactored to work with OrbitControls)
+    // We only update the target; OrbitControls manages the camera position
+    controls.target.lerp(playerGroup.position, 0.1);
 }
 
 let lastBroadcastTime = 0;
