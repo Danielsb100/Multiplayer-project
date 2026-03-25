@@ -97,44 +97,65 @@
             <h1>Welcome!</h1>
             <p>Enter your credentials to join</p>
             
-            <!-- Campos de Autenticação -->
-            <div id="login-error" class="hidden" style="color: #ef4444; margin-bottom: 10px; font-size: 0.9rem; text-align: center;"></div>
-            <input type="email" id="email-input" placeholder="Email" autocomplete="off">
-            <input type="password" id="password-input" placeholder="Password" autocomplete="off">
-            
-            <div style="font-size: 0.85rem; margin-top: 5px; margin-bottom: 15px; text-align: center; color: var(--text-secondary);">
-                Don't have an account? <a href="https://login-system-production-84c6.up.railway.app/" target="_blank" style="color: var(--accent-color); text-decoration: none; font-weight: 500;">Create one</a>
-            </div>
-            
-            <!-- Seção de importação de modelo GLB (Opcional) no Login -->
-            <div class="login-upload-section">
-                <label for="login-glb-upload" class="upload-btn mini">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                    Import .glb (Optional)
-                </label>
-                <input type="file" id="login-glb-upload" accept=".glb">
-                <!-- Mostra o nome do arquivo selecionado ou o padrão -->
-                <span id="login-file-name">Default avatar selected</span>
+            <!-- Auth Tabs to toggle between Login and Register -->
+            <div class="auth-tabs">
+                <button id="tab-login" class="auth-tab active">Login</button>
+                <button id="tab-register" class="auth-tab">Register</button>
             </div>
 
-            <!-- Seleção de Cor do Usuário -->
-            <div class="login-color-section">
-                <span>Escolha sua cor:</span>
-                <div id="login-color-options" class="login-color-grid">
-                    <div class="login-color-option" style="background: #ef4444;" data-color="#ef4444"></div>
-                    <div class="login-color-option" style="background: #3b82f6;" data-color="#3b82f6"></div>
-                    <div class="login-color-option" style="background: #10b981;" data-color="#10b981"></div>
-                    <div class="login-color-option" style="background: #f59e0b;" data-color="#f59e0b"></div>
-                    <div class="login-color-option" style="background: #8b5cf6;" data-color="#8b5cf6"></div>
-                    <div class="login-color-option" style="background: #ec4899;" data-color="#ec4899"></div>
-                    <div class="login-color-option" style="background: #ffffff;" data-color="#ffffff"></div>
-                    <div class="login-color-option" style="background: #94a3b8;" data-color="#94a3b8"></div>
+            <!-- Login Section -->
+            <div id="login-section">
+                <h1>Welcome!</h1>
+                <p>Enter your credentials to join</p>
+                <div id="login-error" class="hidden" style="color: #ef4444; margin-bottom: 10px; font-size: 0.9rem; text-align: center;"></div>
+                <input type="email" id="email-input" placeholder="Email" autocomplete="off">
+                <input type="password" id="password-input" placeholder="Password" autocomplete="off">
+                
+                <div style="font-size: 0.85rem; margin-top: 5px; margin-bottom: 15px; text-align: center; color: var(--text-secondary);">
+                    Don't have an account? <a href="https://login-system-production-84c6.up.railway.app/" target="_blank" style="color: var(--accent-color); text-decoration: none; font-weight: 500;">Create one</a>
+                </div>
+                
+                <!-- Seção de importação de modelo GLB (Opcional) no Login -->
+                <div class="login-upload-section">
+                    <label for="login-glb-upload" class="upload-btn mini">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        Import .glb (Optional)
+                    </label>
+                    <input type="file" id="login-glb-upload" accept=".glb">
+                    <!-- Mostra o nome do arquivo selecionado ou o padrão -->
+                    <span id="login-file-name">Default avatar selected</span>
+                </div>
+
+                <!-- Seleção de Cor do Usuário -->
+                <div class="login-color-section">
+                    <span>Escolha sua cor:</span>
+                    <div id="login-color-options" class="login-color-grid">
+                        <div class="login-color-option" style="background: #ef4444;" data-color="#ef4444"></div>
+                        <div class="login-color-option" style="background: #3b82f6;" data-color="#3b82f6"></div>
+                        <div class="login-color-option" style="background: #10b981;" data-color="#10b981"></div>
+                        <div class="login-color-option" style="background: #f59e0b;" data-color="#f59e0b"></div>
+                        <div class="login-color-option" style="background: #8b5cf6;" data-color="#8b5cf6"></div>
+                        <div class="login-color-option" style="background: #ec4899;" data-color="#ec4899"></div>
+                        <div class="login-color-option" style="background: #ffffff;" data-color="#ffffff"></div>
+                        <div class="login-color-option" style="background: #94a3b8;" data-color="#94a3b8"></div>
+                    </div>
+                </div>
+
+                <div class="login-actions">
+                    <button id="catalog-char-btn" class="secondary-btn">Escolher Avatar</button>
+                    <button id="join-btn">Entrar no Mundo</button>
                 </div>
             </div>
 
-            <div class="login-actions">
-                <button id="catalog-char-btn" class="secondary-btn">Escolher Avatar</button>
-                <button id="join-btn">Entrar no Mundo</button>
+            <!-- Register Section -->
+            <div id="register-section" class="hidden">
+                <h1>Create Account</h1>
+                <p>Join our community today</p>
+                <input type="text" id="reg-username" placeholder="Username" required>
+                <input type="email" id="reg-email" placeholder="Email" required>
+                <input type="password" id="reg-password" placeholder="Password" required>
+                <div id="register-error" class="error-msg"></div>
+                <button id="register-btn">Sign Up</button>
             </div>
         </div>
     </div>

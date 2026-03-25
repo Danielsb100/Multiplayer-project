@@ -19,6 +19,18 @@ const passwordInput = document.getElementById('password-input');
 const loginError = document.getElementById('login-error');
 const AUTH_API = 'https://login-system-production-84c6.up.railway.app';
 
+// Auth Elements
+const authTabs = document.querySelector('.auth-tabs');
+const tabLogin = document.getElementById('tab-login');
+const tabRegister = document.getElementById('tab-register');
+const loginSection = document.getElementById('login-section');
+const registerSection = document.getElementById('register-section');
+const regUsernameInput = document.getElementById('reg-username');
+const regEmailInput = document.getElementById('reg-email');
+const regPasswordInput = document.getElementById('reg-password');
+const registerBtn = document.getElementById('register-btn');
+const registerError = document.getElementById('register-error');
+
 // Map to track object IDs to Three.js UUIDs
 const idToUuid = {};
 
@@ -156,6 +168,22 @@ let isJumping = false;
 let jumpTime = 0;
 const JUMP_DURATION = 0.6; 
 const JUMP_HEIGHT = 1.5;
+
+// --- Auth Tab Switching ---
+if (tabLogin && tabRegister) {
+    tabLogin.onclick = () => {
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+        loginSection.classList.remove('hidden');
+        registerSection.classList.add('hidden');
+    };
+    tabRegister.onclick = () => {
+        tabRegister.classList.add('active');
+        tabLogin.classList.remove('active');
+        registerSection.classList.remove('hidden');
+        loginSection.classList.add('hidden');
+    };
+}
 
 // PeerJS & Audio State
 let peer = null;
@@ -306,6 +334,50 @@ joinBtn.addEventListener('click', async () => {
         joinBtn.innerText = "Entrar no Mundo";
     }
 });
+
+// --- Handle Register ---
+async function handleRegister() {
+    registerError.innerText = '';
+    const username = regUsernameInput.value.trim();
+    const email = regEmailInput.value.trim();
+    const password = regPasswordInput.value;
+
+    if (!username || !email || !password) {
+        registerError.innerText = 'Preencha todos os campos.';
+        return;
+    }
+
+    try {
+        registerBtn.disabled = true;
+        registerBtn.innerText = 'Criando conta...';
+
+        const response = await fetch(`${AUTH_API}/api/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Erro no registro');
+
+        // Post-register: clear inputs and switch to login with a success message
+        alert('Conta criada com sucesso! Faça login para entrar.');
+        regUsernameInput.value = '';
+        regEmailInput.value = '';
+        regPasswordInput.value = '';
+        tabLogin.click(); // Switch to login tab
+        emailInput.value = email; // Pre-fill email for login
+    } catch (err) {
+        registerError.innerText = err.message;
+    } finally {
+        registerBtn.disabled = false;
+        registerBtn.innerText = 'Sign Up';
+    }
+}
+
+if (registerBtn) {
+    registerBtn.onclick = handleRegister;
+}
 
 function setupSocketListeners() {
     socket.on('connect_error', (err) => {
