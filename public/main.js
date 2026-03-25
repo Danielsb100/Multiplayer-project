@@ -205,9 +205,15 @@ const remoteAudio = document.getElementById('remote-audio');
 const incomingModal = document.getElementById('incoming-modal');
 const incomingCaller = document.getElementById('incoming-caller');
 const btnMute = document.getElementById('btn-mute');
+const btnCamera = document.getElementById('btn-camera'); // New
 const btnHangup = document.getElementById('btn-hangup');
 const btnAnswer = document.getElementById('btn-answer');
 const btnReject = document.getElementById('btn-reject');
+
+// Video Elements
+const videoContainer = document.getElementById('video-container');
+const remoteVideo = document.getElementById('remote-video');
+const localVideo = document.getElementById('local-video');
 
 // Player List DOM
 const playerListContainer = document.getElementById('player-list-container');
@@ -2389,13 +2395,23 @@ function createPlacedModel(data) {
 // --- 4. PeerJS & P2P Audio Logic ---
 
 async function initPeer() {
-    // Get microphone access
+    // Get media access (Try video + audio first)
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        console.log('Microphone Ready');
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: true, 
+            video: { width: 640, height: 480 } 
+        });
+        localVideo.srcObject = localStream;
+        console.log('Camera and Microphone Ready');
     } catch (err) {
-        console.error('Microphone access denied:', err);
-        return;
+        console.warn('Camera failed, falling back to audio only:', err);
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            console.log('Microphone Ready (Audio Only)');
+        } catch (audioErr) {
+            console.error('All media access denied:', audioErr);
+            return;
+        }
     }
 
     // Official audio-call-app URL on Railway
@@ -2464,6 +2480,16 @@ function answerCall(call) {
 
 function setupCallListeners(call) {
     call.on('stream', (remoteStream) => {
+        const hasVideo = remoteStream.getVideoTracks().length > 0;
+        
+        if (hasVideo) {
+            videoContainer.classList.remove('hidden');
+            remoteVideo.srcObject = remoteStream;
+            remoteVideo.play();
+        } else {
+            videoContainer.classList.add('hidden');
+        }
+
         remoteAudio.srcObject = remoteStream;
         setupVisualizer(remoteStream);
     });
@@ -2509,8 +2535,16 @@ function setupVisualizer(stream) {
 function resetAudioUI() {
     stopTimer();
     audioCallLayer.classList.add('hidden');
-    if (currentCall) currentCall = null;
+    videoContainer.classList.add('hidden');
+    
+    if (currentCall) currentCall.close();
+    currentCall = null;
+    
     remoteAudio.srcObject = null;
+    remoteVideo.srcObject = null;
+    
+    // Stop local video track but keep audio for future calls if needed
+    // or just leave it if we want users to "stay ready"
     
     const bars = document.querySelectorAll('.bar');
     bars.forEach(bar => {
@@ -2541,12 +2575,44 @@ btnHangup.onclick = () => {
 
 btnMute.onclick = () => {
     const enabled = localStream.getAudioTracks()[0].enabled;
-    if (enabled) {
-        localStream.getAudioTracks()[0].enabled = false;
-        btnMute.innerText = '🔇';
+    localStream.getAudioTracks()[0].enabled = !enabled;
+    btnMute.innerText = !enabled ? '🎤' : '🔇';
+    btnMute.style.background = !enabled ? 'rgba(255, 255, 255, 0.1)' : '#ef4444';
+};
+
+btnCamera.onclick = async () => {
+    const videoTrack = localStream.getVideoTracks()[0];
+    
+    if (!videoTrack) {
+        // Try to get video if we didn't have it
+        try {
+            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const newTrack = tempStream.getVideoTracks()[0];
+            localStream.addTrack(newTrack);
+            localVideo.srcObject = localStream;
+            btnCamera.classList.add('active');
+            videoContainer.classList.remove('hidden');
+            
+            // If in a call, we need to replace the track or restart the stream
+            if (currentCall && currentCall.peerConnection) {
+                const sender = currentCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                if (sender) sender.replaceTrack(newTrack);
+                else currentCall.peerConnection.addTrack(newTrack, localStream);
+            }
+        } catch (err) {
+            alert('Não foi possível acessar a câmera.');
+        }
     } else {
-        localStream.getAudioTracks()[0].enabled = true;
-        btnMute.innerText = '🎤';
+        const enabled = videoTrack.enabled;
+        videoTrack.enabled = !enabled;
+        btnCamera.classList.toggle('active', !enabled);
+        videoContainer.classList.toggle('hidden', enabled);
+        
+        if (enabled) {
+            localVideo.pause();
+        } else {
+            localVideo.play();
+        }
     }
 };
 
