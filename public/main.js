@@ -608,7 +608,7 @@ function openCatalog(type, onSelect) {
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#0f172a');
-scene.fog = new THREE.FogExp2('#0f172a', 0.015);
+scene.fog = new THREE.FogExp2('#0f172a', 0.005); // Relaxed fog for production visibility
 
 const clock = new THREE.Clock(); // For animations
 
@@ -616,7 +616,7 @@ const frustumSize = 15;
 const aspect = window.innerWidth / window.innerHeight;
 const camera = new THREE.OrthographicCamera(
     frustumSize * aspect / -2, frustumSize * aspect / 2,
-    frustumSize / 2, frustumSize / -2, -100, 1000
+    frustumSize / 2, frustumSize / -2, -2000, 2000 // Extended clipping for production
 );
 camera.position.set(20, 20, 20);
 camera.lookAt(0, 0, 0);
@@ -2018,7 +2018,8 @@ function updateOcclusion() {
                 // Apply transparency to all meshes in this root
                 root.traverse(child => {
                     if (child.isMesh && child.material) {
-                        child.material.transparent = true;
+                        // Ensure material is ready for transparency
+                        if (!child.material.transparent) child.material.transparent = true;
                         child.material.opacity = 0.2;
                         child.userData.wasOccluded = true;
                     }
@@ -2067,8 +2068,12 @@ function animate() {
         // Diagnostic & Force Fixes
         if (camera.zoom <= 0) camera.zoom = 0.1; // Guard against scene disappearance
         
-        if (controls) controls.update();
-        camera.updateProjectionMatrix(); // Fix for disappearing scene on zoom
+        if (controls) {
+            // Only update projection if controls actually changed (throttled)
+            if (controls.update()) {
+                camera.updateProjectionMatrix();
+            }
+        }
         
         renderer.render(scene, camera);
     } catch (err) {
