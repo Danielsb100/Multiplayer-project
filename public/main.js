@@ -620,8 +620,9 @@ camera.position.set(20, 20, 20);
 camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setPixelRatio(window.devicePixelRatio || 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
+console.log('Renderer initialized with PixelRatio:', window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -631,8 +632,8 @@ container.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-controls.minZoom = 0.01;
-controls.maxZoom = 15.0;
+controls.minZoom = 0.001; 
+// Removed maxZoom to restore original freedom
 controls.target.set(0, 0, 0);
 controls.enableRotate = false; // Keep isometric view
 

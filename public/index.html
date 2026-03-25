@@ -12,6 +12,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     
     <!-- Import map for Three.js without a build tool -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "three-pathfinding": "https://unpkg.com/three-pathfinding/dist/three-pathfinding.module.js"
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
     <!-- Player Action Menu (Small popup for Call / View Assets) -->
     <div id="player-action-menu" class="context-menu hidden ui-layer">
         <div class="menu-header">
@@ -76,18 +88,6 @@
         </div>
     </div>
 
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-                "three-pathfinding": "https://unpkg.com/three-pathfinding/dist/three-pathfinding.module.js"
-            }
-        }
-    </script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-</head>
-<body>
     <!-- Cursor customizado (Círculo Vermelho) -->
     <div id="custom-cursor"></div>
 
@@ -223,10 +223,6 @@
 
     <!-- Biblioteca Socket.io para comunicação em tempo real -->
     <script src="/socket.io/socket.io.js"></script>
-
-            </div>
-        </div>
-    </div>
 
     <!-- Audio call UI Elements (New) -->
     <div id="audio-call-layer" class="ui-layer hidden">
