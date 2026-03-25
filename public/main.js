@@ -65,6 +65,7 @@ const STATE_CHANGE_DEBOUNCE = 300; // ms
 const LOGIN_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ffffff', '#94a3b8'];
 let localUserColor = LOGIN_COLORS[Math.floor(Math.random() * LOGIN_COLORS.length)];
 let interactionPointGlobal = null; 
+let didInteractThisFrame = false; // Missing variable fix
 const loginColorOptions = document.querySelectorAll('.login-color-option');
 
 // Initialize login color selection
@@ -89,6 +90,8 @@ const preciseColliders = [];
 const GRID_SIZE = 1.0; 
 const activeLoads = new Set();
 const abortedLoads = new Set();
+
+
 
 function snapToGrid(v) {
     if (!v) return v;
@@ -252,9 +255,8 @@ joinBtn.addEventListener('click', async () => {
     joinBtn.disabled = true;
     joinBtn.innerText = "Connecting...";
     loginError.classList.add('hidden');
-
     try {
-        const response = await fetch('https://login-system-production-84c6.up.railway.app/auth/login', {
+        const response = await fetch(`${AUTH_API}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
@@ -273,7 +275,7 @@ joinBtn.addEventListener('click', async () => {
         // Initialize socket with the received token
         // @ts-ignore
         socket = io({
-            auth: { token }
+            auth: { token: authToken }
         });
 
         // Setup socket listeners
@@ -1772,8 +1774,10 @@ window.addEventListener('resize', () => {
     camera.bottom = -frustumSize / 2;
     camera.updateProjectionMatrix();
     
+    // Force renderer refresh to avoid blur
+    renderer.setPixelRatio(1);
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
 });
 
 // --- Movement Logic ---
@@ -2060,16 +2064,12 @@ function animate() {
         updateOcclusion();
         updateGametags();
         
-        // Performance-optimized Resolution & Zoom checks
-        if (renderer.getPixelRatio() !== window.devicePixelRatio) {
-            renderer.setPixelRatio(window.devicePixelRatio);
-        }
-
-        if (controls) {
-            if (controls.update()) {
-                camera.updateProjectionMatrix(); // Only recalculate when zoom/movement happens
-            }
-        }
+        // Diagnostic & Force Fixes
+        if (camera.zoom <= 0) camera.zoom = 0.1; // Guard against scene disappearance
+        
+        if (controls) controls.update();
+        camera.updateProjectionMatrix(); // Fix for disappearing scene on zoom
+        
         renderer.render(scene, camera);
     } catch (err) {
         console.error("Error in animate loop:", err);
