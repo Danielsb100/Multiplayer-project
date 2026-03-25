@@ -620,9 +620,8 @@ camera.position.set(20, 20, 20);
 camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(window.devicePixelRatio || 1);
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
-console.log('Renderer initialized with PixelRatio:', window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -632,9 +631,9 @@ container.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-controls.minZoom = 0.001; // Guard against 0 zoom
+controls.minZoom = 0.001; // Guard against scene disappearance
 controls.target.set(0, 0, 0);
-controls.enableRotate = false; // Maintain isometric orientation
+controls.enableRotate = false; // Keep isometric view
 
 // --- Environment Map Loading ---
 const mapLoader = new GLTFLoader();
@@ -1772,8 +1771,8 @@ window.addEventListener('resize', () => {
     camera.bottom = -frustumSize / 2;
     camera.updateProjectionMatrix();
     
-    renderer.setPixelRatio(window.devicePixelRatio || 1);
-    renderer.setSize(window.innerWidth, window.innerHeight, true);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
 });
 
 // --- Movement Logic ---
@@ -1946,10 +1945,11 @@ function updatePlayer(delta) {
         broadcastMovement();
     }
     
-    // Camera follow logic (Synchronized with OrbitControls to eliminate jitter/blur)
+    // Camera follow logic (moved back inside updatePlayer)
     const cameraOffset = new THREE.Vector3(20, 20, 20);
-    controls.target.lerp(playerGroup.position, 0.1);
-    camera.position.copy(controls.target).add(cameraOffset);
+    const targetCamPos = playerGroup.position.clone().add(cameraOffset);
+    camera.position.lerp(targetCamPos, 0.1);
+    controls.target.set(playerGroup.position.x, playerGroup.position.y, playerGroup.position.z);
 }
 
 let lastBroadcastTime = 0;
@@ -2059,7 +2059,10 @@ function animate() {
         updateOcclusion();
         updateGametags();
         
-        if (controls) controls.update();
+        if (controls) {
+            controls.update();
+            camera.updateProjectionMatrix(); // Ensure zoom is reflected to prevent disappearance
+        }
         renderer.render(scene, camera);
     } catch (err) {
         console.error("Error in animate loop:", err);
