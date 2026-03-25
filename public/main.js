@@ -56,7 +56,7 @@ let placementBasePoint = new THREE.Vector3();
 let previewCube = null;
 let lastMouseY = 0;
 const MAX_CUBE_HEIGHT = 8; 
-console.log("GAME_LOADED: Version 1.2.6 - FIX_CONSTRUCTION_RACE");
+console.log("GAME_LOADED: Version 1.3.0 - PRODUCTION_TUNING_VERIFIED");
 
 let lastStateChangeTime = 0;
 const STATE_CHANGE_DEBOUNCE = 300; // ms
