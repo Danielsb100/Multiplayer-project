@@ -631,8 +631,8 @@ container.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-controls.minZoom = 0.5;
-controls.maxZoom = 4.0;
+controls.minZoom = 0.01;
+controls.maxZoom = 15.0;
 controls.target.set(0, 0, 0);
 controls.enableRotate = false; // Keep isometric view
 
