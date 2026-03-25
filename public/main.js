@@ -632,10 +632,9 @@ container.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-controls.minZoom = 0.001; 
-// Removed maxZoom to restore original freedom
+controls.minZoom = 0.001; // Guard against 0 zoom
 controls.target.set(0, 0, 0);
-controls.enableRotate = false; // Keep isometric view
+controls.enableRotate = false; // Maintain isometric orientation
 
 // --- Environment Map Loading ---
 const mapLoader = new GLTFLoader();
@@ -1773,8 +1772,8 @@ window.addEventListener('resize', () => {
     camera.bottom = -frustumSize / 2;
     camera.updateProjectionMatrix();
     
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.setSize(window.innerWidth, window.innerHeight, true);
 });
 
 // --- Movement Logic ---
@@ -1947,9 +1946,10 @@ function updatePlayer(delta) {
         broadcastMovement();
     }
     
-    // Camera follow logic (Refactored to work with OrbitControls)
-    // We only update the target; OrbitControls manages the camera position
+    // Camera follow logic (Synchronized with OrbitControls to eliminate jitter/blur)
+    const cameraOffset = new THREE.Vector3(20, 20, 20);
     controls.target.lerp(playerGroup.position, 0.1);
+    camera.position.copy(controls.target).add(cameraOffset);
 }
 
 let lastBroadcastTime = 0;
