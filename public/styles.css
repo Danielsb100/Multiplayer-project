@@ -1089,6 +1089,10 @@ input[type="file"] {
     cursor: pointer;
     border-bottom: 2px solid transparent;
     transition: all 0.2s;
+    height: auto; /* Fix clipping */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .tab-btn:hover {
@@ -1096,8 +1100,10 @@ input[type="file"] {
 }
 
 .tab-btn.active {
-    color: var(--accent-color);
-    border-bottom-color: var(--accent-color);
+    background: var(--accent-color);
+    color: white;
+    border-radius: 6px;
+    border-bottom: none;
 }
 
 /* --- Asset Grid Layout --- */
@@ -1121,12 +1127,41 @@ input[type="file"] {
     gap: 8px;
     cursor: pointer;
     transition: all 0.2s;
+    position: relative;
 }
 
 .asset-card:hover {
     background: rgba(255, 255, 255, 0.08);
     transform: translateY(-2px);
     border-color: var(--accent-color);
+}
+
+.delete-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 24px;
+    height: 24px;
+    background: #ef4444;
+    color: white;
+    border-radius: 50%;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 5;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    border: 2px solid var(--panel-bg);
+}
+
+.asset-card:hover .delete-badge {
+    display: flex;
+}
+
+.delete-badge:hover {
+    background: #dc2626;
+    transform: scale(1.1);
 }
 
 .thumbnail-container {
@@ -1174,20 +1209,49 @@ input[type="file"] {
 }
 
 .media-preview-card {
-    width: auto;
-    max-width: 90vw;
-    max-height: 90vh;
+    width: 95vw;
+    height: 95vh;
+    max-width: 1400px;
+    max-height: 900px;
     background: var(--panel-bg);
     border: 1px solid var(--panel-border);
     border-radius: 24px;
-    padding: 1.5rem;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.5rem;
+    justify-content: space-between;
+    gap: 1rem;
     position: relative;
     animation: modalPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
+
+.nav-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: none;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    font-size: 2.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.nav-arrow:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.nav-arrow.prev { left: 2rem; }
+.nav-arrow.next { right: 2rem; }
 
 .preview-close {
     position: absolute;
@@ -1197,8 +1261,9 @@ input[type="file"] {
 }
 
 .preview-content {
-    max-width: 100%;
-    max-height: 70vh;
+    flex: 1;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
     border-radius: 12px;
     display: flex;
@@ -1209,8 +1274,9 @@ input[type="file"] {
 
 .preview-content img, .preview-content video {
     max-width: 100%;
-    max-height: 70vh;
+    max-height: 100%;
     object-fit: contain;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
 }
 
 .preview-footer {

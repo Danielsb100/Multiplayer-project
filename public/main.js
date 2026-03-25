@@ -2508,7 +2508,7 @@ btnViewAssets.addEventListener('click', () => {
 async function showAssetModal(username) {
     console.log("Attempting to fetch assets for username:", username);
     modalUsernameSpan.innerText = username;
-    isSelfModal = false;
+    isSelfModal = false; // This is for other users
     currentAssetTab = 'image'; // Default to image tab
     
     // UI Setup
@@ -2516,7 +2516,8 @@ async function showAssetModal(username) {
     assetListBody.innerHTML = '<tr><td colspan="2">Carregando assets...</td></tr>';
     assetGridContainer.innerHTML = 'Carregando...';
     assetModalOverlay.classList.remove('hidden');
-    btnUploadAsset.classList.add('hidden');
+    btnUploadAsset.classList.add('hidden'); // Hide upload button for other users
+    btnUploadAsset.style.display = 'none'; // Ensure it's hidden
 
     try {
         const response = await fetch(`${AUTH_API}/api/documents/user/${encodeURIComponent(username)}`);
@@ -2566,6 +2567,9 @@ assetModalOverlay.addEventListener('click', (e) => {
 
 // --- Advanced Asset Management ---
 
+let currentFilteredAssets = []; // Added for preview navigation
+let currentIndex = -1; // Added for preview navigation
+
 function updateTabUI() {
     tabBtns.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === currentAssetTab);
@@ -2587,6 +2591,7 @@ async function showSelfAssetModal() {
     
     updateTabUI();
     btnUploadAsset.classList.remove('hidden');
+    btnUploadAsset.style.display = 'block'; // Ensure upload button is visible for self
     assetModalOverlay.classList.remove('hidden');
     
     loadSelfAssets();
@@ -2613,7 +2618,7 @@ async function loadSelfAssets() {
 }
 
 function renderCurrentTab() {
-    const filtered = currentLoadedAssets.filter(doc => {
+    currentFilteredAssets = currentLoadedAssets.filter(doc => {
         const type = doc.type.toLowerCase();
         if (currentAssetTab === 'image') return type.startsWith('image/');
         if (currentAssetTab === 'video') return type.startsWith('video/');
@@ -2625,21 +2630,21 @@ function renderCurrentTab() {
     if (currentAssetTab === 'image' || currentAssetTab === 'video') {
         assetListTable.classList.add('hidden');
         assetGridContainer.classList.remove('hidden');
-        renderGrid(filtered);
+        renderGrid(currentFilteredAssets);
     } else {
         assetListTable.classList.remove('hidden');
         assetGridContainer.classList.add('hidden');
-        renderTable(filtered);
+        renderTable(currentFilteredAssets);
     }
 }
 
 function renderTable(assets) {
+    assetListBody.innerHTML = '';
     if (assets.length === 0) {
         assetListBody.innerHTML = `<tr><td colspan="${isSelfModal ? 3 : 2}" style="text-align: center; padding: 2rem;">Nenhum arquivo nesta categoria.</td></tr>`;
         return;
     }
 
-    assetListBody.innerHTML = '';
     assets.forEach(doc => {
         const date = new Date(doc.createdAt).toLocaleDateString();
         const tr = document.createElement('tr');
@@ -2675,10 +2680,10 @@ async function renderGrid(assets) {
     }
 
     assetGridContainer.innerHTML = '';
-    assets.forEach(async doc => {
+    assets.forEach(async (doc, index) => {
         const card = document.createElement('div');
         card.className = 'asset-card';
-        card.onclick = () => openPreview(doc);
+        card.onclick = () => openPreview(index); // Pass index for navigation
 
         const thumb = document.createElement('div');
         thumb.className = 'thumbnail-container';
@@ -2695,6 +2700,18 @@ async function renderGrid(assets) {
             playIcon.innerHTML = '▶';
             playIcon.style.cssText = 'position: absolute; color: white; font-size: 1.5rem; text-shadow: 0 0 10px rgba(0,0,0,0.5);';
             thumb.appendChild(playIcon);
+        }
+
+        // Deletion Red X for self
+        if (isSelfModal) {
+            const delBtn = document.createElement('div');
+            delBtn.className = 'delete-badge';
+            delBtn.innerHTML = '&times;';
+            delBtn.onclick = (e) => {
+                e.stopPropagation(); // Prevent card click
+                deleteSelfAsset(doc.id);
+            };
+            card.appendChild(delBtn);
         }
 
         const name = document.createElement('span');
@@ -2740,7 +2757,11 @@ function createVideoThumbnail(url) {
 
 // --- Preview Logic ---
 
-function openPreview(doc) {
+function openPreview(index) {
+    currentIndex = index;
+    const doc = currentFilteredAssets[currentIndex];
+    if (!doc) return;
+
     previewContent.innerHTML = '';
     btnDownloadPreview.onclick = () => downloadSharedAsset(doc.id, doc.name);
 
@@ -2751,13 +2772,37 @@ function openPreview(doc) {
     } else if (doc.type.startsWith('video/')) {
         const video = document.createElement('video');
         video.src = `${AUTH_API}/api/documents/download/${doc.id}`;
-        video.controls = true; // User might want to play in preview too
+        video.controls = true;
         video.autoplay = true;
         previewContent.appendChild(video);
     }
 
     previewModal.classList.remove('hidden');
 }
+
+function nextPreview() {
+    if (currentFilteredAssets.length <= 1) return;
+    currentIndex = (currentIndex + 1) % currentFilteredAssets.length;
+    openPreview(currentIndex);
+}
+
+function prevPreview() {
+    if (currentFilteredAssets.length <= 1) return;
+    currentIndex = (currentIndex - 1 + currentFilteredAssets.length) % currentFilteredAssets.length;
+    openPreview(currentIndex);
+}
+
+// Arrows
+document.getElementById('next-preview').onclick = (e) => { e.stopPropagation(); nextPreview(); };
+document.getElementById('prev-preview').onclick = (e) => { e.stopPropagation(); prevPreview(); };
+
+// Keyboard support
+document.addEventListener('keydown', (e) => {
+    if (previewModal.classList.contains('hidden')) return;
+    if (e.key === 'ArrowRight') nextPreview();
+    if (e.key === 'ArrowLeft') prevPreview();
+    if (e.key === 'Escape') closePreviewBtn.click();
+});
 
 closePreviewBtn.onclick = () => {
     previewModal.classList.add('hidden');
@@ -2834,8 +2879,17 @@ window.deleteSelfAsset = async (id) => {
 
 // Reset modal state when closing
 closeAssetModalBtn.addEventListener('click', () => {
+    assetModalOverlay.classList.add('hidden'); // CRITICAL FIX
     btnUploadAsset.classList.add('hidden');
+    btnUploadAsset.style.display = 'none';
     assetThDate.classList.add('hidden');
     assetGridContainer.classList.add('hidden');
     assetListTable.classList.remove('hidden');
+});
+
+// Close when clicking outside content
+assetModalOverlay.addEventListener('click', (e) => {
+    if (e.target === assetModalOverlay) {
+        assetModalOverlay.classList.add('hidden');
+    }
 });
