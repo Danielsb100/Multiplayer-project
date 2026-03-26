@@ -2433,7 +2433,7 @@ async function initPeer() {
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 
-            // FIX: Create a dummy video track so PeerJS always negotiates video
+            // Dummy track for video negotiation
             const canvas = document.createElement('canvas');
             canvas.width = 1; canvas.height = 1;
             const ctx = canvas.getContext('2d');
@@ -2495,7 +2495,6 @@ async function initPeer() {
 
 function makeCall(targetPeerId, name) {
     if (!localStream) return alert('Microfone não detectado.');
-
     callingName.innerText = name;
     audioCallLayer.classList.remove('hidden');
 
@@ -2505,36 +2504,31 @@ function makeCall(targetPeerId, name) {
 
 function answerCall(call) {
     currentCall = call;
-    setupCallListeners(currentCall); 
-    currentCall.answer(localStream);
-
     const callerName = peerIdToName[call.peer] || 'Conectado';
     callingName.innerText = callerName;
     audioCallLayer.classList.remove('hidden');
+    
+    setupCallListeners(currentCall);
+    currentCall.answer(localStream);
 }
 
 function setupCallListeners(call) {
     if (!call) return;
-
     call.on('stream', (remoteStream) => {
-        console.log("Remote stream received.");
-        call.remoteStream = remoteStream;
-
-        // Ensure UI elements are visible
-        audioCallLayer.classList.remove('hidden');
-        videoContainer.classList.remove('hidden');
-
-        // Attach
-        remoteVideo.srcObject = remoteStream;
-        remoteVideo.play().catch(e => console.warn("Video play failed:", e));
-        remoteAudio.srcObject = remoteStream;
-
-        // Visualizer (Safety Check)
-        if (remoteStream.getAudioTracks().length > 0) {
-            setupVisualizer(remoteStream);
+        console.log("Stream remoto recebido");
+        const hasVideo = remoteStream.getVideoTracks().length > 0;
+        
+        if (hasVideo) {
+            videoContainer.classList.remove('hidden');
+            remoteVideo.srcObject = remoteStream;
+            remoteVideo.play().catch(e => console.warn(e));
+        } else {
+            videoContainer.classList.add('hidden');
         }
 
-        // Timer starts only when the first stream arrives
+        remoteAudio.srcObject = remoteStream;
+        setupVisualizer(remoteStream);
+        
         if (!callDurationInterval) {
             startTimer();
         }
