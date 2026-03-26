@@ -2667,7 +2667,7 @@ document.getElementById('menu-assign-module').addEventListener('click', async ()
 
 const moduleSidebar = document.getElementById('module-sidebar');
 const btnCloseSidebar = document.getElementById('close-module-sidebar');
-const moduleTitle = document.getElementById('module-title');
+const moduleTitle = document.getElementById('module-sidebar-title');
 const moduleDescription = document.getElementById('module-description');
 const moduleTabBtns = document.querySelectorAll('.module-tab-btn');
 const tabPanes = document.querySelectorAll('.tab-pane');
@@ -2736,6 +2736,7 @@ async function openModuleSidebar(placementId, moduleId) {
         renderModuleDocs(module.documents);
         renderModuleQuiz(module.questions);
         renderModuleForum(moduleId);
+        renderModuleReports(module);
 
         // Analytics: Log Access
         fetch(`${AUTH_API}/modules/${moduleId}/access`, {
@@ -2833,18 +2834,21 @@ function roundRect(ctx, x, y, width, height, radius, fill) {
 }
 
 function renderModuleVideos(videos) {
-    const list = document.querySelector('#module-tab-videos .video-list');
-    list.innerHTML = videos.length ? '' : 'Nenhum vídeo disponível.';
+    const grid = document.getElementById('module-videos-grid');
+    if (!grid) return;
+    grid.innerHTML = videos.length ? '' : '<p style="padding: 20px; color: #94a3b8;">Nenhum vídeo disponível.</p>';
+    
     videos.forEach(v => {
-        const div = document.createElement('div');
-        div.className = 'video-item';
-        div.innerHTML = `
-            <span>${v.title}</span>
-            <button class="btn-open">Assistir</button>
+        const card = document.createElement('div');
+        card.className = 'video-card';
+        card.innerHTML = `
+            <div class="video-thumb">📺</div>
+            <div class="video-info">
+                <h4>${v.title}</h4>
+            </div>
         `;
-        div.querySelector('button').onclick = () => {
+        card.onclick = () => {
             window.open(v.url, '_blank');
-            // Analytics: Video Progress (simplified as 100% on click for MVP)
             fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${v.id}/progress`, {
                 method: 'POST',
                 headers: { 
@@ -2854,23 +2858,23 @@ function renderModuleVideos(videos) {
                 body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
             });
         };
-        list.appendChild(div);
+        grid.appendChild(card);
     });
 }
 
 function renderModuleDocs(docs) {
-    const list = document.querySelector('#module-tab-docs .document-list');
-    list.innerHTML = docs.length ? '' : 'Nenhum documento disponível.';
+    const list = document.getElementById('module-docs-list');
+    if (!list) return;
+    list.innerHTML = docs.length ? '' : '<tr><td colspan="2" style="padding: 20px; text-align: center; color: #94a3b8;">Nenhum documento disponível.</td></tr>';
+    
     docs.forEach(d => {
-        const div = document.createElement('div');
-        div.className = 'document-item';
-        div.innerHTML = `
-            <span>${d.title}</span>
-            <button class="btn-open">Download</button>
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${d.title}</td>
+            <td><button class="btn-sm">Download</button></td>
         `;
-        div.querySelector('button').onclick = async () => {
+        tr.querySelector('button').onclick = () => {
             window.downloadSharedAsset(d.documentId, d.title);
-            // Analytics: Download
             fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${d.id}/download`, {
                 method: 'POST',
                 headers: { 
@@ -2880,7 +2884,7 @@ function renderModuleDocs(docs) {
                 body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
             });
         };
-        list.appendChild(div);
+        list.appendChild(tr);
     });
 }
 
@@ -2945,14 +2949,49 @@ function renderModuleQuiz(questions) {
 }
 
 function renderModuleForum(moduleId) {
-    const container = document.querySelector('#module-tab-forum .forum-container');
-    container.innerHTML = 'Fórum integrado carregando...';
-    // Forum implementation would call /modules/:id/forum/threads
-    // For MVP, just a placeholder or simple list
+    const container = document.getElementById('module-forum-container');
+    if (!container) return;
     container.innerHTML = `
-        <p>Participe da discussão no fórum deste módulo.</p>
-        <button class="btn-open" onclick="window.open('${AUTH_API.replace('api', '')}', '_blank')">Abrir Fórum no Dashboard</button>
+        <div style="text-align: center; padding: 40px 20px;">
+            <p style="color: #94a3b8; margin-bottom: 20px;">Participe das discussões deste módulo.</p>
+            <button class="upload-btn" onclick="window.open('${AUTH_API.replace('api', '')}', '_blank')">Abrir Fórum</button>
+        </div>
     `;
+}
+
+function renderModuleReports(module) {
+    const container = document.getElementById('module-reports-container');
+    if (!container) return;
+    const isMaster = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
+
+    if (isMaster) {
+        container.innerHTML = `
+            <div style="padding: 10px;">
+                <h3 style="font-size: 1rem; margin-bottom: 15px;">DesempenHO do Módulo</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 0.7rem; color: #94a3b8;">ACESSOS</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">--</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 0.7rem; color: #94a3b8;">QUIZ COMPLETOS</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">--</div>
+                    </div>
+                </div>
+                <button class="upload-btn" style="width: 100%;" onclick="window.open('${AUTH_API.replace('api', '')}/dashboard', '_blank')">Ver Relatórios Completos</button>
+            </div>
+        `;
+    } else {
+        container.innerHTML = `
+            <div style="padding: 20px; text-align: center;">
+                <p style="color: #94a3b8;">Seu progresso neste módulo será exibido aqui em breve.</p>
+                <div style="margin-top: 20px; height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden;">
+                    <div style="width: 30%; height: 100%; background: #60a5fa;"></div>
+                </div>
+                <p style="font-size: 0.75rem; margin-top: 10px; color: #60a5fa;">30% Concluído</p>
+            </div>
+        `;
+    }
 }
 
 async function fetchModulePlacements() {

@@ -198,30 +198,42 @@
             <button id="close-module-sidebar" class="close-btn">&times;</button>
         </div>
         <div class="sidebar-tabs">
-            <button class="tab-btn active" data-tab="content">Conteúdo</button>
-            <button class="tab-btn" data-tab="videos">Vídeos</button>
-            <button class="tab-btn" data-tab="docs">Docs</button>
-            <button class="tab-btn" data-tab="quiz">Quiz</button>
-            <button class="tab-btn" data-tab="forum">Fórum</button>
+            <button class="module-tab-btn active" data-tab="general">Geral</button>
+            <button class="module-tab-btn" data-tab="videos">Vídeos</button>
+            <button class="module-tab-btn" data-tab="docs">Documentos</button>
+            <button class="module-tab-btn" data-tab="quiz">Quiz</button>
+            <button class="module-tab-btn" data-tab="forum">Fórum</button>
+            <button class="module-tab-btn" data-tab="reports">Relatórios</button>
         </div>
-        <div class="sidebar-content-area">
-            <div id="module-tab-content" class="tab-content active">
-                <p id="module-sidebar-description"></p>
+        <div class="sidebar-content">
+            <div id="module-tab-general" class="tab-pane active">
+                <div id="module-description" class="module-description"></div>
             </div>
-            <div id="module-tab-videos" class="tab-content">
-                <div class="video-list"></div>
+            <div id="module-tab-videos" class="tab-pane">
+                <div id="module-videos-grid" class="video-grid"></div>
             </div>
-            <div id="module-tab-docs" class="tab-content">
-                <div class="doc-list"></div>
-            </div>
-            <div id="module-tab-quiz" class="tab-content">
-                <div class="quiz-container">
-                    <div id="quiz-questions"></div>
-                    <button id="btn-submit-quiz" class="btn-open" style="margin-top: 20px;">Enviar Respostas</button>
+            <div id="module-tab-docs" class="tab-pane">
+                <div class="asset-list-container" style="max-height: none;">
+                    <table class="asset-table">
+                        <thead>
+                            <tr>
+                                <th>Documento</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="module-docs-list"></tbody>
+                    </table>
                 </div>
             </div>
-            <div id="module-tab-forum" class="tab-content">
-                <div class="forum-list">Em breve...</div>
+            <div id="module-tab-quiz" class="tab-pane">
+                <div id="module-quiz-container" class="quiz-container"></div>
+                <button id="btn-submit-quiz" class="btn-open" style="margin-top: 20px;">Enviar Respostas</button>
+            </div>
+            <div id="module-tab-forum" class="tab-pane">
+                <div id="module-forum-container" class="forum-container"></div>
+            </div>
+            <div id="module-tab-reports" class="tab-pane">
+                <div id="module-reports-container" class="reports-container"></div>
             </div>
         </div>
     </div>
