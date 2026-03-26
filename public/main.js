@@ -2490,48 +2490,66 @@ function makeCall(targetPeerId, name) {
 
     currentCall = peer.call(targetPeerId, localStream);
     setupCallListeners(currentCall);
+    
+    // Immediate feedback for the caller
+    callTimer.innerText = 'Chamando...';
 }
 
 function answerCall(call) {
+    if (!localStream) {
+        console.error("Local stream not ready for answering.");
+        // Try one last fallback to get audio
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+            localStream = stream;
+            proceedWithAnswer(call);
+        }).catch(err => {
+            alert("Erro: Microfone não disponível para atender a chamada.");
+            call.close();
+        });
+        return;
+    }
+    proceedWithAnswer(call);
+}
+
+function proceedWithAnswer(call) {
     currentCall = call;
-    setupCallListeners(currentCall); // Attach listeners BEFORE answering
+    setupCallListeners(currentCall); 
     currentCall.answer(localStream);
     
     const callerName = peerIdToName[call.peer] || 'Conectado';
     callingName.innerText = callerName;
     audioCallLayer.classList.remove('hidden');
+    
+    // Feedback: UI suggests "Connecting..."
+    callTimer.innerText = 'Conectando...';
 }
 
 function setupCallListeners(call) {
     if (!call) return;
 
     call.on('stream', (remoteStream) => {
-        // Use the 'call' argument passed to the function for better isolation
+        console.log("Remote stream received.");
         call.remoteStream = remoteStream;
 
-        // Ensure the call UI is visible (fallback)
+        // Ensure UI elements are ready
         audioCallLayer.classList.remove('hidden');
         videoContainer.classList.remove('hidden');
         
-        // Attach remote media
+        // Attachment
         remoteVideo.srcObject = remoteStream;
-        remoteVideo.play().catch(e => console.warn("Remote video play failed:", e));
-
+        remoteVideo.play().catch(e => console.warn("Video play failed:", e));
         remoteAudio.srcObject = remoteStream;
+
+        // Visualizer
         setupVisualizer(remoteStream);
 
-        // Start timer ONLY when stream starts
+        // Timer Start (only once)
         if (!callDurationInterval) {
             startTimer();
         }
     });
 
     call.on('close', () => {
-        resetAudioUI();
-    });
-
-    call.on('error', (err) => {
-        console.error("Call error:", err);
         resetAudioUI();
     });
 }
@@ -2602,7 +2620,10 @@ function startTimer() {
 }
 
 function stopTimer() {
-    clearInterval(callDurationInterval);
+    if (callDurationInterval) {
+        clearInterval(callDurationInterval);
+        callDurationInterval = null; // CRITICAL: Reset the interval variable
+    }
 }
 
 btnHangup.onclick = () => {
