@@ -989,6 +989,7 @@ function addOtherPlayer(playerInfo) {
         avatarContainer: avatarContainer, // visual container: use this for model loading
         mainMesh: avatar.bodyMesh,
         color: playerInfo.color,
+        peerId: playerInfo.peerId || null, // FIX: Store PeerJS ID for audio calls
         // --- Interpolation Targets ---
         targetPosition: anchorGroup.position.clone(),
         targetRotation: anchorGroup.rotation.clone(),
@@ -2505,15 +2506,36 @@ function answerCall(call) {
 
 function setupCallListeners(call) {
     call.on('stream', (remoteStream) => {
-        const hasVideo = remoteStream.getVideoTracks().length > 0;
+        if (!currentCall) return;
+        currentCall.remoteStream = remoteStream;
+
+        const updateVisibility = () => {
+            const hasRemoteVideo = remoteStream.getVideoTracks().some(t => t.enabled);
+            const hasLocalVideo = localStream && localStream.getVideoTracks().some(t => t.enabled);
+            
+            if (hasRemoteVideo || hasLocalVideo) {
+                videoContainer.classList.remove('hidden');
+            } else {
+                videoContainer.classList.add('hidden');
+            }
+
+            if (hasRemoteVideo) {
+                remoteVideo.srcObject = remoteStream;
+                remoteVideo.play().catch(e => console.warn("Remote video play failed:", e));
+            }
+        };
+
+        updateVisibility();
         
-        if (hasVideo) {
-            videoContainer.classList.remove('hidden');
-            remoteVideo.srcObject = remoteStream;
-            remoteVideo.play();
-        } else {
-            videoContainer.classList.add('hidden');
-        }
+        // PeerJS streams might not trigger onaddtrack, so we check periodically 
+        // if the person enables camera mid-call
+        const trackCheckInterval = setInterval(() => {
+            if (!currentCall) {
+                clearInterval(trackCheckInterval);
+                return;
+            }
+            updateVisibility();
+        }, 1000);
 
         remoteAudio.srcObject = remoteStream;
         setupVisualizer(remoteStream);
@@ -2606,7 +2628,7 @@ btnMute.onclick = () => {
 };
 
 btnCamera.onclick = async () => {
-    const videoTrack = localStream.getVideoTracks()[0];
+    let videoTrack = localStream.getVideoTracks()[0];
     
     if (!videoTrack) {
         // Try to get video if we didn't have it
@@ -2616,35 +2638,49 @@ btnCamera.onclick = async () => {
             localStream.addTrack(newTrack);
             localVideo.srcObject = localStream;
             btnCamera.classList.add('active');
-            videoContainer.classList.remove('hidden');
+            
+            // Re-fetch track
+            videoTrack = newTrack;
             
             // If in a call, we need to replace the track or restart the stream
             if (currentCall && currentCall.peerConnection) {
-                const sender = currentCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-                if (sender) sender.replaceTrack(newTrack);
-                else currentCall.peerConnection.addTrack(newTrack, localStream);
+                const senders = currentCall.peerConnection.getSenders();
+                const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                
+                if (videoSender) {
+                    videoSender.replaceTrack(newTrack);
+                } else {
+                    currentCall.peerConnection.addTrack(newTrack, localStream);
+                    // Negotiate again if needed (PeerJS usually handles this if we call again or similar, 
+                    // but addTrack on existing connection might need manual re-call or simple track substitution)
+                }
             }
         } catch (err) {
+            console.error(err);
             alert('Não foi possível acessar a câmera.');
+            return;
         }
     } else {
         const enabled = videoTrack.enabled;
         videoTrack.enabled = !enabled;
         btnCamera.classList.toggle('active', !enabled);
         
-        // Only hide the big container if BOTH people have cameras off
-        const remoteHasVideo = currentCall && currentCall.remoteStream && currentCall.remoteStream.getVideoTracks().some(t => t.enabled);
-        if (enabled && !remoteHasVideo) {
-            videoContainer.classList.add('hidden');
-        } else if (!enabled) {
-            videoContainer.classList.remove('hidden');
-        }
-        
         if (enabled) {
             localVideo.pause();
         } else {
             localVideo.play();
         }
+    }
+
+    // Logic to update UI visibility
+    const hasLocalVideo = videoTrack && videoTrack.enabled;
+    const hasRemoteVideo = currentCall && currentCall.remoteStream && 
+                           currentCall.remoteStream.getVideoTracks().some(t => t.enabled);
+
+    if (hasLocalVideo || hasRemoteVideo) {
+        videoContainer.classList.remove('hidden');
+    } else {
+        videoContainer.classList.add('hidden');
     }
 };
 
