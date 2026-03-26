@@ -2501,18 +2501,16 @@ function makeCall(targetPeerId, name) {
 
     currentCall = peer.call(targetPeerId, localStream);
     setupCallListeners(currentCall);
-    startTimer();
 }
 
 function answerCall(call) {
     currentCall = call;
+    setupCallListeners(currentCall); 
     currentCall.answer(localStream);
+
     const callerName = peerIdToName[call.peer] || 'Conectado';
     callingName.innerText = callerName;
     audioCallLayer.classList.remove('hidden');
-
-    setupCallListeners(currentCall);
-    startTimer();
 }
 
 function setupCallListeners(call) {
@@ -2534,6 +2532,11 @@ function setupCallListeners(call) {
         // Visualizer (Safety Check)
         if (remoteStream.getAudioTracks().length > 0) {
             setupVisualizer(remoteStream);
+        }
+
+        // Timer starts only when the first stream arrives
+        if (!callDurationInterval) {
+            startTimer();
         }
     });
 
