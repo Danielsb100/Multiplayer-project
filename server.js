@@ -309,6 +309,7 @@ io.on('connection', (socket) => {
         const newPlacement = {
             id: data.id, // ID from Login-System
             moduleId: data.moduleId,
+            status: data.status || 'NONE',
             position: data.position,
             rotation: data.rotation || { x: 0, y: 0, z: 0 },
             ownerMasterId: socket.decoded?.id,
@@ -323,7 +324,8 @@ io.on('connection', (socket) => {
         const placement = placedModulePlacements.find(p => p.id === data.id);
         if (placement) {
             placement.moduleId = data.moduleId;
-            io.emit('modulePlacementUpdated', { id: data.id, moduleId: data.moduleId });
+            placement.status = data.status || 'NONE';
+            io.emit('modulePlacementUpdated', { id: data.id, moduleId: data.moduleId, status: data.status });
         }
     });
 

@@ -516,7 +516,8 @@ function setupSocketListeners() {
         const obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
         if (obj) {
             obj.userData.moduleId = data.moduleId;
-            // Maybe visual feedback
+            obj.userData.status = data.status || 'NONE';
+            if (obj.userData.refreshBadge) obj.userData.refreshBadge();
         }
     });
 
@@ -2500,10 +2501,16 @@ function createModulePlacement(data) {
     group.rotation.set(data.rotation?.x || 0, data.rotation?.y || 0, data.rotation?.z || 0);
     group.userData.id = data.id;
     group.userData.moduleId = data.moduleId;
+    group.userData.status = data.status || 'NONE'; // Status from joined module query
     group.userData.isPlacement = true;
 
     idToUuid[data.id] = group.uuid;
     scene.add(group);
+
+    // Badge for MASTER
+    if (socket.decoded && (socket.decoded.role === 'MASTER' || socket.decoded.role === 'ADMIN')) {
+        createPlacementBadge(group);
+    }
 
     // Animation loop for the floating icon
     const startTime = Date.now();
@@ -2620,7 +2627,7 @@ document.getElementById('menu-assign-module').addEventListener('click', async ()
             throw new Error(data.error || 'Falha ao vincular');
         }
 
-        socket.emit('updateModuleAssignment', { id, moduleId: selectedModule.id });
+        socket.emit('updateModuleAssignment', { id, moduleId: selectedModule.id, status: selectedModule.status });
         alert(`Módulo "${selectedModule.title}" vinculado com sucesso!`);
     } catch (err) {
         alert('Erro ao vincular módulo: ' + err.message);
@@ -2652,14 +2659,11 @@ moduleTabBtns.forEach(btn => {
 });
 
 async function openModuleSidebar(placementId, moduleId) {
+    const isOwner = authToken && socket.decoded && (socket.decoded.role === 'MASTER' || socket.decoded.role === 'ADMIN');
+    
     if (!moduleId) {
-        // If MASTER, prompt to assign. If USER, show nothing.
-        const response = await fetch(`${AUTH_API}/auth/verify`, {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-        });
-        const user = await response.json();
-        if (user.role === 'MASTER' || user.role === 'ADMIN') {
-            alert('Este objeto ainda não possui um módulo vinculado. Use o menu de contexto (botão direito) para vincular.');
+        if (isOwner) {
+            alert('Este sinalizador ainda não possui um módulo vinculado. Clique com o botão direito para vincular.');
         }
         return;
     }
@@ -2670,6 +2674,7 @@ async function openModuleSidebar(placementId, moduleId) {
     // Reset UI
     moduleTitle.innerText = 'Carregando...';
     moduleDescription.innerText = '';
+    document.getElementById('sidebar-preview-banner').classList.remove('active');
     moduleSidebar.classList.remove('hidden');
     // Set default tab
     moduleTabBtns[0].click();
@@ -2680,10 +2685,21 @@ async function openModuleSidebar(placementId, moduleId) {
         });
         const module = await response.json();
 
+        if (response.status === 403) {
+            const errorMsg = module.error || 'Módulo indisponível ou em manutenção.';
+            alert(errorMsg);
+            moduleSidebar.classList.add('hidden');
+            return;
+        }
+
         if (!response.ok) throw new Error(module.error || 'Erro ao carregar módulo');
 
         moduleTitle.innerText = module.title;
         moduleDescription.innerText = module.description || 'Sem descrição.';
+
+        if (module.isPreview) {
+            document.getElementById('sidebar-preview-banner').classList.add('active');
+        }
 
         renderModuleVideos(module.videos);
         renderModuleDocs(module.documents);
@@ -2697,13 +2713,81 @@ async function openModuleSidebar(placementId, moduleId) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
+            body: JSON.stringify({ 
+                source: 'MULTIPLAYER_WORLD',
+                sceneId: 'level1',
+                placementId: placementId
+            })
         });
 
     } catch (err) {
         alert('Erro: ' + err.message);
         moduleSidebar.classList.add('hidden');
     }
+}
+
+function createPlacementBadge(parentGroup) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+
+    const updateBadge = () => {
+        const status = parentGroup.userData.status;
+        let label = 'Sem Módulo';
+        let color = '#94a3b8';
+
+        if (status === 'DRAFT') { label = 'Rascunho'; color = '#f59e0b'; }
+        else if (status === 'PUBLISHED') { label = 'Publicado'; color = '#10b981'; }
+        else if (status === 'ARCHIVED') { label = 'Arquivado'; color = '#ef4444'; }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Background capsule
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        roundRect(ctx, 10, 10, 236, 44, 22, true);
+        
+        // Dot
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(35, 32, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Text
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 24px Inter, sans-serif';
+        ctx.fillText(label, 55, 40);
+
+        texture.needsUpdate = true;
+    };
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(1.5, 0.375, 1);
+    sprite.name = "status_badge";
+    sprite.position.y = 1.8;
+    parentGroup.add(sprite);
+
+    updateBadge();
+
+    // Listen for updates (we can wrap updateBadge in userData if we want to call it later)
+    parentGroup.userData.refreshBadge = updateBadge;
+}
+
+function roundRect(ctx, x, y, width, height, radius, fill) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    if (fill) ctx.fill();
 }
 
 function renderModuleVideos(videos) {
@@ -2842,6 +2926,7 @@ async function fetchModulePlacements() {
                     createModulePlacement({
                         id: p.id,
                         moduleId: p.moduleId,
+                        status: p.module ? p.module.status : 'NONE',
                         position: { x: p.positionX, y: p.positionY, z: p.positionZ },
                         rotation: { x: p.rotationX, y: p.rotationY, z: p.rotationZ }
                     });
