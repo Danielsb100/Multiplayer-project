@@ -9,7 +9,7 @@ const _navmeshZone = 'level1';
 let localPlayerPath = null;
 
 // --- 0. Socket & Login ---
-let socket = null; 
+let socket = null;
 let localUsername = '';
 let authToken = '';
 const loginScreen = document.getElementById('login-screen');
@@ -55,7 +55,7 @@ let placementStartPoint = new THREE.Vector3();
 let placementBasePoint = new THREE.Vector3();
 let previewCube = null;
 let lastMouseY = 0;
-const MAX_CUBE_HEIGHT = 8; 
+const MAX_CUBE_HEIGHT = 8;
 console.log("GAME_LOADED: Version 1.3.1 - VIDEO_IDENTITY_FIXED");
 
 let lastStateChangeTime = 0;
@@ -64,7 +64,7 @@ const STATE_CHANGE_DEBOUNCE = 300; // ms
 // User Color Logic
 const LOGIN_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ffffff', '#94a3b8'];
 let localUserColor = LOGIN_COLORS[Math.floor(Math.random() * LOGIN_COLORS.length)];
-let interactionPointGlobal = null; 
+let interactionPointGlobal = null;
 let didInteractThisFrame = false; // Missing variable fix
 const loginColorOptions = document.querySelectorAll('.login-color-option');
 
@@ -87,7 +87,7 @@ let contextMenuPoint = new THREE.Vector3();
 // --- Collision Structures ---
 const wallBoxes = [];
 const preciseColliders = [];
-const GRID_SIZE = 1.0; 
+const GRID_SIZE = 1.0;
 const activeLoads = new Set();
 const abortedLoads = new Set();
 
@@ -111,7 +111,7 @@ const contextGlbUpload = document.getElementById('context-glb-upload');
 // Catalog State & UI
 let catalogData = { characters: [], models: [], structures: [] };
 let selectedCatalogModelUrl = null;
-let selectedCatalogAnims = null; 
+let selectedCatalogAnims = null;
 const catalogOverlay = document.getElementById('catalog-overlay');
 const catalogGrid = document.getElementById('catalog-grid');
 const catalogTitle = document.getElementById('catalog-title');
@@ -160,7 +160,7 @@ const playerAnims = {
     currentState: null,
     currentAction: null
 };
-let playerState = 'idle'; 
+let playerState = 'idle';
 let jumpVelocity = 0;
 const GRAVITY = -0.01;
 const JUMP_FORCE = 0.2;
@@ -169,7 +169,7 @@ let isGrounded = true;
 // Parabolic Jump State
 let isJumping = false;
 let jumpTime = 0;
-const JUMP_DURATION = 0.6; 
+const JUMP_DURATION = 0.6;
 const JUMP_HEIGHT = 1.5;
 
 // --- Auth Tab Switching ---
@@ -192,7 +192,7 @@ if (tabLogin && tabRegister) {
 let peer = null;
 let localStream = null;
 let currentCall = null;
-const peerIdToName = {}; 
+const peerIdToName = {};
 let callDurationInterval = null;
 let secondsElapsed = 0;
 let audioContext = null;
@@ -283,14 +283,14 @@ joinBtn.addEventListener('click', async () => {
 
         // Emit initial user data
         socket.emit('setName', { name: localUsername, color: localUserColor });
-        
+
         if (selectedModelBuffer) {
             socket.emit('modelUpdate', { buffer: selectedModelBuffer });
             loadLocalModel(selectedModelBuffer);
         } else if (selectedCatalogModelUrl) {
-            socket.emit('modelUpdate', { 
+            socket.emit('modelUpdate', {
                 path: selectedCatalogModelUrl,
-                animations: selectedCatalogAnims 
+                animations: selectedCatalogAnims
             });
             loadModelByUrl(selectedCatalogModelUrl, selectedCatalogAnims);
         } else {
@@ -302,13 +302,13 @@ joinBtn.addEventListener('click', async () => {
                 jump: 'assets/characters/default/jump.glb',
                 interact: 'assets/characters/default/interact.glb'
             };
-            
+
             fetch(defaultModelPath, { method: 'HEAD' })
                 .then(res => {
                     if (res.ok) {
-                        socket.emit('modelUpdate', { 
+                        socket.emit('modelUpdate', {
                             path: defaultModelPath,
-                            animations: defaultModelAnims 
+                            animations: defaultModelAnims
                         });
                         loadModelByUrl(defaultModelPath, defaultModelAnims);
                     } else {
@@ -330,7 +330,7 @@ joinBtn.addEventListener('click', async () => {
 
         // Initialize PeerJS for audio calls
         initPeer();
-        
+
         playerListContainer.classList.remove('hidden');
         updatePlayerList();
 
@@ -392,7 +392,7 @@ function setupSocketListeners() {
         console.error("Socket connection error:", err.message);
         loginError.innerText = "Connection failed: " + err.message;
         loginError.classList.remove('hidden');
-        
+
         // Show login screen again if connection was rejected
         loginScreen.classList.remove('hidden');
         playerGroup.visible = false;
@@ -417,7 +417,7 @@ function setupSocketListeners() {
     socket.on('playerMoved', (playerInfo) => {
         if (remotePlayers[playerInfo.id]) {
             const p = remotePlayers[playerInfo.id];
-            
+
             // Set targets instead of immediate position
             p.targetPosition.set(playerInfo.position.x, playerInfo.position.y, playerInfo.position.z);
             p.targetRotation.set(
@@ -570,11 +570,11 @@ closeCatalogBtn.addEventListener('click', () => catalogOverlay.classList.add('hi
 
 function renderCatalog(type, onSelect) {
     catalogGrid.innerHTML = '';
-    
+
     if (type === 'characters') catalogTitle.innerText = 'Escolher Avatar';
     else if (type === 'structures') catalogTitle.innerText = 'Elementos de Estrutura';
     else catalogTitle.innerText = 'Catálogo de Objetos';
-    
+
     catalogData[type].forEach(item => {
         const div = document.createElement('div');
         div.className = 'catalog-item';
@@ -586,7 +586,7 @@ function renderCatalog(type, onSelect) {
             e.stopPropagation();
             console.log("Catalog Item Selected:", item.name);
             try {
-                onSelect(item); 
+                onSelect(item);
                 catalogOverlay.classList.add('hidden');
                 closeContextMenu();
             } catch (err) {
@@ -650,7 +650,7 @@ mapLoader.load('assets/maps/map/map.glb', (gltf) => {
             child.receiveShadow = true;
 
             const name = child.name ? child.name.toLowerCase() : '';
-            
+
             // NavMesh Extraction
             if (name.includes('navmesh')) {
                 child.visible = false;
@@ -660,19 +660,19 @@ mapLoader.load('assets/maps/map/map.glb', (gltf) => {
                 _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(geo));
                 return; // Skip collision and render for navmesh
             }
-            
+
             if (name.includes('collision')) {
                 child.visible = false;
             } else if (name.includes('wall')) {
                 // Important for Occlusion Logic (makes walls transparent)
-                child.userData.isStructure = true; 
+                child.userData.isStructure = true;
                 // Clone material so fading one wall doesn't fade all walls sharing the same material
                 if (child.material) {
                     child.material = child.material.clone();
                     child.material.transparent = true;
                 }
             }
-            
+
             // ALL map geometry is now used for precise physical collisions
             child.userData.id = 'env_mesh_' + child.uuid;
             preciseColliders.push(child);
@@ -700,7 +700,7 @@ function applyCharacterColor(model, color) {
 
 function handleAnimationState(animObj, state, duration = 0.2, loop = true) {
     if (!animObj.mixer || animObj.currentState === state) return;
-    
+
     // Restriction: This only handles 'idle' and 'walk' base states now.
     // 'jump' and 'interact' are handled as overlays.
     if (state !== 'idle' && state !== 'walk') return;
@@ -722,7 +722,7 @@ function handleAnimationState(animObj, state, duration = 0.2, loop = true) {
 
 function triggerInteract(animObj, targetPoint = null) {
     if (!animObj.mixer || !animObj.actions['interact']) return;
-    
+
     // Rotate to face the point if provided
     if (targetPoint && animObj.mixer.getRoot().parent) {
         const root = animObj.mixer.getRoot();
@@ -780,7 +780,7 @@ function createGametag(id, name, color, isLocal) {
     const element = document.createElement('div');
     element.className = 'gametag';
     element.innerHTML = `<span>${name}</span>`;
-    
+
     if (!isLocal) {
         const callBtn = document.createElement('button');
         callBtn.innerText = '📞';
@@ -820,7 +820,7 @@ function updatePlayerList() {
     // 1. Add Me
     const meDiv = document.createElement('div');
     meDiv.className = 'player-item';
-    
+
     const meInfoDiv = document.createElement('div');
     meInfoDiv.className = 'player-info player-name-container';
     meInfoDiv.innerHTML = `
@@ -828,7 +828,7 @@ function updatePlayerList() {
         <span class="player-name">${localUsername}</span>
         <span class="is-me">VOCÊ</span>
     `;
-    
+
     meInfoDiv.onclick = (e) => {
         e.stopPropagation();
         showSelfAssetModal();
@@ -841,19 +841,19 @@ function updatePlayerList() {
     for (const id in remotePlayers) {
         const player = remotePlayers[id];
         let name = player.name || 'Desconhecido';
-        
+
         // Final fallback: if state name is Guest or Desconhecido, check gametag
         if ((!player.name || player.name.includes('Guest')) && gametags[id]) {
             const tagText = gametags[id].element.innerText.replace('📞', '').replace('(sem voz)', '').trim();
             if (tagText && !tagText.includes('Guest') && tagText !== 'Carregando...') {
-                 name = tagText;
-                 player.name = name; // Update state silently
+                name = tagText;
+                player.name = name; // Update state silently
             }
         }
-        
+
         const playerDiv = document.createElement('div');
         playerDiv.className = 'player-item';
-        
+
         const infoDiv = document.createElement('div');
         infoDiv.className = 'player-info';
         infoDiv.style.cursor = 'pointer';
@@ -862,7 +862,7 @@ function updatePlayerList() {
             <span class="player-name">${name}</span>
             ${!player.peerId ? '<span style="font-size: 0.7rem; color: #94a3b8; margin-left: 5px;">(sem voz)</span>' : ''}
         `;
-        
+
         infoDiv.addEventListener('click', (e) => {
             e.stopPropagation();
             selectedPlayerPeerId = player.peerId; // Track peerId for the menu
@@ -878,13 +878,13 @@ function updatePlayerList() {
 function updateGametags() {
     if (!socket || !socket.id) return;
     const tempV = new THREE.Vector3();
-    
+
     // Update local config
     if (gametags[socket.id] && localUsername !== '') {
         playerGroup.getWorldPosition(tempV);
         tempV.y += 2.5; // Above head
         tempV.project(camera);
-        const x = (tempV.x *  .5 + .5) * window.innerWidth;
+        const x = (tempV.x * .5 + .5) * window.innerWidth;
         const y = (tempV.y * -.5 + .5) * window.innerHeight;
         gametags[socket.id].element.style.transform = `translate(-50%, -50%) translate(${x}px,${y}px)`;
         gametags[socket.id].element.style.display = 'block';
@@ -896,7 +896,7 @@ function updateGametags() {
             remotePlayers[id].group.getWorldPosition(tempV);
             tempV.y += 2.5;
             tempV.project(camera);
-            const x = (tempV.x *  .5 + .5) * window.innerWidth;
+            const x = (tempV.x * .5 + .5) * window.innerWidth;
             const y = (tempV.y * -.5 + .5) * window.innerHeight;
             gametags[id].element.style.transform = `translate(-50%, -50%) translate(${x}px,${y}px)`;
             gametags[id].element.style.display = 'block';
@@ -936,7 +936,7 @@ function cleanupByPosition(pos) {
 
 function removeOptimisticObject(id) {
     if (id) abortedLoads.add(id);
-    
+
     // Find objects by ID directly instead of traversing the whole scene
     const targets = [];
     scene.traverse(obj => {
@@ -955,7 +955,7 @@ function removeOptimisticObject(id) {
                 preciseColliders.splice(i, 1);
             }
         }
-        
+
         // 2. Remove from scene and mapping
         scene.remove(obj);
         delete idToUuid[id];
@@ -966,7 +966,7 @@ function removeOptimisticObject(id) {
 
 
 // (Removed redundant sync area - already in setupSocketListeners)
-function syncChatHistory(history) {}
+function syncChatHistory(history) { }
 
 function addOtherPlayer(playerInfo) {
     // Anchor group: holds only network position/rotation — never touched visually
@@ -982,7 +982,7 @@ function addOtherPlayer(playerInfo) {
     // Default avatar goes into avatarContainer
     const avatar = createDefaultAvatar(playerInfo.color);
     avatarContainer.add(avatar.group);
-    
+
     remotePlayers[playerInfo.id] = {
         name: playerInfo.name,       // Store real name or Guest
         group: anchorGroup,          // anchor: use this for position/rotation from network
@@ -1000,7 +1000,7 @@ function addOtherPlayer(playerInfo) {
             currentAction: null
         }
     };
-    
+
     createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
 
     if (playerInfo.modelData) {
@@ -1030,8 +1030,8 @@ function loadModelFromBuffer(arrayBuffer, targetPlayerObj, color = '#3b82f6') {
     const gltfLoader = new GLTFLoader();
     gltfLoader.parse(arrayBuffer, '', (gltf) => {
         // Clear previous meshes inside the inner group
-        while(targetPlayerObj.avatarContainer.children.length > 0){ 
-            targetPlayerObj.avatarContainer.remove(targetPlayerObj.avatarContainer.children[0]); 
+        while (targetPlayerObj.avatarContainer.children.length > 0) {
+            targetPlayerObj.avatarContainer.remove(targetPlayerObj.avatarContainer.children[0]);
         }
 
         const newModel = gltf.scene;
@@ -1053,7 +1053,7 @@ function loadModelFromBuffer(arrayBuffer, targetPlayerObj, color = '#3b82f6') {
 
         targetPlayerObj.avatarContainer.add(newModel);
         targetPlayerObj.mainMesh = newModel;
-        
+
         // Apply character color to 'clothes' material
         applyCharacterColor(newModel, color);
 
@@ -1105,7 +1105,7 @@ window.addEventListener('keydown', (e) => {
 
     const key = e.key.toLowerCase();
     if (keys.hasOwnProperty(key)) keys[key] = true;
-    
+
     // Jump trigger (Parabolic)
     if (e.code === 'Space' && !isJumping) {
         keys[' '] = true;
@@ -1116,7 +1116,7 @@ window.addEventListener('keydown', (e) => {
             playerAnims.actions['jump'].reset().setEffectiveWeight(0).play();
         }
     }
-    
+
     // Interact trigger
     if (key === 'e') {
         triggerInteract(playerAnims);
@@ -1182,7 +1182,7 @@ scene.add(cursorMarker);
 
 window.addEventListener('contextmenu', (event) => {
     if (localUsername === '' || isOverUI(event)) return;
-    
+
     // Feature: Cancel placement with right click
     if (currentPlacementState !== PlacementState.NONE) {
         event.preventDefault();
@@ -1208,7 +1208,7 @@ window.addEventListener('contextmenu', (event) => {
         for (const intersect of intersects) {
             let isPlayerOrGhost = false;
             let isEnvMap = false;
-            
+
             let tempRoot = intersect.object;
             while (tempRoot && tempRoot !== scene) {
                 if (tempRoot === playerGroup || (tempRoot.userData && tempRoot.userData.isOptimistic) || tempRoot === cursorMarker) isPlayerOrGhost = true;
@@ -1256,7 +1256,7 @@ window.addEventListener('contextmenu', (event) => {
                 }
             }
             contextMenuTarget = root || finalHit.object;
-            contextMenuPoint.copy(snapToGrid(finalHit.point)); 
+            contextMenuPoint.copy(snapToGrid(finalHit.point));
 
             contextMenu.style.left = event.clientX + 'px';
             contextMenu.style.top = event.clientY + 'px';
@@ -1289,14 +1289,14 @@ document.getElementById('menu-create-block').addEventListener('click', () => {
     currentPlacementState = PlacementState.BASE;
     console.log("State -> BASE");
     placementStartPoint.copy(contextMenuPoint);
-    
+
     const geo = new THREE.BoxGeometry(1, 1, 1);
     const mat = new THREE.MeshStandardMaterial({ color: localUserColor, transparent: true, opacity: 0.5 });
     previewCube = new THREE.Mesh(geo, mat);
     previewCube.userData.isPreview = true; // Mark for aggressive cleanup
     previewCube.position.set(placementStartPoint.x, 0.5, placementStartPoint.z);
     scene.add(previewCube);
-    
+
     closeContextMenu();
 });
 
@@ -1309,7 +1309,7 @@ document.getElementById('menu-catalog-models').addEventListener('click', () => {
                 isStructure: false
             });
         }
-        
+
         // Trigger interact animation
         triggerInteract(playerAnims, contextMenuPoint);
         didInteractThisFrame = true;
@@ -1333,7 +1333,7 @@ menuCatalogStructs.onclick = () => {
                 isStructure: true
             });
         }
-        
+
         triggerInteract(playerAnims, contextMenuPoint);
         didInteractThisFrame = true;
         catalogOverlay.classList.add('hidden'); // Explicitly hide after selection
@@ -1386,7 +1386,7 @@ function checkGeneralCollision(box, ignorePreview = false) {
     for (const wallBox of wallBoxes) {
         if (box.intersectsBox(wallBox)) return true;
     }
-    
+
     // Check active placement (preview cube)
     if (!ignorePreview && previewCube) {
         const previewBox = new THREE.Box3().setFromObject(previewCube);
@@ -1396,7 +1396,7 @@ function checkGeneralCollision(box, ignorePreview = false) {
     // Check local player
     const localBox = new THREE.Box3().setFromObject(playerGroup);
     if (box.intersectsBox(localBox)) return true;
-    
+
     // Check remote players
     for (const id in remotePlayers) {
         const player = remotePlayers[id];
@@ -1405,7 +1405,7 @@ function checkGeneralCollision(box, ignorePreview = false) {
             if (box.intersectsBox(remoteBox)) return true;
         }
     }
-    
+
     return false;
 }
 
@@ -1453,7 +1453,7 @@ function checkOverlap(box, ignoreId) {
                 intersection.max.z - intersection.min.z > 0.01) return true;
         }
     }
-    
+
     // 2. Check against ALL other models in scene (for structures)
     // We use a simple AABB check for performance during placement/rotation
     for (const key in idToUuid) {
@@ -1475,7 +1475,7 @@ function rotateObject(target, angle) {
     const oldRotationY = target.rotation.y;
     target.rotation.y += angle;
     target.updateMatrixWorld(true); // Rotates root + all children (including collision meshes)
-    
+
     // Check overlap after rotation
     const newBox = new THREE.Box3().setFromObject(target);
     if (checkOverlap(newBox, target.userData.id)) {
@@ -1496,7 +1496,7 @@ function rotateObject(target, angle) {
             }
         }
     }
-    
+
     if (socket) {
         socket.emit('updateObjectRotation', {
             id: target.userData.id,
@@ -1519,7 +1519,7 @@ document.querySelectorAll('.color-option').forEach(opt => {
 
 window.addEventListener('mousedown', (event) => {
     if (localUsername === '' || document.activeElement === chatInput || isMenuOpen || isOverUI(event)) return;
-    
+
     // Feature: Cancel with RIGHT click immediately
     if (event.button === 2 && currentPlacementState !== PlacementState.NONE) {
         cancelPlacement();
@@ -1538,7 +1538,7 @@ window.addEventListener('mousedown', (event) => {
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
-            
+
             const intersects = raycaster.intersectObjects(scene.children, true);
             if (intersects.length > 0) {
                 let hitPoint = null;
@@ -1577,7 +1577,7 @@ window.addEventListener('mousedown', (event) => {
 
                         const path = _pathfinding.findPath(startPos, hitPoint, _navmeshZone, groupID);
                         localPlayerPath = (path && path.length > 0) ? path : [hitPoint];
-                    } catch(e) {
+                    } catch (e) {
                         console.error("Pathfinding error:", e);
                         localPlayerPath = [hitPoint];
                     }
@@ -1634,7 +1634,7 @@ window.addEventListener('mousemove', (event) => {
     // Custom Cursor
     customCursor.style.left = event.clientX + 'px';
     customCursor.style.top = event.clientY + 'px';
-    
+
     // UI Detection for cursor
     if (isOverUI(event)) {
         customCursor.classList.add('ui-hover');
@@ -1648,7 +1648,7 @@ window.addEventListener('mousemove', (event) => {
         mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-        
+
         let hitPoint = null;
         let hitNormal = null;
         const intersects = raycaster.intersectObjects(scene.children, true);
@@ -1664,12 +1664,12 @@ window.addEventListener('mousemove', (event) => {
                 let isFloor = hit.face && hit.face.normal.y > 0.5;
                 if (isFloor) {
                     hitPoint = hit.point;
-                    hitNormal = hit.face.normal; 
+                    hitNormal = hit.face.normal;
                     break;
                 }
             }
         }
-        
+
         if (hitPoint && hitNormal) {
             cursorMarker.position.copy(hitPoint);
             cursorMarker.position.addScaledVector(hitNormal, 0.05); // Hover slightly above
@@ -1693,7 +1693,7 @@ window.addEventListener('mousemove', (event) => {
             const currentPoint = snapToGrid(intersects[0].point);
             const width = currentPoint.x - placementStartPoint.x;
             const depth = currentPoint.z - placementStartPoint.z;
-            
+
             previewCube.scale.set(width || 0.1, 1, depth || 0.1);
             previewCube.position.set(
                 placementStartPoint.x + width / 2,
@@ -1737,15 +1737,15 @@ function cancelPlacement() {
 
 function getSurfaceHeight(xzPos) {
     let maxHeight = 0;
-    
+
     // 1. Box check (Cubes and static walls)
     for (const box of wallBoxes) {
-        if (xzPos.x >= box.min.x && xzPos.x <= box.max.x && 
+        if (xzPos.x >= box.min.x && xzPos.x <= box.max.x &&
             xzPos.z >= box.min.z && xzPos.z <= box.max.z) {
             if (box.max.y > maxHeight) maxHeight = box.max.y;
         }
     }
-    
+
     // 2. Precise Mesh Check (Ramps, Stairs, Slopes)
     if (preciseColliders.length > 0) {
         // Cast from Eye Level (1.8m) — ensures ray sees floor/ramp from safe height
@@ -1753,21 +1753,21 @@ function getSurfaceHeight(xzPos) {
         const rayOrigin = new THREE.Vector3(xzPos.x, originY, xzPos.z);
         const rayDir = new THREE.Vector3(0, -1, 0);
         raycaster.set(rayOrigin, rayDir);
-        
+
         // NOTE: matrixWorld is guaranteed current because animate() calls
         // scene.updateMatrixWorld(true) before any game logic runs.
         const hits = raycaster.intersectObjects(preciseColliders, true);
         if (hits.length > 0) {
             const hitY = hits[0].point.y;
             const currentFeetY = playerGroup ? playerGroup.position.y : 0;
-            
+
             // STEP LIMIT: Only accept surface within [feet-0.5, feet+0.5]
             if (hitY > maxHeight && hitY <= currentFeetY + 0.5) {
                 maxHeight = hitY;
             }
         }
     }
-    
+
     return maxHeight;
 }
 
@@ -1775,20 +1775,20 @@ window.addEventListener('resize', () => {
     const width = container.clientWidth;
     const height = container.clientHeight;
     const aspect = width / height;
-    
+
     camera.left = -frustumSize * aspect / 2;
     camera.right = frustumSize * aspect / 2;
     camera.top = frustumSize / 2;
     camera.bottom = -frustumSize / 2;
     camera.updateProjectionMatrix();
-    
+
     // Force renderer refresh to avoid blur, using container dimensions
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     renderer.setSize(width, height);
 });
 
 // --- Movement Logic ---
-let moveSpeed = 0.05; 
+let moveSpeed = 0.05;
 let currentSurfaceHeight = 0;
 let autoWalkStuckTimer = 0;
 const lastStoredPosition = new THREE.Vector3();
@@ -1798,7 +1798,7 @@ function checkCollision(targetPosition) {
     const playerBoxSize = new THREE.Vector3(0.4, 1.8, 0.4);
     const playerCenter = targetPosition.clone().add(new THREE.Vector3(0, 0.9, 0));
     const playerBox = new THREE.Box3().setFromCenterAndSize(playerCenter, playerBoxSize);
-    
+
     // 1. Check for "wall" collision (Cubes and Legacy Models)
     for (const wallBox of wallBoxes) {
         if (playerBox.intersectsBox(wallBox)) {
@@ -1806,14 +1806,14 @@ function checkCollision(targetPosition) {
             if (feetY < wallBox.max.y - 0.5) return true;
         }
     }
-    
+
     // 2. PRECISE MESH COLLISION (Structures)
     if (preciseColliders.length > 0) {
         const moveDir = targetPosition.clone().sub(playerGroup.position);
         const moveDist = moveDir.length();
         if (moveDist > 0.001) {
             moveDir.normalize();
-            
+
             // Multiple rays to cover the player's width
             const playerRadius = 0.2;
             const rayOffsets = [
@@ -1830,7 +1830,7 @@ function checkCollision(targetPosition) {
                 const rayStart = playerGroup.position.clone().add(offset);
                 raycaster.set(rayStart, moveDir);
                 const hits = raycaster.intersectObjects(preciseColliders, true);
-                
+
                 // If we hit a collision mesh within the step distance
                 if (hits.length > 0 && hits[0].distance <= moveDist + 0.05) {
                     return true;
@@ -1838,7 +1838,7 @@ function checkCollision(targetPosition) {
             }
         }
     }
-    
+
     return false;
 }
 
@@ -1847,7 +1847,7 @@ function updatePlayer(delta) {
 
     // --- Ground/Surface Logic ---
     const targetSurface = getSurfaceHeight(playerGroup.position);
-    
+
     // Smooth step-up or gravity
     if (!isJumping) {
         // If we are on a platform, snap to it or fall towards it
@@ -1864,15 +1864,15 @@ function updatePlayer(delta) {
         jumpTime += delta;
         let progress = Math.min(jumpTime / JUMP_DURATION, 1);
         let parabola = Math.sin(progress * Math.PI);
-        
+
         // Jump starts relative to the surface height at the start of the jump
         playerGroup.position.y = currentSurfaceHeight + (parabola * JUMP_HEIGHT);
-        
+
         // Modulate animation weight
         if (playerAnims.actions['jump']) {
             playerAnims.actions['jump'].setEffectiveWeight(parabola);
         }
-        
+
         if (progress >= 1) {
             isJumping = false;
             playerGroup.position.y = targetSurface; // Land on current surface
@@ -1881,7 +1881,7 @@ function updatePlayer(delta) {
                 playerAnims.actions['jump'].fadeOut(0.2);
             }
         }
-        
+
         // CRITICAL: Emit even if not moving horizontally during jump
         broadcastMovement();
     }
@@ -1892,13 +1892,13 @@ function updatePlayer(delta) {
     }
 
     let moveX = 0, moveZ = 0;
-    
+
     // Pathfinding logic override
     if (localPlayerPath && localPlayerPath.length > 0) {
         const targetPoint = localPlayerPath[0];
         const dir = new THREE.Vector3().subVectors(targetPoint, playerGroup.position);
         dir.y = 0; // Move ONLY on XZ plane
-        
+
         const dist = dir.length();
         if (dist < 0.1) {
             // Reached waypoint
@@ -1908,11 +1908,11 @@ function updatePlayer(delta) {
             dir.normalize();
             moveX = dir.x * moveSpeed;
             moveZ = dir.z * moveSpeed;
-            
+
             // Stuck detection (dynamic objects blocking navmesh path)
             if (lastStoredPosition.distanceToSquared(playerGroup.position) < 0.0001) {
                 autoWalkStuckTimer += delta;
-                if (autoWalkStuckTimer > 0.5) { 
+                if (autoWalkStuckTimer > 0.5) {
                     localPlayerPath = null;
                     autoWalkStuckTimer = 0;
                 }
@@ -1956,7 +1956,7 @@ function updatePlayer(delta) {
         handleAnimationState(playerAnims, 'idle');
         broadcastMovement();
     }
-    
+
     // Camera follow logic (moved back inside updatePlayer)
     const cameraOffset = new THREE.Vector3(20, 20, 20);
     const targetCamPos = playerGroup.position.clone().add(cameraOffset);
@@ -2009,13 +2009,13 @@ function updateOcclusion() {
     // 3. Raycast from camera to center
     const direction = new THREE.Vector3().subVectors(targetPoint, camera.position).normalize();
     const distanceToPlayer = camera.position.distanceTo(targetPoint);
-    
+
     raycaster.set(camera.position, direction);
     const intersects = raycaster.intersectObjects(scene.children, true);
 
     for (let i = 0; i < intersects.length; i++) {
         const hit = intersects[i];
-        if (hit.distance >= distanceToPlayer - 0.5) break; 
+        if (hit.distance >= distanceToPlayer - 0.5) break;
 
         let obj = hit.object;
         // Check if this object should be occluded (cubes or structures)
@@ -2031,7 +2031,7 @@ function updateOcclusion() {
                         child.userData.wasOccluded = true;
                     }
                 });
-                break; 
+                break;
             }
             root = root.parent;
         }
@@ -2040,24 +2040,24 @@ function updateOcclusion() {
 
 function animate() {
     requestAnimationFrame(animate);
-    
+
     try {
         const delta = clock.getDelta();
-        
+
         // Update matrices first
         scene.updateMatrixWorld(true);
-        
+
         // Update local mixer
         if (playerAnims && playerAnims.mixer) playerAnims.mixer.update(delta);
-        
+
         // Update remote players with interpolation (lers/slerp)
-        const LERP_SPEED = 0.2; 
+        const LERP_SPEED = 0.2;
         for (const id in remotePlayers) {
             const p = remotePlayers[id];
-            
+
             // Smooth Position
             p.group.position.lerp(p.targetPosition, LERP_SPEED);
-            
+
             // Smooth Rotation (Simple lerp for Y axis is usually enough for characters)
             p.group.rotation.x = THREE.MathUtils.lerp(p.group.rotation.x, p.targetRotation.x, LERP_SPEED);
             p.group.rotation.y = THREE.MathUtils.lerp(p.group.rotation.y, p.targetRotation.y, LERP_SPEED);
@@ -2071,17 +2071,17 @@ function animate() {
         updatePlayer(delta);
         updateOcclusion();
         updateGametags();
-        
+
         // Diagnostic & Force Fixes
         if (camera.zoom <= 0) camera.zoom = 0.1; // Guard against scene disappearance
-        
+
         if (controls) {
             // Only update projection if controls actually changed (throttled)
             if (controls.update()) {
                 camera.updateProjectionMatrix();
             }
         }
-        
+
         renderer.render(scene, camera);
     } catch (err) {
         console.error("Error in animate loop:", err);
@@ -2113,11 +2113,11 @@ function loadLocalModel(arrayBuffer) {
     loadingIndicator.classList.remove('hidden');
     const gltfLoader = new GLTFLoader();
     gltfLoader.parse(arrayBuffer, '', (gltf) => {
-        while(playerGroup.children.length > 0) playerGroup.remove(playerGroup.children[0]);
+        while (playerGroup.children.length > 0) playerGroup.remove(playerGroup.children[0]);
 
         characterMesh = gltf.scene;
-        characterMesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
-        
+        characterMesh.traverse(child => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+
         // Apply local character color to 'clothes' material
         applyCharacterColor(characterMesh, localUserColor);
 
@@ -2158,7 +2158,7 @@ function loadLocalModel(arrayBuffer) {
 
 function createCube(data) {
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({ 
+    const material = new THREE.MeshStandardMaterial({
         color: data.color,
         roughness: 0.4,
         metalness: 0.3,
@@ -2169,11 +2169,11 @@ function createCube(data) {
     cube.userData.id = data.id; // Store ID
     cube.userData.isOptimistic = data.isOptimistic || false;
     idToUuid[data.id] = cube.uuid;
-    
+
     // Apply dimensions from data
     const size = data.size || { w: 1, h: 1, d: 1 };
     cube.scale.set(size.w, size.h, size.d);
-    
+
     cube.position.set(data.position.x, data.position.y, data.position.z);
     cube.castShadow = true;
     cube.receiveShadow = true;
@@ -2192,7 +2192,7 @@ function createCube(data) {
         let alpha = 0;
         const intr = setInterval(() => {
             alpha += 0.1;
-            cube.scale.lerpVectors(new THREE.Vector3(0,0,0), targetScale, alpha);
+            cube.scale.lerpVectors(new THREE.Vector3(0, 0, 0), targetScale, alpha);
             if (alpha >= 1) {
                 cube.scale.copy(targetScale);
                 clearInterval(intr);
@@ -2205,10 +2205,10 @@ function loadModelByUrl(url, animPaths = null) {
     loadingIndicator.classList.remove('hidden');
     const gltfLoader = new GLTFLoader();
     gltfLoader.load(url, (gltf) => {
-        while(playerGroup.children.length > 0) playerGroup.remove(playerGroup.children[0]);
+        while (playerGroup.children.length > 0) playerGroup.remove(playerGroup.children[0]);
 
         characterMesh = gltf.scene;
-        characterMesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+        characterMesh.traverse(child => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
 
         // Apply character color to 'clothes' material
         applyCharacterColor(characterMesh, localUserColor);
@@ -2267,9 +2267,9 @@ function updateRemotePlayerModelByUrl(id, url, animPaths = null, color = '#3b82f
     gltfLoader.load(url, (gltf) => {
         // Use avatarContainer (visual child) — NOT group (network anchor)
         const container = player.avatarContainer || player.group;
-        while(container.children.length > 0) container.remove(container.children[0]);
+        while (container.children.length > 0) container.remove(container.children[0]);
         const mesh = gltf.scene;
-        mesh.traverse(child => { if(child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+        mesh.traverse(child => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
 
         // Center BEFORE parenting so Box3 is in local (model) space, not world space
         mesh.position.set(0, 0, 0);
@@ -2281,7 +2281,7 @@ function updateRemotePlayerModelByUrl(id, url, animPaths = null, color = '#3b82f
         mesh.position.y = -box.min.y;
 
         container.add(mesh);
-        
+
         // Apply character color to 'clothes' material
         applyCharacterColor(mesh, color);
 
@@ -2369,7 +2369,7 @@ function createPlacedModel(data) {
         scene.add(model);
 
         model.updateMatrixWorld(true);
-        
+
         // --- Custom Collision Mesh Extraction ---
         // SAFETY: Clear any existing collisions for this ID (prevents ghosts)
         for (let i = wallBoxes.length - 1; i >= 0; i--) {
@@ -2388,7 +2388,7 @@ function createPlacedModel(data) {
             if (isCollision) {
                 hasCollisionMeshes = true;
                 child.visible = false; // Hide collision helpers
-                
+
                 // Add the mesh itself to preciseColliders for raycasting
                 child.traverse(c => {
                     if (c.isMesh) {
@@ -2422,17 +2422,28 @@ function createPlacedModel(data) {
 async function initPeer() {
     // Get media access (Try video + audio first)
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ 
-            audio: true, 
-            video: { width: 640, height: 480 } 
+        localStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: { width: 640, height: 480 }
         });
         localVideo.srcObject = localStream;
         console.log('Camera and Microphone Ready');
     } catch (err) {
-        console.warn('Camera failed, falling back to audio only:', err);
+        console.warn('Camera failed, falling back to audio only + dummy track:', err);
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            console.log('Microphone Ready (Audio Only)');
+
+            // FIX: Create a dummy video track so PeerJS always negotiates video
+            const canvas = document.createElement('canvas');
+            canvas.width = 1; canvas.height = 1;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, 1, 1);
+            const dummyStream = canvas.captureStream();
+            const dummyTrack = dummyStream.getVideoTracks()[0];
+            localStream.addTrack(dummyTrack);
+
+            console.log('Microphone Ready (Audio Only + Placeholder Video)');
         } catch (audioErr) {
             console.error('All media access denied:', audioErr);
             return;
@@ -2440,7 +2451,7 @@ async function initPeer() {
     }
 
     // Official audio-call-app URL on Railway
-    const AUDIO_SERVER_HOST = 'audio-call-app-production.up.railway.app'; 
+    const AUDIO_SERVER_HOST = 'audio-call-app-production.up.railway.app';
 
     peer = new Peer({
         host: AUDIO_SERVER_HOST,
@@ -2490,38 +2501,18 @@ function makeCall(targetPeerId, name) {
 
     currentCall = peer.call(targetPeerId, localStream);
     setupCallListeners(currentCall);
-    
-    // Immediate feedback for the caller
-    callTimer.innerText = 'Chamando...';
+    startTimer();
 }
 
 function answerCall(call) {
-    if (!localStream) {
-        console.error("Local stream not ready for answering.");
-        // Try one last fallback to get audio
-        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-            localStream = stream;
-            proceedWithAnswer(call);
-        }).catch(err => {
-            alert("Erro: Microfone não disponível para atender a chamada.");
-            call.close();
-        });
-        return;
-    }
-    proceedWithAnswer(call);
-}
-
-function proceedWithAnswer(call) {
     currentCall = call;
-    setupCallListeners(currentCall); 
     currentCall.answer(localStream);
-    
     const callerName = peerIdToName[call.peer] || 'Conectado';
     callingName.innerText = callerName;
     audioCallLayer.classList.remove('hidden');
-    
-    // Feedback: UI suggests "Connecting..."
-    callTimer.innerText = 'Conectando...';
+
+    setupCallListeners(currentCall);
+    startTimer();
 }
 
 function setupCallListeners(call) {
@@ -2531,21 +2522,18 @@ function setupCallListeners(call) {
         console.log("Remote stream received.");
         call.remoteStream = remoteStream;
 
-        // Ensure UI elements are ready
+        // Ensure UI elements are visible
         audioCallLayer.classList.remove('hidden');
         videoContainer.classList.remove('hidden');
-        
-        // Attachment
+
+        // Attach
         remoteVideo.srcObject = remoteStream;
         remoteVideo.play().catch(e => console.warn("Video play failed:", e));
         remoteAudio.srcObject = remoteStream;
 
-        // Visualizer
-        setupVisualizer(remoteStream);
-
-        // Timer Start (only once)
-        if (!callDurationInterval) {
-            startTimer();
+        // Visualizer (Safety Check)
+        if (remoteStream.getAudioTracks().length > 0) {
+            setupVisualizer(remoteStream);
         }
     });
 
@@ -2591,16 +2579,16 @@ function resetAudioUI() {
     stopTimer();
     audioCallLayer.classList.add('hidden');
     videoContainer.classList.add('hidden');
-    
+
     if (currentCall) currentCall.close();
     currentCall = null;
-    
+
     remoteAudio.srcObject = null;
     remoteVideo.srcObject = null;
-    
+
     // Stop local video track but keep audio for future calls if needed
     // or just leave it if we want users to "stay ready"
-    
+
     const bars = document.querySelectorAll('.bar');
     bars.forEach(bar => {
         bar.style.height = '5px';
@@ -2640,52 +2628,40 @@ btnMute.onclick = () => {
 
 btnCamera.onclick = async () => {
     let videoTrack = localStream.getVideoTracks()[0];
-    
-    if (!videoTrack) {
-        // Try to get video if we didn't have it
-        try {
-            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
-            const newTrack = tempStream.getVideoTracks()[0];
-            localStream.addTrack(newTrack);
-            localVideo.srcObject = localStream;
-            btnCamera.classList.add('active');
-            
-            // Re-fetch track
-            videoTrack = newTrack;
-            
-            // If in a call, we need to replace the track or restart the stream
-            if (currentCall && currentCall.peerConnection) {
-                const senders = currentCall.peerConnection.getSenders();
-                const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+    const isDummy = videoTrack && videoTrack.label === ''; // Canvas tracks often have empty labels
+
+    if (!videoTrack || isDummy || !videoTrack.enabled) {
+        if (!videoTrack || isDummy) {
+            try {
+                const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const newTrack = tempStream.getVideoTracks()[0];
                 
-                if (videoSender) {
-                    videoSender.replaceTrack(newTrack);
-                } else {
-                    currentCall.peerConnection.addTrack(newTrack, localStream);
-                    // Negotiate again if needed (PeerJS usually handles this if we call again or similar, 
-                    // but addTrack on existing connection might need manual re-call or simple track substitution)
+                if (videoTrack) localStream.removeTrack(videoTrack);
+                localStream.addTrack(newTrack);
+                localVideo.srcObject = localStream;
+                btnCamera.classList.add('active');
+                videoContainer.classList.remove('hidden');
+                
+                if (currentCall && currentCall.peerConnection) {
+                    const senders = currentCall.peerConnection.getSenders();
+                    const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                    if (videoSender) videoSender.replaceTrack(newTrack);
+                    else currentCall.peerConnection.addTrack(newTrack, localStream);
                 }
+            } catch (err) {
+                alert('Não foi possível acessar a câmera.');
             }
-        } catch (err) {
-            console.error(err);
-            alert('Não foi possível acessar a câmera.');
-            return;
+        } else {
+            videoTrack.enabled = true;
+            btnCamera.classList.add('active');
+            videoContainer.classList.remove('hidden');
         }
     } else {
-        const enabled = videoTrack.enabled;
-        videoTrack.enabled = !enabled;
-        btnCamera.classList.toggle('active', !enabled);
-        
-        if (enabled) {
-            localVideo.pause();
-        } else {
-            localVideo.play();
-        }
+        videoTrack.enabled = false;
+        btnCamera.classList.remove('active');
+        const remoteHasVideo = currentCall && remoteVideo.srcObject && remoteVideo.srcObject.getVideoTracks().some(t => t.enabled);
+        if (!remoteHasVideo) videoContainer.classList.add('hidden');
     }
-
-    // "Transmitir sempre!" - We no longer hide the container mid-call 
-    // based on track state, as per user request.
-    videoContainer.classList.remove('hidden');
 };
 
 // --- Player Interaction Menu & Asset Modal ---
@@ -2693,11 +2669,11 @@ btnCamera.onclick = async () => {
 function showPlayerActionMenu(username, event) {
     selectedPlayerForAction = username;
     actionMenuName.innerText = username;
-    
+
     playerActionMenu.style.left = event.clientX + 'px';
     playerActionMenu.style.top = event.clientY + 'px';
     playerActionMenu.classList.remove('hidden');
-    
+
     // Auto-close when clicking elsewhere
     const closeMenu = () => {
         playerActionMenu.classList.add('hidden');
@@ -2723,7 +2699,7 @@ async function showAssetModal(username) {
     modalUsernameSpan.innerText = username;
     isSelfModal = false; // This is for other users
     currentAssetTab = 'image'; // Default to image tab
-    
+
     // UI Setup
     updateTabUI();
     assetListBody.innerHTML = '<tr><td colspan="2">Carregando assets...</td></tr>';
@@ -2737,7 +2713,7 @@ async function showAssetModal(username) {
     try {
         const response = await fetch(`${AUTH_API}/api/documents/user/${encodeURIComponent(username)}`);
         if (!response.ok) throw new Error('Não foi possível carregar os arquivos.');
-        
+
         const data = await response.json();
         currentLoadedAssets = data.documents || []; // Use currentLoadedAssets
 
@@ -2809,19 +2785,19 @@ async function showSelfAssetModal() {
     modalUsernameSpan.innerText = `${localUsername} (Meu Perfil)`;
     isSelfModal = true;
     currentAssetTab = 'image';
-    
+
     updateTabUI();
     btnUploadAsset.classList.remove('hidden');
     btnUploadAsset.style.display = 'block'; // Ensure upload button is visible for self
     assetModalOverlay.classList.remove('hidden');
-    
+
     loadSelfAssets();
 }
 
 async function loadSelfAssets() {
     assetListBody.innerHTML = '<tr><td colspan="3">Carregando seus arquivos...</td></tr>';
     assetGridContainer.innerHTML = 'Carregando...';
-    
+
     try {
         const response = await fetch(`${AUTH_API}/api/documents`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
@@ -2888,7 +2864,7 @@ function renderTable(assets) {
         }
         assetListBody.appendChild(tr);
     });
-    
+
     // Show/hide date col
     if (isSelfModal) assetThDate.classList.remove('hidden');
     else assetThDate.classList.add('hidden');
@@ -2908,7 +2884,7 @@ async function renderGrid(assets) {
 
         const thumb = document.createElement('div');
         thumb.className = 'thumbnail-container';
-        
+
         if (doc.type.startsWith('image/')) {
             const img = document.createElement('img');
             img.src = `${AUTH_API}/api/documents/download/${doc.id}`;
@@ -2959,7 +2935,7 @@ function createVideoThumbnail(url) {
             canvas.width = 160;
             canvas.height = 160;
             const ctx = canvas.getContext('2d');
-            
+
             // Wait slightly for seek
             setTimeout(() => {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -2968,10 +2944,10 @@ function createVideoThumbnail(url) {
             }, 200);
         };
         video.onerror = () => {
-             const div = document.createElement('div');
-             div.innerText = '🎬';
-             div.style.fontSize = '2rem';
-             resolve(div);
+            const div = document.createElement('div');
+            div.innerText = '🎬';
+            div.style.fontSize = '2rem';
+            resolve(div);
         };
     });
 }
@@ -3046,7 +3022,7 @@ selfAssetUploadInput.onchange = async (e) => {
     // Validate type
     const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/');
-    
+
     if (!validTypes.includes(file.type) && !isMedia) {
         alert('Tipo de arquivo não suportado. Use PDF, Word, Imagens ou Vídeos.');
         return;
