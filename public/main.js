@@ -12,6 +12,7 @@ let localPlayerPath = null;
 let socket = null;
 let localUsername = '';
 let authToken = '';
+let localUserRole = 'USER'; // New: Store user role
 const loginScreen = document.getElementById('login-screen');
 const joinBtn = document.getElementById('join-btn');
 const emailInput = document.getElementById('email-input');
@@ -108,7 +109,7 @@ const menuCubeSection = document.getElementById('menu-cube-section');
 const menuModelSection = document.getElementById('menu-model-section');
 const menuPlacementSection = document.getElementById('menu-placement-section'); // New
 const contextGlbUpload = document.getElementById('context-glb-upload');
-const menuPlaceModule = document.getElementById('menu-place-module'); // New
+const menuPlaceModule = document.getElementById('menu-place-module');
 
 // Catalog State & UI
 let catalogData = { characters: [], models: [], structures: [] };
@@ -273,6 +274,7 @@ joinBtn.addEventListener('click', async () => {
         const token = result.token;
         authToken = token; // Store globally
         localUsername = result.user?.username || email.split('@')[0];
+        localUserRole = result.user?.role || 'USER'; // Store role
 
         // Initialize socket with the received token
         // @ts-ignore
@@ -1296,19 +1298,32 @@ window.addEventListener('contextmenu', (event) => {
             menuGroundSection.classList.add('hidden');
             menuCubeSection.classList.add('hidden');
             menuModelSection.classList.add('hidden');
+            menuPlacementSection.classList.add('hidden'); // Reset all
 
-            // Ground name check must be exact OR an environment mesh
+            // Ground name check
             const isEnv = contextMenuTarget.userData && contextMenuTarget.userData.id && contextMenuTarget.userData.id.toString().includes('env_');
             if (contextMenuTarget.name === "ground" || (contextMenuTarget.object && contextMenuTarget.object.name === "ground") || isEnv) {
                 menuGroundSection.classList.remove('hidden');
+                
+                // Role-based visibility for Module Placement
+                if (localUserRole === 'MASTER' || localUserRole === 'ADMIN') {
+                    menuPlaceModule.classList.remove('hidden');
+                    menuPlaceModule.style.display = 'block';
+                } else {
+                    menuPlaceModule.classList.add('hidden');
+                    menuPlaceModule.style.display = 'none';
+                }
             } else if (contextMenuTarget.userData && contextMenuTarget.userData.id) {
                 const id = contextMenuTarget.userData.id.toString().toLowerCase();
                 if (id.includes('cube')) {
                     menuCubeSection.classList.remove('hidden');
                 } else if (id.includes('model') || id.includes('struct')) {
                     menuModelSection.classList.remove('hidden');
-                } else if (id.includes('placement')) {
-                    menuPlacementSection.classList.remove('hidden');
+                } else if (contextMenuTarget.userData.isPlacement) {
+                    // Show assignment/delete only for MASTERs
+                    if (localUserRole === 'MASTER' || localUserRole === 'ADMIN') {
+                        menuPlacementSection.classList.remove('hidden');
+                    }
                 }
             }
         }
@@ -2508,7 +2523,7 @@ function createModulePlacement(data) {
     scene.add(group);
 
     // Badge for MASTER
-    if (socket.decoded && (socket.decoded.role === 'MASTER' || socket.decoded.role === 'ADMIN')) {
+    if (localUserRole === 'MASTER' || localUserRole === 'ADMIN') {
         createPlacementBadge(group);
     }
 
@@ -2659,7 +2674,7 @@ moduleTabBtns.forEach(btn => {
 });
 
 async function openModuleSidebar(placementId, moduleId) {
-    const isOwner = authToken && socket.decoded && (socket.decoded.role === 'MASTER' || socket.decoded.role === 'ADMIN');
+    const isOwner = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
     
     if (!moduleId) {
         if (isOwner) {
