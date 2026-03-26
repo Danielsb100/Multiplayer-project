@@ -88,6 +88,7 @@ app.use(express.static('public'));
 const players = {};
 const placedCubes = [];
 const placedModels = [];
+const placedModulePlacements = []; // New: Stores teaching module placements
 const chatHistory = []; // New: Stores the last 50 messages
 const MAX_CHAT_LOGS = 50;
 
@@ -163,6 +164,7 @@ io.on('connection', (socket) => {
     socket.emit('currentPlayers', players);
     socket.emit('initialCubes', placedCubes);
     socket.emit('initialModels', placedModels);
+    socket.emit('initialModulePlacements', placedModulePlacements); // Sync module placements
     socket.emit('initialChatHistory', chatHistory); // Sync chat history
 
     // Broadcast the new player
@@ -299,6 +301,38 @@ io.on('connection', (socket) => {
         if (model) {
             model.rotation = data.rotation;
             io.emit('objectUpdated', { id: data.id, rotation: data.rotation });
+        }
+    });
+
+    // Handle module placement
+    socket.on('placeModulePlacement', (data) => {
+        const newPlacement = {
+            id: data.id, // ID from Login-System
+            moduleId: data.moduleId,
+            position: data.position,
+            rotation: data.rotation || { x: 0, y: 0, z: 0 },
+            ownerMasterId: socket.decoded?.id,
+            ownerUsername: socket.decoded?.username
+        };
+        placedModulePlacements.push(newPlacement);
+        io.emit('modulePlacementAdded', newPlacement);
+    });
+
+    // Handle module assignment update
+    socket.on('updateModuleAssignment', (data) => {
+        const placement = placedModulePlacements.find(p => p.id === data.id);
+        if (placement) {
+            placement.moduleId = data.moduleId;
+            io.emit('modulePlacementUpdated', { id: data.id, moduleId: data.moduleId });
+        }
+    });
+
+    // Handle module placement deletion
+    socket.on('deleteModulePlacement', (id) => {
+        const index = placedModulePlacements.findIndex(p => p.id === id);
+        if (index !== -1) {
+            placedModulePlacements.splice(index, 1);
+            io.emit('modulePlacementDeleted', id);
         }
     });
 

@@ -106,7 +106,9 @@ const contextMenu = document.getElementById('context-menu');
 const menuGroundSection = document.getElementById('menu-ground-section');
 const menuCubeSection = document.getElementById('menu-cube-section');
 const menuModelSection = document.getElementById('menu-model-section');
+const menuPlacementSection = document.getElementById('menu-placement-section'); // New
 const contextGlbUpload = document.getElementById('context-glb-upload');
+const menuPlaceModule = document.getElementById('menu-place-module'); // New
 
 // Catalog State & UI
 let catalogData = { characters: [], models: [], structures: [] };
@@ -498,6 +500,33 @@ function setupSocketListeners() {
 
     socket.on('initialModels', (models) => {
         if (models) models.forEach(model => createPlacedModel(model));
+    });
+
+    socket.on('initialModulePlacements', (placements) => {
+        if (placements) placements.forEach(p => createModulePlacement(p));
+        // Also fetch from DB in case some are not in transient memory
+        fetchModulePlacements();
+    });
+
+    socket.on('modulePlacementAdded', (data) => {
+        createModulePlacement(data);
+    });
+
+    socket.on('modulePlacementUpdated', (data) => {
+        const obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
+        if (obj) {
+            obj.userData.moduleId = data.moduleId;
+            // Maybe visual feedback
+        }
+    });
+
+    socket.on('modulePlacementDeleted', (id) => {
+        const uuid = idToUuid[id];
+        if (uuid) {
+            const obj = scene.getObjectByProperty('uuid', uuid);
+            if (obj) scene.remove(obj);
+        }
+        delete idToUuid[id];
     });
 
     socket.on('cubeAdded', (cube) => {
@@ -1277,6 +1306,8 @@ window.addEventListener('contextmenu', (event) => {
                     menuCubeSection.classList.remove('hidden');
                 } else if (id.includes('model') || id.includes('struct')) {
                     menuModelSection.classList.remove('hidden');
+                } else if (id.includes('placement')) {
+                    menuPlacementSection.classList.remove('hidden');
                 }
             }
         }
@@ -1533,13 +1564,25 @@ window.addEventListener('mousedown', (event) => {
     try {
         console.log("Mousedown - Button:", event.button, "State:", currentPlacementState);
         if (currentPlacementState === PlacementState.NONE) {
-            // --- Pathfinding Interaction ---
+            // --- Module Placement Interaction ---
             const rect = container.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
-
             const intersects = raycaster.intersectObjects(scene.children, true);
+            
+            for (const hit of intersects) {
+                let root = hit.object;
+                while (root && root !== scene) {
+                    if (root.userData && root.userData.isPlacement) {
+                        openModuleSidebar(root.userData.id, root.userData.moduleId);
+                        return; // Prevent pathfinding if clicked on placement
+                    }
+                    root = root.parent;
+                }
+            }
+
+            // --- Pathfinding Interaction ---
             if (intersects.length > 0) {
                 let hitPoint = null;
                 for (const hit of intersects) {
@@ -2414,6 +2457,399 @@ function createPlacedModel(data) {
         gltfLoader.parse(data.modelBuffer, '', onParsed);
     } else if (data.modelPath) {
         gltfLoader.load(data.modelPath, onParsed);
+    }
+}
+
+function createModulePlacement(data) {
+    const group = new THREE.Group();
+    
+    // Base - Cylinder
+    const baseGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.1, 32);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x60a5fa, metalness: 0.8, roughness: 0.2 });
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.y = 0.05;
+    group.add(base);
+
+    // Floating Icon - Octahedron
+    const iconGeo = new THREE.OctahedronGeometry(0.3);
+    const iconMat = new THREE.MeshStandardMaterial({ 
+        color: 0x60a5fa, 
+        emissive: 0x3b82f6, 
+        emissiveIntensity: 0.5,
+        transparent: true,
+        opacity: 0.8
+    });
+    const icon = new THREE.Mesh(iconGeo, iconMat);
+    icon.position.y = 1.2;
+    icon.name = "floating_icon";
+    group.add(icon);
+
+    // Light beam/Glow
+    const beamGeo = new THREE.CylinderGeometry(0.3, 0.3, 1, 32, 1, true);
+    const beamMat = new THREE.MeshBasicMaterial({ 
+        color: 0x60a5fa, 
+        transparent: true, 
+        opacity: 0.2, 
+        side: THREE.DoubleSide 
+    });
+    const beam = new THREE.Mesh(beamGeo, beamMat);
+    beam.position.y = 0.6;
+    group.add(beam);
+
+    group.position.set(data.position.x, data.position.y, data.position.z);
+    group.rotation.set(data.rotation?.x || 0, data.rotation?.y || 0, data.rotation?.z || 0);
+    group.userData.id = data.id;
+    group.userData.moduleId = data.moduleId;
+    group.userData.isPlacement = true;
+
+    idToUuid[data.id] = group.uuid;
+    scene.add(group);
+
+    // Animation loop for the floating icon
+    const startTime = Date.now();
+    const animateIcon = () => {
+        if (!group.parent) return; // Stop if removed
+        const time = (Date.now() - startTime) * 0.002;
+        icon.position.y = 1.2 + Math.sin(time) * 0.1;
+        icon.rotation.y = time;
+        requestAnimationFrame(animateIcon);
+    };
+    animateIcon();
+}
+
+// --- Module Placement Handlers ---
+
+menuPlaceModule.addEventListener('click', async () => {
+    closeContextMenu();
+    
+    // Determine if MASTER
+    // (Assuming authToken verification in server/socket ensures only authorized can emit if we were doing server-side checks, 
+    // but here we just follow the UI logic)
+    
+    try {
+        const response = await fetch(`${AUTH_API}/world/placements`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                sceneId: 'level1',
+                objectType: 'TEACHING_MODULE_BEACON',
+                position: contextMenuPoint,
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: { x: 1, y: 1, z: 1 }
+            })
+        });
+
+        const newPlacement = await response.json();
+        if (!response.ok) throw new Error(newPlacement.error || 'Falha ao criar placement');
+
+        // Notify socket server
+        socket.emit('placeModulePlacement', {
+            id: newPlacement.id,
+            position: contextMenuPoint.clone(),
+            rotation: { x: 0, y: 0, z: 0 }
+        });
+
+        triggerInteract(playerAnims, contextMenuPoint);
+        didInteractThisFrame = true;
+    } catch (err) {
+        alert('Erro ao criar módulo interativo: ' + err.message);
+    }
+});
+
+document.getElementById('menu-delete-placement').addEventListener('click', async () => {
+    const id = contextMenuTarget.userData.id;
+    closeContextMenu();
+
+    if (!confirm('Excluir este módulo interativo?')) return;
+
+    try {
+        const response = await fetch(`${AUTH_API}/world/placements/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Falha ao excluir');
+        }
+
+        socket.emit('deleteModulePlacement', id);
+    } catch (err) {
+        alert('Erro ao excluir: ' + err.message);
+    }
+});
+
+document.getElementById('menu-assign-module').addEventListener('click', async () => {
+    const id = contextMenuTarget.userData.id;
+    closeContextMenu();
+
+    try {
+        const response = await fetch(`${AUTH_API}/modules/my/assignable`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const modules = await response.json();
+
+        if (modules.length === 0) {
+            alert('Você não possui módulos para vincular. Crie um no Dashboard!');
+            return;
+        }
+
+        // Show a simple prompt/selection for now (MVP)
+        const moduleList = modules.map((m, i) => `${i + 1}. ${m.title} (${m.status})`).join('\n');
+        const choice = prompt(`Escolha o módulo para vincular:\n\n${moduleList}\n\nDigite o número:`);
+        
+        const idx = parseInt(choice) - 1;
+        if (isNaN(idx) || !modules[idx]) return;
+
+        const selectedModule = modules[idx];
+
+        const assignRes = await fetch(`${AUTH_API}/world/placements/${id}/assign-module`, {
+            method: 'PATCH',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ moduleId: selectedModule.id })
+        });
+
+        if (!assignRes.ok) {
+            const data = await assignRes.json();
+            throw new Error(data.error || 'Falha ao vincular');
+        }
+
+        socket.emit('updateModuleAssignment', { id, moduleId: selectedModule.id });
+        alert(`Módulo "${selectedModule.title}" vinculado com sucesso!`);
+    } catch (err) {
+        alert('Erro ao vincular módulo: ' + err.message);
+    }
+});
+
+// --- Module Sidebar Logic ---
+
+const moduleSidebar = document.getElementById('module-sidebar');
+const btnCloseSidebar = document.getElementById('close-module-sidebar');
+const moduleTitle = document.getElementById('module-title');
+const moduleDescription = document.getElementById('module-description');
+const moduleTabBtns = document.querySelectorAll('.module-tab-btn');
+const tabPanes = document.querySelectorAll('.tab-pane');
+
+let currentModuleId = null;
+let currentPlacementId = null;
+
+btnCloseSidebar.onclick = () => moduleSidebar.classList.add('hidden');
+
+moduleTabBtns.forEach(btn => {
+    btn.onclick = () => {
+        const tab = btn.dataset.tab;
+        moduleTabBtns.forEach(b => b.classList.remove('active'));
+        tabPanes.forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(`module-tab-${tab}`).classList.add('active');
+    };
+});
+
+async function openModuleSidebar(placementId, moduleId) {
+    if (!moduleId) {
+        // If MASTER, prompt to assign. If USER, show nothing.
+        const response = await fetch(`${AUTH_API}/auth/verify`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const user = await response.json();
+        if (user.role === 'MASTER' || user.role === 'ADMIN') {
+            alert('Este objeto ainda não possui um módulo vinculado. Use o menu de contexto (botão direito) para vincular.');
+        }
+        return;
+    }
+
+    currentModuleId = moduleId;
+    currentPlacementId = placementId;
+
+    // Reset UI
+    moduleTitle.innerText = 'Carregando...';
+    moduleDescription.innerText = '';
+    moduleSidebar.classList.remove('hidden');
+    // Set default tab
+    moduleTabBtns[0].click();
+
+    try {
+        const response = await fetch(`${AUTH_API}/runtime/modules/${moduleId}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const module = await response.json();
+
+        if (!response.ok) throw new Error(module.error || 'Erro ao carregar módulo');
+
+        moduleTitle.innerText = module.title;
+        moduleDescription.innerText = module.description || 'Sem descrição.';
+
+        renderModuleVideos(module.videos);
+        renderModuleDocs(module.documents);
+        renderModuleQuiz(module.questions);
+        renderModuleForum(moduleId);
+
+        // Analytics: Log Access
+        fetch(`${AUTH_API}/modules/${moduleId}/access`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
+        });
+
+    } catch (err) {
+        alert('Erro: ' + err.message);
+        moduleSidebar.classList.add('hidden');
+    }
+}
+
+function renderModuleVideos(videos) {
+    const list = document.querySelector('#module-tab-videos .video-list');
+    list.innerHTML = videos.length ? '' : 'Nenhum vídeo disponível.';
+    videos.forEach(v => {
+        const div = document.createElement('div');
+        div.className = 'video-item';
+        div.innerHTML = `
+            <span>${v.title}</span>
+            <button class="btn-open">Assistir</button>
+        `;
+        div.querySelector('button').onclick = () => {
+            window.open(v.url, '_blank');
+            // Analytics: Video Progress (simplified as 100% on click for MVP)
+            fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${v.id}/progress`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
+            });
+        };
+        list.appendChild(div);
+    });
+}
+
+function renderModuleDocs(docs) {
+    const list = document.querySelector('#module-tab-docs .document-list');
+    list.innerHTML = docs.length ? '' : 'Nenhum documento disponível.';
+    docs.forEach(d => {
+        const div = document.createElement('div');
+        div.className = 'document-item';
+        div.innerHTML = `
+            <span>${d.title}</span>
+            <button class="btn-open">Download</button>
+        `;
+        div.querySelector('button').onclick = async () => {
+            window.downloadSharedAsset(d.documentId, d.title);
+            // Analytics: Download
+            fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${d.id}/download`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
+            });
+        };
+        list.appendChild(div);
+    });
+}
+
+function renderModuleQuiz(questions) {
+    const container = document.querySelector('#module-tab-quiz .quiz-container');
+    container.innerHTML = questions.length ? '' : 'Nenhum quiz disponível.';
+    
+    const quizForm = document.createElement('div');
+    questions.forEach((q, qIdx) => {
+        const qDiv = document.createElement('div');
+        qDiv.className = 'quiz-question';
+        qDiv.innerHTML = `<p><strong>${qIdx + 1}. ${q.text}</strong></p>`;
+        
+        q.options.forEach(opt => {
+            const optDiv = document.createElement('div');
+            optDiv.innerHTML = `
+                <label>
+                    <input type="radio" name="question_${q.id}" value="${opt.id}">
+                    ${opt.text}
+                </label>
+            `;
+            qDiv.appendChild(optDiv);
+        });
+        quizForm.appendChild(qDiv);
+    });
+
+    if (questions.length) {
+        const submitBtn = document.createElement('button');
+        submitBtn.className = 'btn-open';
+        submitBtn.style.marginTop = '20px';
+        submitBtn.innerText = 'Enviar Respostas';
+        submitBtn.onclick = async () => {
+            const answers = [];
+            questions.forEach(q => {
+                const selected = quizForm.querySelector(`input[name="question_${q.id}"]:checked`);
+                if (selected) answers.push({ questionId: q.id, optionId: parseInt(selected.value) });
+            });
+
+            if (answers.length < questions.length) {
+                alert('Responda todas as perguntas antes de enviar.');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${AUTH_API}/modules/${currentModuleId}/quiz/submit`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ answers, source: 'MULTIPLAYER_WORLD' })
+                });
+                const result = await res.json();
+                alert(`Quiz enviado! Sua nota: ${result.score.toFixed(1)}%`);
+            } catch (err) {
+                alert('Erro ao enviar quiz: ' + err.message);
+            }
+        };
+        quizForm.appendChild(submitBtn);
+    }
+    container.appendChild(quizForm);
+}
+
+function renderModuleForum(moduleId) {
+    const container = document.querySelector('#module-tab-forum .forum-container');
+    container.innerHTML = 'Fórum integrado carregando...';
+    // Forum implementation would call /modules/:id/forum/threads
+    // For MVP, just a placeholder or simple list
+    container.innerHTML = `
+        <p>Participe da discussão no fórum deste módulo.</p>
+        <button class="btn-open" onclick="window.open('${AUTH_API.replace('api', '')}', '_blank')">Abrir Fórum no Dashboard</button>
+    `;
+}
+
+async function fetchModulePlacements() {
+    try {
+        const response = await fetch(`${AUTH_API}/world/placements?sceneId=level1`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const placements = await response.json();
+        if (response.ok) {
+            placements.forEach(p => {
+                // Check if already in idToUuid (managed by initialModulePlacements socket sync)
+                if (!idToUuid[p.id]) {
+                    createModulePlacement({
+                        id: p.id,
+                        moduleId: p.moduleId,
+                        position: { x: p.positionX, y: p.positionY, z: p.positionZ },
+                        rotation: { x: p.rotationX, y: p.rotationY, z: p.rotationZ }
+                    });
+                }
+            });
+        }
+    } catch (err) {
+        console.error("Error fetching module placements:", err);
     }
 }
 
