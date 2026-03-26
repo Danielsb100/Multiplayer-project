@@ -1,17 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Environment Viewer</title>
     <link rel="stylesheet" href="styles.css">
-    
+
     <!-- Google Fonts for Modern Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap"
+        rel="stylesheet">
+
     <!-- Import map for Three.js without a build tool -->
+    </script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+
+<body>
+    <!-- Cursor customizado (Círculo Vermelho) -->
+    <div id="custom-cursor"></div>
+
+    <!-- Tela de Carregamento Inicial / Login -->
+    <div id="login-screen" class="login-overlay ui-layer">
+        <div class="login-box">
+            <h1>Welcome!</h1>
+            <p>Enter your credentials to join</p>
+
+            <!-- Auth Tabs to toggle between Login and Register -->
+            <div class="auth-tabs">
+                <button id="tab-login" class="auth-tab active">Login</button>
+                <button id="tab-register" class="auth-tab">Register</button>
+            </div>
+
+            <!-- Login Section -->
+            <div id="login-section">
+                <h1>Welcome!</h1>
+                <p>Enter your credentials to join</p>
+                <div id="login-error" class="hidden"
+                    style="color: #ef4444; margin-bottom: 10px; font-size: 0.9rem; text-align: center;"></div>
+                <input type="email" id="email-input" placeholder="Email" autocomplete="off">
+                <input type="password" id="password-input" placeholder="Password" autocomplete="off">
+
+                <div
+                    style="font-size: 0.85rem; margin-top: 5px; margin-bottom: 15px; text-align: center; color: var(--text-secondary);">
+                    Don't have an account? <a href="https://login-system-production-84c6.up.railway.app/"
+                        target="_blank"
+                        style="color: var(--accent-color); text-decoration: none; font-weight: 500;">Create one</a>
+                </div>
+
+                <!-- Seção de importação de modelo GLB (Opcional) no Login -->
+                <div class="login-upload-section">
+                    <label for="login-glb-upload" class="upload-btn mini">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        Import .glb (Optional)
+                    </label>
+                    <input type="file" id="login-glb-upload" accept=".glb">
+                    <!-- Mostra o nome do arquivo selecionado ou o padrão -->
+                    <span id="login-file-name">Default avatar selected</span>
+                </div>
+
+                <!-- Seleção de Cor do Usuário -->
+                <div class="login-color-section">
+                    <span>Escolha sua cor:</span>
+                    <div id="login-color-options" class="login-color-grid">
+                        <div class="login-color-option" style="background: #ef4444;" data-color="#ef4444"></div>
+                        <div class="login-color-option" style="background: #3b82f6;" data-color="#3b82f6"></div>
+                        <div class="login-color-option" style="background: #10b981;" data-color="#10b981"></div>
+                        <div class="login-color-option" style="background: #f59e0b;" data-color="#f59e0b"></div>
+                        <div class="login-color-option" style="background: #8b5cf6;" data-color="#8b5cf6"></div>
+                        <div class="login-color-option" style="background: #ec4899;" data-color="#ec4899"></div>
+                        <div class="login-color-option" style="background: #ffffff;" data-color="#ffffff"></div>
+                        <div class="login-color-option" style="background: #94a3b8;" data-color="#94a3b8"></div>
+                    </div>
+                </div>
+
+                <div class="login-actions">
+                    <button id="catalog-char-btn" class="secondary-btn">Escolher Avatar</button>
+                    <button id="join-btn">Entrar no Mundo</button>
+                </div>
+            </div>
+
+            <!-- Register Section -->
+            <div id="register-section" class="hidden">
+                <h1>Create Account</h1>
+                <p>Join our community today</p>
+                <input type="text" id="reg-username" placeholder="Username" required>
+                <input type="email" id="reg-email" placeholder="Email" required>
+                <input type="password" id="reg-password" placeholder="Password" required>
+                <button id="register-btn">Sign Up</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- UI Modals -->
     <!-- Player Action Menu (Small popup for Call / View Assets) -->
     <div id="player-action-menu" class="context-menu hidden ui-layer">
         <div class="menu-header">
@@ -28,8 +116,15 @@
                 <h2>Shared Assets - <span id="modal-username">User</span></h2>
                 <div class="header-actions">
                     <input type="file" id="self-asset-upload" accept=".pdf,.doc,.docx,image/*,video/*" class="hidden">
-                    <button id="btn-upload-asset" class="upload-btn hidden" style="padding: 0.5rem 1rem; font-size: 0.8rem; width: auto; margin-right: 1rem;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <button id="btn-upload-asset" class="upload-btn hidden"
+                        style="padding: 0.5rem 1rem; font-size: 0.8rem; width: auto; margin-right: 1rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            style="margin-right: 4px;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
                         Upload File
                     </button>
                     <button id="close-asset-modal" class="close-btn">&times;</button>
@@ -71,98 +166,15 @@
             <button id="prev-preview" class="nav-arrow prev">&lsaquo;</button>
             <button id="next-preview" class="nav-arrow next">&rsaquo;</button>
             <div class="preview-footer">
-                <button id="btn-download-preview" class="upload-btn" style="width: auto; padding: 0.75rem 2rem;">Download</button>
-            </div>
-        </div>
-    </div>
-
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-                "three-pathfinding": "https://unpkg.com/three-pathfinding/dist/three-pathfinding.module.js"
-            }
-        }
-    </script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-</head>
-<body>
-    <!-- Cursor customizado (Círculo Vermelho) -->
-    <div id="custom-cursor"></div>
-
-    <!-- Tela de Carregamento Inicial / Login -->
-    <div id="login-screen" class="login-overlay ui-layer">
-        <div class="login-box">
-            <h1>Welcome!</h1>
-            <p>Enter your credentials to join</p>
-            
-            <!-- Auth Tabs to toggle between Login and Register -->
-            <div class="auth-tabs">
-                <button id="tab-login" class="auth-tab active">Login</button>
-                <button id="tab-register" class="auth-tab">Register</button>
-            </div>
-
-            <!-- Login Section -->
-            <div id="login-section">
-                <h1>Welcome!</h1>
-                <p>Enter your credentials to join</p>
-                <div id="login-error" class="hidden" style="color: #ef4444; margin-bottom: 10px; font-size: 0.9rem; text-align: center;"></div>
-                <input type="email" id="email-input" placeholder="Email" autocomplete="off">
-                <input type="password" id="password-input" placeholder="Password" autocomplete="off">
-                
-                <div style="font-size: 0.85rem; margin-top: 5px; margin-bottom: 15px; text-align: center; color: var(--text-secondary);">
-                    Don't have an account? <a href="https://login-system-production-84c6.up.railway.app/" target="_blank" style="color: var(--accent-color); text-decoration: none; font-weight: 500;">Create one</a>
-                </div>
-                
-                <!-- Seção de importação de modelo GLB (Opcional) no Login -->
-                <div class="login-upload-section">
-                    <label for="login-glb-upload" class="upload-btn mini">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                        Import .glb (Optional)
-                    </label>
-                    <input type="file" id="login-glb-upload" accept=".glb">
-                    <!-- Mostra o nome do arquivo selecionado ou o padrão -->
-                    <span id="login-file-name">Default avatar selected</span>
-                </div>
-
-                <!-- Seleção de Cor do Usuário -->
-                <div class="login-color-section">
-                    <span>Escolha sua cor:</span>
-                    <div id="login-color-options" class="login-color-grid">
-                        <div class="login-color-option" style="background: #ef4444;" data-color="#ef4444"></div>
-                        <div class="login-color-option" style="background: #3b82f6;" data-color="#3b82f6"></div>
-                        <div class="login-color-option" style="background: #10b981;" data-color="#10b981"></div>
-                        <div class="login-color-option" style="background: #f59e0b;" data-color="#f59e0b"></div>
-                        <div class="login-color-option" style="background: #8b5cf6;" data-color="#8b5cf6"></div>
-                        <div class="login-color-option" style="background: #ec4899;" data-color="#ec4899"></div>
-                        <div class="login-color-option" style="background: #ffffff;" data-color="#ffffff"></div>
-                        <div class="login-color-option" style="background: #94a3b8;" data-color="#94a3b8"></div>
-                    </div>
-                </div>
-
-                <div class="login-actions">
-                    <button id="catalog-char-btn" class="secondary-btn">Escolher Avatar</button>
-                    <button id="join-btn">Entrar no Mundo</button>
-                </div>
-            </div>
-
-            <!-- Register Section -->
-            <div id="register-section" class="hidden">
-                <h1>Create Account</h1>
-                <p>Join our community today</p>
-                <input type="text" id="reg-username" placeholder="Username" required>
-                <input type="email" id="reg-email" placeholder="Email" required>
-                <input type="password" id="reg-password" placeholder="Password" required>
-                <div id="register-error" class="error-msg"></div>
-                <button id="register-btn">Sign Up</button>
+                <button id="btn-download-preview" class="upload-btn"
+                    style="width: auto; padding: 0.75rem 2rem;">Download</button>
             </div>
         </div>
     </div>
 
     <!-- Container onde o Three.js irá renderizar a cena 3D -->
     <div id="canvas-container"></div>
-    
+
     <!-- Player List Container -->
     <div id="player-list-container" class="ui-layer hidden">
         <div class="player-list-header">
@@ -175,6 +187,37 @@
     <div id="module-sidebar" class="ui-layer hidden module-sidebar">
         <div id="sidebar-preview-banner" class="preview-banner">MODO PREVIEW: Módulo não publicado</div>
         <div class="sidebar-header">
+            <h2 id="module-sidebar-title">Nome do Módulo</h2>
+            <button id="close-module-sidebar" class="close-btn">&times;</button>
+        </div>
+        <div class="sidebar-tabs">
+            <button class="tab-btn active" data-tab="content">Conteúdo</button>
+            <button class="tab-btn" data-tab="videos">Vídeos</button>
+            <button class="tab-btn" data-tab="docs">Docs</button>
+            <button class="tab-btn" data-tab="quiz">Quiz</button>
+            <button class="tab-btn" data-tab="forum">Fórum</button>
+        </div>
+        <div class="sidebar-content-area">
+            <div id="module-tab-content" class="tab-content active">
+                <p id="module-sidebar-description"></p>
+            </div>
+            <div id="module-tab-videos" class="tab-content">
+                <div class="video-list"></div>
+            </div>
+            <div id="module-tab-docs" class="tab-content">
+                <div class="doc-list"></div>
+            </div>
+            <div id="module-tab-quiz" class="tab-content">
+                <div class="quiz-container">
+                    <div id="quiz-questions"></div>
+                    <button id="btn-submit-quiz" class="btn-open" style="margin-top: 20px;">Enviar Respostas</button>
+                </div>
+            </div>
+            <div id="module-tab-forum" class="tab-content">
+                <div class="forum-list">Em breve...</div>
+            </div>
+        </div>
+    </div>
 
     <!-- Estrutura do Chat Global - Histórico (Canto Superior Direito) -->
     <div id="chat-history-container" class="ui-layer">
@@ -183,7 +226,7 @@
 
     <!-- Estrutura do Chat Global - Entrada de Texto (Canto Inferior Direito) -->
     <div id="chat-input-container" class="ui-layer">
-        <input type="text" id="chat-input" placeholder="Tipe your message..." autocomplete="off">
+        <input type="text" id="chat-input" placeholder="Type your message..." autocomplete="off">
     </div>
 
     <!-- Menu de Contexto (Botão Direito) -->
@@ -216,6 +259,11 @@
             <div class="menu-item" id="menu-rotate-45-left">↩️ Girar 45° Esquerda</div>
             <div class="menu-item" id="menu-delete-model">🗑️ Deletar Modelo</div>
         </div>
+        <!-- Section for Module Placement -->
+        <div id="menu-placement-section" class="hidden">
+            <div class="menu-item" id="menu-assign-module">🎯 Assign Module</div>
+            <div class="menu-item" id="menu-delete-placement" style="color: #ef4444;">🗑️ Delete Placement</div>
+        </div>
     </div>
 
     <!-- Input oculto para importação via menu -->
@@ -230,7 +278,7 @@
     <!-- Biblioteca Socket.io para comunicação em tempo real -->
     <script src="/socket.io/socket.io.js"></script>
 
-    <!-- Audio call UI Elements (New) -->
+    <!-- Audio call UI Elements -->
     <div id="audio-call-layer" class="ui-layer hidden">
         <div class="audio-call-card glass">
             <div id="video-container" class="video-grid hidden">
@@ -254,7 +302,7 @@
         </div>
     </div>
 
-    <!-- Incoming Call Notification (New) -->
+    <!-- Incoming Call Notification -->
     <div id="incoming-modal" class="modal hidden ui-layer">
         <div class="modal-content glass">
             <h3>Chamada de <span id="incoming-caller">...</span></h3>
@@ -280,7 +328,7 @@
         </div>
     </div>
 
-    <!-- Lógica principal do Frontend (Three.js, Sockets e Chat) -->
+    <!-- Main Logic -->
     <script type="module" src="main.js?v=1.3.1"></script>
     <div style="position: fixed; bottom: 5px; right: 5px; font-size: 0.6rem; color: #475569; z-index: 1000; pointer-events: none;">v1.3.1</div>
 </body>
