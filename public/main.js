@@ -110,6 +110,9 @@ const menuModelSection = document.getElementById('menu-model-section');
 const menuPlacementSection = document.getElementById('menu-placement-section'); // New
 const contextGlbUpload = document.getElementById('context-glb-upload');
 const menuPlaceModule = document.getElementById('menu-place-module');
+const menuImportPlacementGlb = document.getElementById('menu-import-placement-glb');
+const placementModelUpload = document.getElementById('placement-model-upload');
+const placementMixers = {};
 
 // Catalog State & UI
 let catalogData = { characters: [], models: [], structures: [] };
@@ -596,6 +599,18 @@ function setupSocketListeners() {
 
     socket.on('initialChatHistory', (history) => {
         if (history) history.forEach(msg => addMessageToChat(msg));
+    });
+
+    socket.on('modulePlacementModelUpdated', (data) => {
+        let obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
+        if (!obj) {
+            scene.traverse(child => { if (child.userData && child.userData.id == data.id) obj = child; });
+        }
+        if (obj && obj.userData.refreshModel) {
+            obj.userData.idleAnimName = data.idleAnim || 'idle';
+            obj.userData.interactedAnimName = data.interactedAnim || 'interacted';
+            obj.userData.refreshModel();
+        }
     });
 }
 
@@ -1413,28 +1428,49 @@ function closeContextMenu() {
 }
 
 // Menu Actions
-document.getElementById('menu-import-glb').addEventListener('click', () => {
-    contextGlbUpload.click();
+document.getElementById('menu-import-placement-glb').addEventListener('click', () => {
+    if (contextMenuTarget && contextMenuTarget.userData.isPlacement) {
+        placementModelUpload.click();
+    }
     closeContextMenu();
 });
-contextGlbUpload.addEventListener('change', (e) => {
+
+placementModelUpload.addEventListener('change', async (e) => {
     const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const buffer = event.target.result;
-            if (socket) {
-                socket.emit('placeModel', {
-                    modelBuffer: buffer,
-                    position: contextMenuPoint.clone()
-                });
-            }
-            // Object will appear when server confirms via 'modelAdded'
-            triggerInteract(playerAnims, contextMenuPoint);
-            didInteractThisFrame = true;
-        };
-        reader.readAsArrayBuffer(file);
-        e.target.value = ''; // Reset input to allow re-importing same file
+    if (!file || !contextMenuTarget) return;
+
+    const id = contextMenuTarget.userData.id;
+    const idleAnim = prompt("Nome da animação IDLE (opcional):", "idle");
+    const interactedAnim = prompt("Nome da animação INTERAÇÃO (opcional):", "interacted");
+
+    const formData = new FormData();
+    formData.append('model', file);
+    if (idleAnim) formData.append('idleAnim', idleAnim);
+    if (interactedAnim) formData.append('interactedAnim', interactedAnim);
+
+    try {
+        const response = await fetch(`${AUTH_API}/world/placements/${id}/model`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            body: formData
+        });
+
+        if (!response.ok) throw new Error('Falha no upload do modelo');
+        
+        const data = await response.json();
+        alert('Modelo importado com sucesso!');
+        
+        socket.emit('updateModulePlacementModel', {
+            id: id,
+            idleAnim: idleAnim,
+            interactedAnim: interactedAnim,
+            hasModel: true
+        });
+
+    } catch (err) {
+        alert('Erro ao importar modelo: ' + err.message);
+    } finally {
+        e.target.value = '';
     }
 });
 
@@ -1602,6 +1638,15 @@ window.addEventListener('mousedown', (event) => {
                 while (root && root !== scene) {
                     if (root.userData && root.userData.isPlacement) {
                         openModuleSidebar(root.userData.id, root.userData.moduleId);
+                        
+                        // Trigger interacted animation if present
+                        const mixerInfo = placementMixers[root.userData.id];
+                        if (mixerInfo && mixerInfo.actions['interacted']) {
+                            const action = mixerInfo.actions['interacted'];
+                            action.reset().setLoop(THREE.LoopOnce).play();
+                            action.clampWhenFinished = false;
+                        }
+
                         return; // Prevent pathfinding if clicked on placement
                     }
                     root = root.parent;
@@ -2137,6 +2182,13 @@ function animate() {
             }
         }
 
+        // Update placement mixers
+        for (const id in placementMixers) {
+            if (placementMixers[id] && placementMixers[id].mixer) {
+                placementMixers[id].mixer.update(delta);
+            }
+        }
+
         updatePlayer(delta);
         updateOcclusion();
         updateGametags();
@@ -2488,64 +2540,126 @@ function createPlacedModel(data) {
 
 function createModulePlacement(data) {
     const group = new THREE.Group();
-    
-    // Base - Cylinder
-    const baseGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.1, 32);
-    const baseMat = new THREE.MeshStandardMaterial({ color: 0x60a5fa, metalness: 0.8, roughness: 0.2 });
-    const base = new THREE.Mesh(baseGeo, baseMat);
-    base.position.y = 0.05;
-    group.add(base);
+    const modelGroup = new THREE.Group();
+    group.add(modelGroup);
 
-    // Floating Icon - Octahedron
-    const iconGeo = new THREE.OctahedronGeometry(0.3);
-    const iconMat = new THREE.MeshStandardMaterial({ 
-        color: 0x60a5fa, 
-        emissive: 0x3b82f6, 
-        emissiveIntensity: 0.5,
-        transparent: true,
-        opacity: 0.8
-    });
-    const icon = new THREE.Mesh(iconGeo, iconMat);
-    icon.position.y = 1.2;
-    icon.name = "floating_icon";
-    group.add(icon);
-
-    // Light beam/Glow
-    const beamGeo = new THREE.CylinderGeometry(0.3, 0.3, 1, 32, 1, true);
-    const beamMat = new THREE.MeshBasicMaterial({ 
-        color: 0x60a5fa, 
-        transparent: true, 
-        opacity: 0.2, 
-        side: THREE.DoubleSide 
-    });
-    const beam = new THREE.Mesh(beamGeo, beamMat);
-    beam.position.y = 0.6;
-    group.add(beam);
-
-    group.position.set(data.position.x, data.position.y, data.position.z);
-    group.rotation.set(data.rotation?.x || 0, data.rotation?.y || 0, data.rotation?.z || 0);
+    // Initial state
     group.userData.id = data.id;
     group.userData.moduleId = data.moduleId;
     group.userData.moduleTitle = data.moduleTitle || '';
     group.userData.status = data.status || 'NONE'; 
     group.userData.isPlacement = true;
+    group.userData.idleAnimName = data.idleAnim || 'idle';
+    group.userData.interactedAnimName = data.interactedAnim || 'interacted';
 
+    // Helper to setup default beacon
+    const setupDefaultBeacon = () => {
+        modelGroup.clear();
+        // Base - Cylinder
+        const baseGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.1, 32);
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x60a5fa, metalness: 0.8, roughness: 0.2 });
+        const base = new THREE.Mesh(baseGeo, baseMat);
+        base.position.y = 0.05;
+        modelGroup.add(base);
+
+        // Floating Icon - Octahedron
+        const iconGeo = new THREE.OctahedronGeometry(0.3);
+        const iconMat = new THREE.MeshStandardMaterial({ 
+            color: 0x60a5fa, 
+            emissive: 0x3b82f6, 
+            emissiveIntensity: 0.5,
+            transparent: true,
+            opacity: 0.8
+        });
+        const icon = new THREE.Mesh(iconGeo, iconMat);
+        icon.position.y = 1.2;
+        icon.name = "floating_icon";
+        modelGroup.add(icon);
+
+        // Light beam/Glow
+        const beamGeo = new THREE.CylinderGeometry(0.3, 0.3, 1, 32, 1, true);
+        const beamMat = new THREE.MeshBasicMaterial({ 
+            color: 0x60a5fa, 
+            transparent: true, 
+            opacity: 0.2, 
+            side: THREE.DoubleSide 
+        });
+        const beam = new THREE.Mesh(beamGeo, beamMat);
+        beam.position.y = 0.6;
+        modelGroup.add(beam);
+
+        // Animation loop for the floating icon
+        const startTime = Date.now();
+        const animateIcon = () => {
+            if (!group.parent || (modelGroup.children.length > 0 && modelGroup.children[0] !== base)) return; 
+            const time = (Date.now() - startTime) * 0.002;
+            icon.position.y = 1.2 + Math.sin(time) * 0.1;
+            icon.rotation.y = time;
+            requestAnimationFrame(animateIcon);
+        };
+        animateIcon();
+    };
+
+    // Helper to load GLB model
+    const loadCustomModel = () => {
+        const loader = new GLTFLoader();
+        loader.load(`${AUTH_API}/world/placements/${data.id}/model`, (gltf) => {
+            modelGroup.clear();
+            const model = gltf.scene;
+            model.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+            
+            // Auto-center and ground the model
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            model.position.set(-center.x, -box.min.y, -center.z);
+            
+            modelGroup.add(model);
+
+            // Cleanup old mixer
+            if (placementMixers[data.id]) {
+                placementMixers[data.id].mixer.stopAllAction();
+            }
+
+            // Setup new mixer
+            if (gltf.animations && gltf.animations.length > 0) {
+                const mixer = new THREE.AnimationMixer(model);
+                const actions = {};
+                
+                gltf.animations.forEach(clip => {
+                    const name = clip.name.toLowerCase();
+                    if (name.includes(group.userData.idleAnimName.toLowerCase())) {
+                        actions['idle'] = mixer.clipAction(clip);
+                        actions['idle'].play();
+                    }
+                    if (name.includes(group.userData.interactedAnimName.toLowerCase())) {
+                        actions['interacted'] = mixer.clipAction(clip);
+                    }
+                });
+
+                placementMixers[data.id] = { mixer, actions };
+            }
+        }, undefined, (err) => {
+            console.warn("Custom model load failed, using beacon:", err);
+            setupDefaultBeacon();
+        });
+    };
+
+    if (data.hasModel || (data.modelData !== undefined && data.modelData !== null)) {
+        loadCustomModel();
+    } else {
+        setupDefaultBeacon();
+    }
+
+    group.position.set(data.position.x, data.position.y, data.position.z);
+    group.rotation.set(data.rotation?.x || 0, data.rotation?.y || 0, data.rotation?.z || 0);
+    
     idToUuid[data.id] = group.uuid;
     scene.add(group);
-
-    // Badge for EVERYONE (MASTER sees status, USER sees Title)
+    
     createPlacementBadge(group);
 
-    // Animation loop for the floating icon
-    const startTime = Date.now();
-    const animateIcon = () => {
-        if (!group.parent) return; // Stop if removed
-        const time = (Date.now() - startTime) * 0.002;
-        icon.position.y = 1.2 + Math.sin(time) * 0.1;
-        icon.rotation.y = time;
-        requestAnimationFrame(animateIcon);
-    };
-    animateIcon();
+    // Store load function for refresh
+    group.userData.refreshModel = loadCustomModel;
 }
 
 // --- Module Placement Handlers ---
