@@ -2490,7 +2490,6 @@ function makeCall(targetPeerId, name) {
 
     currentCall = peer.call(targetPeerId, localStream);
     setupCallListeners(currentCall);
-    startTimer();
 }
 
 function answerCall(call) {
@@ -2501,7 +2500,6 @@ function answerCall(call) {
     audioCallLayer.classList.remove('hidden');
 
     setupCallListeners(currentCall);
-    startTimer();
 }
 
 function setupCallListeners(call) {
@@ -2509,36 +2507,20 @@ function setupCallListeners(call) {
         if (!currentCall) return;
         currentCall.remoteStream = remoteStream;
 
-        const updateVisibility = () => {
-            const hasRemoteVideo = remoteStream.getVideoTracks().some(t => t.enabled);
-            const hasLocalVideo = localStream && localStream.getVideoTracks().some(t => t.enabled);
-            
-            if (hasRemoteVideo || hasLocalVideo) {
-                videoContainer.classList.remove('hidden');
-            } else {
-                videoContainer.classList.add('hidden');
-            }
-
-            if (hasRemoteVideo) {
-                remoteVideo.srcObject = remoteStream;
-                remoteVideo.play().catch(e => console.warn("Remote video play failed:", e));
-            }
-        };
-
-        updateVisibility();
+        // "É para transmitir sempre!" - Show the container immediately upon connection
+        videoContainer.classList.remove('hidden');
         
-        // PeerJS streams might not trigger onaddtrack, so we check periodically 
-        // if the person enables camera mid-call
-        const trackCheckInterval = setInterval(() => {
-            if (!currentCall) {
-                clearInterval(trackCheckInterval);
-                return;
-            }
-            updateVisibility();
-        }, 1000);
+        // Attach remote stream (audio and video tracks)
+        remoteVideo.srcObject = remoteStream;
+        remoteVideo.play().catch(e => console.warn("Remote video play failed:", e));
 
         remoteAudio.srcObject = remoteStream;
         setupVisualizer(remoteStream);
+
+        // Start timer ONLY when stream starts (connection established)
+        if (!callDurationInterval) {
+            startTimer();
+        }
     });
 
     call.on('close', () => {
@@ -2672,16 +2654,9 @@ btnCamera.onclick = async () => {
         }
     }
 
-    // Logic to update UI visibility
-    const hasLocalVideo = videoTrack && videoTrack.enabled;
-    const hasRemoteVideo = currentCall && currentCall.remoteStream && 
-                           currentCall.remoteStream.getVideoTracks().some(t => t.enabled);
-
-    if (hasLocalVideo || hasRemoteVideo) {
-        videoContainer.classList.remove('hidden');
-    } else {
-        videoContainer.classList.add('hidden');
-    }
+    // "Transmitir sempre!" - We no longer hide the container mid-call 
+    // based on track state, as per user request.
+    videoContainer.classList.remove('hidden');
 };
 
 // --- Player Interaction Menu & Asset Modal ---
