@@ -2494,36 +2494,44 @@ function makeCall(targetPeerId, name) {
 
 function answerCall(call) {
     currentCall = call;
+    setupCallListeners(currentCall); // Attach listeners BEFORE answering
     currentCall.answer(localStream);
+    
     const callerName = peerIdToName[call.peer] || 'Conectado';
     callingName.innerText = callerName;
     audioCallLayer.classList.remove('hidden');
-
-    setupCallListeners(currentCall);
 }
 
 function setupCallListeners(call) {
-    call.on('stream', (remoteStream) => {
-        if (!currentCall) return;
-        currentCall.remoteStream = remoteStream;
+    if (!call) return;
 
-        // "É para transmitir sempre!" - Show the container immediately upon connection
+    call.on('stream', (remoteStream) => {
+        // Use the 'call' argument passed to the function for better isolation
+        call.remoteStream = remoteStream;
+
+        // Ensure the call UI is visible (fallback)
+        audioCallLayer.classList.remove('hidden');
         videoContainer.classList.remove('hidden');
         
-        // Attach remote stream (audio and video tracks)
+        // Attach remote media
         remoteVideo.srcObject = remoteStream;
         remoteVideo.play().catch(e => console.warn("Remote video play failed:", e));
 
         remoteAudio.srcObject = remoteStream;
         setupVisualizer(remoteStream);
 
-        // Start timer ONLY when stream starts (connection established)
+        // Start timer ONLY when stream starts
         if (!callDurationInterval) {
             startTimer();
         }
     });
 
     call.on('close', () => {
+        resetAudioUI();
+    });
+
+    call.on('error', (err) => {
+        console.error("Call error:", err);
         resetAudioUI();
     });
 }
