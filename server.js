@@ -309,6 +309,7 @@ io.on('connection', (socket) => {
         const newPlacement = {
             id: data.id, // ID from Login-System
             moduleId: data.moduleId,
+            moduleTitle: data.moduleTitle || '', // New: Store title
             status: data.status || 'NONE',
             position: data.position,
             rotation: data.rotation || { x: 0, y: 0, z: 0 },
@@ -319,13 +320,18 @@ io.on('connection', (socket) => {
         io.emit('modulePlacementAdded', newPlacement);
     });
 
-    // Handle module assignment update
     socket.on('updateModuleAssignment', (data) => {
         const placement = placedModulePlacements.find(p => p.id === data.id);
         if (placement) {
             placement.moduleId = data.moduleId;
+            placement.moduleTitle = data.moduleTitle || ''; // Update title
             placement.status = data.status || 'NONE';
-            io.emit('modulePlacementUpdated', { id: data.id, moduleId: data.moduleId, status: data.status });
+            io.emit('modulePlacementUpdated', { 
+                id: data.id, 
+                moduleId: data.moduleId, 
+                moduleTitle: data.moduleTitle, 
+                status: data.status 
+            });
         }
     });
 

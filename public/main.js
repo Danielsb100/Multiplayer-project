@@ -515,9 +515,14 @@ function setupSocketListeners() {
     });
 
     socket.on('modulePlacementUpdated', (data) => {
-        const obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
+        let obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
+        if (!obj) {
+            // Fallback: search by id in userData
+            scene.traverse(child => { if (child.userData && child.userData.id == data.id) obj = child; });
+        }
         if (obj) {
             obj.userData.moduleId = data.moduleId;
+            obj.userData.moduleTitle = data.moduleTitle || '';
             obj.userData.status = data.status || 'NONE';
             if (obj.userData.refreshBadge) obj.userData.refreshBadge();
         }
@@ -525,9 +530,14 @@ function setupSocketListeners() {
 
     socket.on('modulePlacementDeleted', (id) => {
         const uuid = idToUuid[id];
-        if (uuid) {
-            const obj = scene.getObjectByProperty('uuid', uuid);
-            if (obj) scene.remove(obj);
+        let obj = uuid ? scene.getObjectByProperty('uuid', uuid) : null;
+        if (!obj) {
+            // Fallback: search by id in userData
+            scene.traverse(child => { if (child.userData && child.userData.id == id) obj = child; });
+        }
+        if (obj) {
+            // Cleanup collisions if any (though placements usually don't have them)
+            scene.remove(obj);
         }
         delete idToUuid[id];
     });
@@ -2516,16 +2526,15 @@ function createModulePlacement(data) {
     group.rotation.set(data.rotation?.x || 0, data.rotation?.y || 0, data.rotation?.z || 0);
     group.userData.id = data.id;
     group.userData.moduleId = data.moduleId;
-    group.userData.status = data.status || 'NONE'; // Status from joined module query
+    group.userData.moduleTitle = data.moduleTitle || '';
+    group.userData.status = data.status || 'NONE'; 
     group.userData.isPlacement = true;
 
     idToUuid[data.id] = group.uuid;
     scene.add(group);
 
-    // Badge for MASTER
-    if (localUserRole === 'MASTER' || localUserRole === 'ADMIN') {
-        createPlacementBadge(group);
-    }
+    // Badge for EVERYONE (MASTER sees status, USER sees Title)
+    createPlacementBadge(group);
 
     // Animation loop for the floating icon
     const startTime = Date.now();
@@ -2642,7 +2651,12 @@ document.getElementById('menu-assign-module').addEventListener('click', async ()
             throw new Error(data.error || 'Falha ao vincular');
         }
 
-        socket.emit('updateModuleAssignment', { id, moduleId: selectedModule.id, status: selectedModule.status });
+        socket.emit('updateModuleAssignment', { 
+            id, 
+            moduleId: selectedModule.id, 
+            moduleTitle: selectedModule.title,
+            status: selectedModule.status 
+        });
         alert(`Módulo "${selectedModule.title}" vinculado com sucesso!`);
     } catch (err) {
         alert('Erro ao vincular módulo: ' + err.message);
@@ -2679,6 +2693,8 @@ async function openModuleSidebar(placementId, moduleId) {
     if (!moduleId) {
         if (isOwner) {
             alert('Este sinalizador ainda não possui um módulo vinculado. Clique com o botão direito para vincular.');
+        } else {
+            alert('Este módulo ainda não foi configurado pelo professor.');
         }
         return;
     }
@@ -2748,30 +2764,41 @@ function createPlacementBadge(parentGroup) {
     const ctx = canvas.getContext('2d');
 
     const updateBadge = () => {
-        const status = parentGroup.userData.status;
-        let label = 'Sem Módulo';
-        let color = '#94a3b8';
+        const { status, moduleTitle } = parentGroup.userData;
+        const isMaster = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
+        
+        let label = moduleTitle || (isMaster ? 'Sem Módulo' : 'Interativo');
+        let color = '#3b82f6'; // Default blue
 
-        if (status === 'DRAFT') { label = 'Rascunho'; color = '#f59e0b'; }
-        else if (status === 'PUBLISHED') { label = 'Publicado'; color = '#10b981'; }
-        else if (status === 'ARCHIVED') { label = 'Arquivado'; color = '#ef4444'; }
+        if (status === 'DRAFT') { 
+            color = '#f59e0b'; 
+            if (isMaster) label = `[Rascunho] ${moduleTitle || ''}`.trim();
+        }
+        else if (status === 'PUBLISHED') { 
+            color = '#10b981'; 
+        }
+        else if (status === 'ARCHIVED') { 
+            color = '#ef4444'; 
+            if (isMaster) label = `[Arquivado] ${moduleTitle || ''}`.trim();
+        }
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         // Background capsule
         ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-        roundRect(ctx, 10, 10, 236, 44, 22, true);
+        roundRect(ctx, 5, 10, 246, 44, 22, true);
         
         // Dot
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(35, 32, 6, 0, Math.PI * 2);
+        ctx.arc(25, 32, 6, 0, Math.PI * 2);
         ctx.fill();
 
-        // Text
+        // Text (with basic truncation if too long)
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 24px Inter, sans-serif';
-        ctx.fillText(label, 55, 40);
+        ctx.font = 'bold 18px Inter, sans-serif';
+        const displayLabel = label.length > 20 ? label.substring(0, 17) + '...' : label;
+        ctx.fillText(displayLabel, 40, 40);
 
         texture.needsUpdate = true;
     };
