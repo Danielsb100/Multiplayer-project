@@ -2962,18 +2962,57 @@ function renderModuleVideos(videos) {
             </div>
         `;
         card.onclick = () => {
-            window.open(v.url, '_blank');
+            playModuleVideo(v);
             fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${v.id}/progress`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${authToken}`
-                },
+               },
                 body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
             });
         };
         grid.appendChild(card);
     });
+}
+
+function playModuleVideo(video) {
+    previewContent.innerHTML = '';
+    const url = video.url;
+    
+    if (url.includes('/api/documents/download/')) {
+        const videoElement = document.createElement('video');
+        videoElement.src = url;
+        videoElement.controls = true;
+        videoElement.autoplay = true;
+        videoElement.style.width = '100%';
+        videoElement.style.maxHeight = '70vh';
+        previewContent.appendChild(videoElement);
+        btnDownloadPreview.style.display = 'inline-block';
+        btnDownloadPreview.onclick = () => {
+             const parts = url.split('/');
+             const id = parts[parts.length - 1];
+             window.downloadSharedAsset(id, video.title);
+        };
+    } else {
+        const ytMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.get_video_info|youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
+        if (ytMatch) {
+            const iframe = document.createElement('iframe');
+            iframe.src = `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`;
+            iframe.width = '100%';
+            iframe.height = '450px';
+            iframe.frameBorder = '0';
+            iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+            iframe.allowFullscreen = true;
+            previewContent.appendChild(iframe);
+            btnDownloadPreview.style.display = 'none';
+        } else {
+            window.open(url, '_blank');
+            return;
+        }
+    }
+    
+    previewModal.classList.remove('hidden');
 }
 
 function renderModuleDocs(docs) {
