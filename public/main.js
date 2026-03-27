@@ -2848,7 +2848,7 @@ async function openModuleSidebar(placementId, moduleId) {
 
         renderModuleVideos(module.videos);
         renderModuleDocs(module.documents);
-        renderModuleQuiz(module.questions);
+        renderModuleQuiz(module.quizzes);
         renderModuleForum(moduleId);
         renderModuleReports(module);
 
@@ -3041,64 +3041,83 @@ function renderModuleDocs(docs) {
     });
 }
 
-function renderModuleQuiz(questions) {
+function renderModuleQuiz(quizzes) {
     const container = document.querySelector('#module-tab-quiz .quiz-container');
-    container.innerHTML = questions.length ? '' : 'Nenhum quiz disponível.';
+    container.innerHTML = (quizzes && quizzes.length) ? '' : '<p style="padding: 20px; color: #94a3b8;">Nenhum quiz disponível.</p>';
     
-    const quizForm = document.createElement('div');
-    questions.forEach((q, qIdx) => {
-        const qDiv = document.createElement('div');
-        qDiv.className = 'quiz-question';
-        qDiv.innerHTML = `<p><strong>${qIdx + 1}. ${q.text}</strong></p>`;
+    (quizzes || []).forEach((quiz) => {
+        const quizBox = document.createElement('div');
+        quizBox.className = 'quiz-box glassmorphism';
+        quizBox.style.marginBottom = '20px';
+        quizBox.style.padding = '15px';
+        quizBox.style.borderRadius = '12px';
+        quizBox.style.background = 'rgba(255,255,255,0.05)';
         
-        q.options.forEach(opt => {
-            const optDiv = document.createElement('div');
-            optDiv.innerHTML = `
-                <label>
-                    <input type="radio" name="question_${q.id}" value="${opt.id}">
-                    ${opt.text}
-                </label>
-            `;
-            qDiv.appendChild(optDiv);
-        });
-        quizForm.appendChild(qDiv);
-    });
-
-    if (questions.length) {
-        const submitBtn = document.createElement('button');
-        submitBtn.className = 'btn-open';
-        submitBtn.style.marginTop = '20px';
-        submitBtn.innerText = 'Enviar Respostas';
-        submitBtn.onclick = async () => {
-            const answers = [];
-            questions.forEach(q => {
-                const selected = quizForm.querySelector(`input[name="question_${q.id}"]:checked`);
-                if (selected) answers.push({ questionId: q.id, optionId: parseInt(selected.value) });
+        quizBox.innerHTML = `<h3 style="color: var(--accent-color); margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">${quiz.title}</h3>`;
+        
+        quiz.questions.forEach((q, qIdx) => {
+            const qDiv = document.createElement('div');
+            qDiv.className = 'quiz-question';
+            qDiv.style.marginBottom = '15px';
+            qDiv.innerHTML = `<p style="margin-bottom: 8px;"><strong>${qIdx + 1}. ${q.text}</strong></p>`;
+            
+            q.options.forEach(opt => {
+                const optDiv = document.createElement('div');
+                optDiv.style.marginBottom = '4px';
+                optDiv.innerHTML = `
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="radio" name="quiz_${quiz.id}_question_${q.id}" value="${opt.id}">
+                        ${opt.text}
+                    </label>
+                `;
+                qDiv.appendChild(optDiv);
             });
+            quizBox.appendChild(qDiv);
+        });
 
-            if (answers.length < questions.length) {
-                alert('Responda todas as perguntas antes de enviar.');
-                return;
-            }
-
-            try {
-                const res = await fetch(`${AUTH_API}/modules/${currentModuleId}/quiz/submit`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: JSON.stringify({ answers, source: 'MULTIPLAYER_WORLD' })
+        if (quiz.questions.length) {
+            const submitBtn = document.createElement('button');
+            submitBtn.className = 'btn-open';
+            submitBtn.style.marginTop = '10px';
+            submitBtn.style.width = '100%';
+            submitBtn.innerText = 'Enviar este Quiz';
+            submitBtn.onclick = async () => {
+                const answers = [];
+                quiz.questions.forEach(q => {
+                    const selected = quizBox.querySelector(`input[name="quiz_${quiz.id}_question_${q.id}"]:checked`);
+                    if (selected) answers.push({ questionId: q.id, optionId: parseInt(selected.value) });
                 });
-                const result = await res.json();
-                alert(`Quiz enviado! Sua nota: ${result.score.toFixed(1)}%`);
-            } catch (err) {
-                alert('Erro ao enviar quiz: ' + err.message);
-            }
-        };
-        quizForm.appendChild(submitBtn);
-    }
-    container.appendChild(quizForm);
+
+                if (answers.length < quiz.questions.length) {
+                    alert('Responda todas as perguntas deste quiz antes de enviar.');
+                    return;
+                }
+
+                try {
+                    submitBtn.disabled = true;
+                    submitBtn.innerText = 'Enviando...';
+                    const res = await fetch(`${AUTH_API}/modules/${currentModuleId}/quiz/submit`, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${authToken}`
+                        },
+                        body: JSON.stringify({ answers, source: 'MULTIPLAYER_WORLD' })
+                    });
+                    const result = await res.json();
+                    if (!res.ok) throw new Error(result.error || 'Erro ao enviar');
+                    alert(`Quiz "${quiz.title}" enviado! Sua nota parcial: ${result.score.toFixed(1)}%`);
+                } catch (err) {
+                    alert('Erro ao enviar quiz: ' + err.message);
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Enviar este Quiz';
+                }
+            };
+            quizBox.appendChild(submitBtn);
+        }
+        container.appendChild(quizBox);
+    });
 }
 
 function renderModuleForum(moduleId) {
