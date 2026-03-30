@@ -1922,52 +1922,37 @@ function updatePlayer(delta) {
 
     // --- Ground/Surface Logic ---
     const targetSurface = getSurfaceHeight(playerGroup.position);
-
-    // If we are on a platform, snap to it or fall towards it
     if (playerGroup.position.y < targetSurface) {
-        playerGroup.position.y = targetSurface; // Instant step-up for now
+        playerGroup.position.y = targetSurface;
     } else if (playerGroup.position.y > targetSurface) {
-        playerGroup.position.y = Math.max(targetSurface, playerGroup.position.y - 0.1); // Gravity fall
+        playerGroup.position.y = Math.max(targetSurface, playerGroup.position.y - 0.1);
     }
     currentSurfaceHeight = targetSurface;
 
-    // --- Manual input interrupts auto-walk ---
+    // Manual input interrupts auto-walk
     if (keys.w || keys.a || keys.s || keys.d) {
         localPlayerPath = null;
     }
 
     let moveX = 0, moveZ = 0;
 
-    // Pathfinding logic override
+    // Pathfinding logic
     if (localPlayerPath && localPlayerPath.length > 0) {
         const targetPoint = localPlayerPath[0];
         const dir = new THREE.Vector3().subVectors(targetPoint, playerGroup.position);
-        dir.y = 0; // Move ONLY on XZ plane
+        dir.y = 0;
 
         const dist = dir.length();
         if (dist < 0.1) {
-            // Reached waypoint
             localPlayerPath.shift();
             if (localPlayerPath.length === 0) localPlayerPath = null;
         } else {
             dir.normalize();
-            moveX = dir.x * moveSpeed;
-            moveZ = dir.z * moveSpeed;
-
-            // Stuck detection (dynamic objects blocking navmesh path)
-            if (lastStoredPosition.distanceToSquared(playerGroup.position) < 0.0001) {
-                autoWalkStuckTimer += delta;
-                if (autoWalkStuckTimer > 0.5) {
-                    localPlayerPath = null;
-                    autoWalkStuckTimer = 0;
-                }
-            } else {
-                autoWalkStuckTimer = 0;
-                lastStoredPosition.copy(playerGroup.position);
-            }
+            moveX = dir.x * moveSpeed * 1.5;
+            moveZ = dir.z * moveSpeed * 1.5;
         }
     } else {
-        // Traditional WASD
+        // WASD Movement
         if (keys.w) { moveZ -= moveSpeed; moveX -= moveSpeed; }
         if (keys.s) { moveZ += moveSpeed; moveX += moveSpeed; }
         if (keys.a) { moveX -= moveSpeed; moveZ += moveSpeed; }
@@ -1980,37 +1965,38 @@ function updatePlayer(delta) {
     }
 
     if (moveX !== 0 || moveZ !== 0) {
-        if (Date.now() - lastLogTime > 1000) {
-            console.log(`Moving: ${moveX.toFixed(3)}, ${moveZ.toFixed(3)}`);
-            lastLogTime = Date.now();
-        }
-        handleAnimationState(playerAnims, 'walk');
         const targetPos = playerGroup.position.clone();
         targetPos.x += moveX;
         targetPos.z += moveZ;
 
+        // Collision check with sliding
         if (!checkCollision(targetPos)) {
             playerGroup.position.copy(targetPos);
-        } else {
+        } else if (!localPlayerPath) {
+            // Slide only for WASD
             const targetPosX = playerGroup.position.clone(); targetPosX.x += moveX;
             if (!checkCollision(targetPosX)) playerGroup.position.copy(targetPosX);
             else {
                 const targetPosZ = playerGroup.position.clone(); targetPosZ.z += moveZ;
                 if (!checkCollision(targetPosZ)) playerGroup.position.copy(targetPosZ);
             }
+        } else {
+            // Pathfinding blocked
+            localPlayerPath = null;
         }
+        
         playerGroup.rotation.y = Math.atan2(moveX, moveZ);
-        broadcastMovement();
+        handleAnimationState(playerAnims, 'walk');
     } else {
         handleAnimationState(playerAnims, 'idle');
-        broadcastMovement();
     }
 
-    // Camera follow logic (moved back inside updatePlayer)
+    // Camera follow
     const cameraOffset = new THREE.Vector3(20, 20, 20);
-    const targetCamPos = playerGroup.position.clone().add(cameraOffset);
-    camera.position.lerp(targetCamPos, 0.1);
+    camera.position.lerp(playerGroup.position.clone().add(cameraOffset), 0.1);
     controls.target.set(playerGroup.position.x, playerGroup.position.y, playerGroup.position.z);
+
+    broadcastMovement();
 }
 
 let lastBroadcastTime = 0;
