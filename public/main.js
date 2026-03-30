@@ -355,11 +355,13 @@ function setupSocketListeners() {
     });
 
     socket.on('newPlayer', (playerInfo) => {
+        if (playerInfo.id === socket.id) return;
         addOtherPlayer(playerInfo);
         updatePlayerList();
     });
 
     socket.on('playerMoved', (playerInfo) => {
+        if (playerInfo.id === socket.id) return; // Ignore self
         if (remotePlayers[playerInfo.id]) {
             const p = remotePlayers[playerInfo.id];
             
@@ -391,6 +393,7 @@ function setupSocketListeners() {
     });
 
     socket.on('playerModelUpdated', (data) => {
+        if (data.id === socket.id) return; // Ignore self
         console.log("Remote player model update:", data.id);
         if (remotePlayers[data.id]) {
             const path = data.modelData.path + '?v=' + Date.now();

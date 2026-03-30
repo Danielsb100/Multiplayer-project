@@ -202,9 +202,8 @@ io.on('connection', (socket) => {
             players[socket.id].position = movementData.position;
             players[socket.id].rotation = movementData.rotation;
             players[socket.id].animation = movementData.animation || 'idle';
-            
-            console.log(`[Replication] Movement from ${socket.id}:`, movementData.position);
-            socket.broadcast.emit('playerMoved', {
+            // Use io.emit for movement to ensure maximum availability, then filter on client
+            io.emit('playerMoved', {
                 id: socket.id,
                 position: movementData.position,
                 rotation: movementData.rotation,
