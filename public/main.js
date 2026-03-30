@@ -11,6 +11,7 @@ let localPlayerPath = null;
 // --- 0. Socket & Login ---
 let socket = null;
 let localUsername = '';
+let localProfilePicture = null;
 let authToken = '';
 let localUserRole = 'USER'; // New: Store user role
 const loginScreen = document.getElementById('login-screen');
@@ -159,24 +160,8 @@ fetch('/api/catalog')
     .then(data => { catalogData = data; })
     .catch(err => console.error("Error fetching catalog:", err));
 
-// --- Animation State ---
-const playerAnims = {
-    mixer: null,
-    actions: {},
-    currentState: null,
-    currentAction: null
-};
-let playerState = 'idle';
-let jumpVelocity = 0;
-const GRAVITY = -0.01;
-const JUMP_FORCE = 0.2;
+// --- Empty State ---
 let isGrounded = true;
-
-// Parabolic Jump State
-let isJumping = false;
-let jumpTime = 0;
-const JUMP_DURATION = 0.6;
-const JUMP_HEIGHT = 1.5;
 
 // --- Auth Tab Switching ---
 if (tabLogin && tabRegister) {
@@ -277,6 +262,7 @@ joinBtn.addEventListener('click', async () => {
         const token = result.token;
         authToken = token; // Store globally
         localUsername = result.user?.username || email.split('@')[0];
+        localProfilePicture = result.user?.profilePicture || null;
         localUserRole = result.user?.role || 'USER'; // Store role
 
         // Initialize socket with the received token
@@ -289,51 +275,16 @@ joinBtn.addEventListener('click', async () => {
         setupSocketListeners();
 
         // Emit initial user data
-        socket.emit('setName', { name: localUsername, color: localUserColor });
+        socket.emit('setName', { name: localUsername, color: localUserColor, profilePicture: localProfilePicture });
 
-        if (selectedModelBuffer) {
-            socket.emit('modelUpdate', { buffer: selectedModelBuffer });
-            loadLocalModel(selectedModelBuffer);
-        } else if (selectedCatalogModelUrl) {
-            socket.emit('modelUpdate', {
-                path: selectedCatalogModelUrl,
-                animations: selectedCatalogAnims
-            });
-            loadModelByUrl(selectedCatalogModelUrl, selectedCatalogAnims);
-        } else {
-            // Try loading the default GLB character
-            const defaultModelPath = 'assets/characters/default/default.glb';
-            const defaultModelAnims = {
-                idle: 'assets/characters/default/idle.glb',
-                walk: 'assets/characters/default/walk.glb',
-                jump: 'assets/characters/default/jump.glb',
-                interact: 'assets/characters/default/interact.glb'
-            };
-
-            fetch(defaultModelPath, { method: 'HEAD' })
-                .then(res => {
-                    if (res.ok) {
-                        socket.emit('modelUpdate', {
-                            path: defaultModelPath,
-                            animations: defaultModelAnims
-                        });
-                        loadModelByUrl(defaultModelPath, defaultModelAnims);
-                    } else {
-                        if (characterMesh && characterMesh.material) {
-                            characterMesh.material.color.set(localUserColor);
-                        }
-                    }
-                })
-                .catch(() => {
-                    if (characterMesh && characterMesh.material) {
-                        characterMesh.material.color.set(localUserColor);
-                    }
-                });
-        }
+        // Load the static player character directly
+        const playerModelPath = 'assets/character/player.glb';
+        socket.emit('modelUpdate', { path: playerModelPath });
+        loadPlayerModel(playerModelPath, localUserColor, playerGroup, true);
 
         playerGroup.visible = true;
         loginScreen.classList.add('hidden');
-        createGametag(socket.id, localUsername, localUserColor, true);
+        createGametag(socket.id, localUsername, localUserColor, true, localProfilePicture);
 
         // Initialize PeerJS for audio calls
         initPeer();
@@ -432,33 +383,11 @@ function setupSocketListeners() {
                 playerInfo.rotation.y,
                 playerInfo.rotation.z
             );
-
-            if (playerInfo.animation && p.anims) {
-                handleAnimationState(p.anims, playerInfo.animation);
-            }
-
-            if (remotePlayers[playerInfo.id].anims) {
-                const rAnims = remotePlayers[playerInfo.id].anims;
-                if (playerInfo.isJumping) {
-                    if (rAnims.actions['jump']) {
-                        rAnims.actions['jump'].setEffectiveWeight(playerInfo.jumpAlpha || 0);
-                        rAnims.actions['jump'].play();
-                    }
-                } else {
-                    if (rAnims.actions['jump']) {
-                        if (rAnims.actions['jump'].isRunning()) rAnims.actions['jump'].fadeOut(0.2);
-                    }
-                }
-
-                if (playerInfo.didInteract) {
-                    triggerInteract(rAnims, playerInfo.interactionPoint);
-                }
-            }
         }
     });
 
     socket.on('playerUpdated', (playerInfo) => {
-        createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
+        createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false, playerInfo.profilePicture);
         if (remotePlayers[playerInfo.id]) {
             remotePlayers[playerInfo.id].name = playerInfo.name; // Keep name sync
             remotePlayers[playerInfo.id].color = playerInfo.color;
@@ -744,12 +673,10 @@ mapLoader.load('assets/maps/map/map.glb', (gltf) => {
 function applyCharacterColor(model, color) {
     if (!model) return;
     model.traverse((child) => {
-        if (child.isMesh) {
+        if (child.isMesh && child.material) {
             const materials = Array.isArray(child.material) ? child.material : [child.material];
             materials.forEach(mat => {
-                if (mat.name && mat.name.toLowerCase().includes('clothes')) {
-                    if (mat.color) mat.color.set(color);
-                }
+                if (mat.color) mat.color.set(color);
             });
         }
     });
@@ -828,21 +755,30 @@ playerGroup.add(localAvatar.group);
 playerGroup.position.set(0, 0, 0);
 playerGroup.visible = false; // Hidden until join
 
-function createGametag(id, name, color, isLocal) {
+function createGametag(id, name, color, isLocal, profilePictureUrl = null) {
     if (gametags[id]) {
-        gametags[id].element.innerText = name;
-        if (color) gametags[id].element.style.color = color;
+        gametags[id].element.querySelector('span.gametag-name').innerText = name;
+        if (color) gametags[id].element.querySelector('span.gametag-name').style.color = color;
+        const img = gametags[id].element.querySelector('.gametag-avatar');
+        if (img) img.src = profilePictureUrl || '/profile picture.png';
         return;
     }
     const element = document.createElement('div');
     element.className = 'gametag';
-    element.innerHTML = `<span>${name}</span>`;
+    const avatarSrc = profilePictureUrl || '/profile picture.png';
+    element.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: auto;">
+            <img src="${avatarSrc}" class="gametag-avatar" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid ${color || '#fff'}; object-fit: cover; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+            <div style="display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 12px;">
+                <span class="gametag-name" style="color: ${color || '#fff'}; font-weight: 500; font-size: 0.8rem; text-shadow: 1px 1px 0 #000;">${name}</span>
+            </div>
+        </div>
+    `;
 
     if (!isLocal) {
         const callBtn = document.createElement('button');
         callBtn.innerText = '📞';
         callBtn.className = 'gametag-call-btn';
-        callBtn.style.marginLeft = '8px';
         callBtn.style.background = 'none';
         callBtn.style.border = 'none';
         callBtn.style.cursor = 'pointer';
@@ -855,12 +791,11 @@ function createGametag(id, name, color, isLocal) {
                 alert('Jogador ainda não configurou canal de voz.');
             }
         };
-        element.appendChild(callBtn);
+        element.querySelector('div > div:nth-child(2)').appendChild(callBtn);
     }
 
-    if (color) element.style.color = color;
     document.body.appendChild(element);
-    gametags[id] = { element, isLocal, color };
+    gametags[id] = { element, isLocal, color, profilePicture: profilePictureUrl };
 }
 
 function removeGametag(id) {
@@ -1060,81 +995,56 @@ function addOtherPlayer(playerInfo) {
 
     createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
 
-    if (playerInfo.modelData) {
-        if (playerInfo.modelData.buffer) {
-            loadModelFromBuffer(playerInfo.modelData.buffer, remotePlayers[playerInfo.id], playerInfo.color);
-        } else if (playerInfo.modelData.path) {
-            updateRemotePlayerModelByUrl(playerInfo.id, playerInfo.modelData.path, playerInfo.modelData.animations, playerInfo.color);
-        }
+    if (playerInfo.modelData && playerInfo.modelData.path) {
+        loadPlayerModel(playerInfo.modelData.path, playerInfo.color, remotePlayers[playerInfo.id].avatarContainer, false, playerInfo.id);
     } else {
-        // Try loading default model for remote player if no specific model selected
-        const defaultModelPath = 'assets/characters/default/default.glb';
-        fetch(defaultModelPath, { method: 'HEAD' }).then(res => {
-            if (res.ok) {
-                const defaultModelAnims = {
-                    idle: 'assets/characters/default/idle.glb',
-                    walk: 'assets/characters/default/walk.glb',
-                    jump: 'assets/characters/default/jump.glb',
-                    interact: 'assets/characters/default/interact.glb'
-                };
-                updateRemotePlayerModelByUrl(playerInfo.id, defaultModelPath, defaultModelAnims, playerInfo.color);
-            }
-        });
+        const defaultModelPath = 'assets/character/player.glb';
+        loadPlayerModel(defaultModelPath, playerInfo.color, remotePlayers[playerInfo.id].avatarContainer, false, playerInfo.id);
     }
 }
 
-function loadModelFromBuffer(arrayBuffer, targetPlayerObj, color = '#3b82f6') {
+function loadPlayerModel(path, color, container, isLocal = false, remoteId = null) {
+    loadingIndicator.classList.remove('hidden');
     const gltfLoader = new GLTFLoader();
-    gltfLoader.parse(arrayBuffer, '', (gltf) => {
-        // Clear previous meshes inside the inner group
-        while (targetPlayerObj.avatarContainer.children.length > 0) {
-            targetPlayerObj.avatarContainer.remove(targetPlayerObj.avatarContainer.children[0]);
-        }
+    gltfLoader.load(path, (gltf) => {
+        // Clear previous meshes
+        while (container.children.length > 0) container.remove(container.children[0]);
 
-        const newModel = gltf.scene;
-        newModel.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
+        const mesh = gltf.scene;
+        mesh.traverse(child => { 
+            if (child.isMesh) { 
+                child.castShadow = true; 
+                child.receiveShadow = true; 
+            } 
         });
 
-        // Center BEFORE parenting so Box3 is in local (model) space, not world space
-        newModel.position.set(0, 0, 0);
-        newModel.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(newModel);
+        // Apply character color
+        applyCharacterColor(mesh, color);
+
+        // Center before parenting
+        mesh.position.set(0, 0, 0);
+        mesh.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(mesh);
         const center = box.getCenter(new THREE.Vector3());
-        newModel.position.x = -center.x;
-        newModel.position.z = -center.z;
-        newModel.position.y = -box.min.y;
+        // For simple static proxy, just center X and Z, stand on MIN Y
+        mesh.position.x = -center.x;
+        mesh.position.z = -center.z;
+        mesh.position.y = -box.min.y;
 
-        targetPlayerObj.avatarContainer.add(newModel);
-        targetPlayerObj.mainMesh = newModel;
-
-        // Apply character color to 'clothes' material
-        applyCharacterColor(newModel, color);
-
-        // Setup Mixer for remote player with buffer model
-        targetPlayerObj.anims.mixer = new THREE.AnimationMixer(newModel);
-        targetPlayerObj.anims.actions = {};
-        targetPlayerObj.anims.currentState = null;
-
-        if (gltf.animations && gltf.animations.length > 0) {
-            const states = ['idle', 'walk', 'jump', 'interact'];
-            gltf.animations.forEach(clip => {
-                const lowerName = clip.name.toLowerCase();
-                states.forEach(state => {
-                    if (lowerName.includes(state)) {
-                        targetPlayerObj.anims.actions[state] = targetPlayerObj.anims.mixer.clipAction(clip);
-                        if (state === 'idle') handleAnimationState(targetPlayerObj.anims, 'idle');
-                    }
-                });
-            });
+        container.add(mesh);
+        if (isLocal) {
+            characterMesh = mesh;
+        } else if (remoteId && remotePlayers[remoteId]) {
+            remotePlayers[remoteId].mainMesh = mesh;
         }
-    }, (error) => {
-        console.error('Error parsing remote model', error);
+
+        loadingIndicator.classList.add('hidden');
+    }, undefined, (err) => {
+        console.error("Failed to load player model:", err);
+        loadingIndicator.classList.add('hidden');
     });
 }
+
 
 // --- Input Handling ---
 const keys = { w: false, a: false, s: false, d: false, ' ': false, e: false };
@@ -1163,16 +1073,7 @@ window.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
     if (keys.hasOwnProperty(key)) keys[key] = true;
 
-    // Jump trigger (Parabolic)
-    if (e.code === 'Space' && !isJumping) {
-        keys[' '] = true;
-        isJumping = true;
-        jumpTime = 0;
-        // Start jump animation at 0 weight (it will be modulated in updatePlayer)
-        if (playerAnims.actions['jump']) {
-            playerAnims.actions['jump'].reset().setEffectiveWeight(0).play();
-        }
-    }
+    // Jump trigger (Parabolic) - Removed
 
     // Interact trigger
     if (key === 'e') {
@@ -1962,43 +1863,13 @@ function updatePlayer(delta) {
     // --- Ground/Surface Logic ---
     const targetSurface = getSurfaceHeight(playerGroup.position);
 
-    // Smooth step-up or gravity
-    if (!isJumping) {
-        // If we are on a platform, snap to it or fall towards it
-        if (playerGroup.position.y < targetSurface) {
-            playerGroup.position.y = targetSurface; // Instant step-up for now
-        } else if (playerGroup.position.y > targetSurface) {
-            playerGroup.position.y = Math.max(targetSurface, playerGroup.position.y - 0.1); // Gravity fall
-        }
-        currentSurfaceHeight = targetSurface;
+    // If we are on a platform, snap to it or fall towards it
+    if (playerGroup.position.y < targetSurface) {
+        playerGroup.position.y = targetSurface; // Instant step-up for now
+    } else if (playerGroup.position.y > targetSurface) {
+        playerGroup.position.y = Math.max(targetSurface, playerGroup.position.y - 0.1); // Gravity fall
     }
-
-    // --- Parabolic Jump Handling ---
-    if (isJumping) {
-        jumpTime += delta;
-        let progress = Math.min(jumpTime / JUMP_DURATION, 1);
-        let parabola = Math.sin(progress * Math.PI);
-
-        // Jump starts relative to the surface height at the start of the jump
-        playerGroup.position.y = currentSurfaceHeight + (parabola * JUMP_HEIGHT);
-
-        // Modulate animation weight
-        if (playerAnims.actions['jump']) {
-            playerAnims.actions['jump'].setEffectiveWeight(parabola);
-        }
-
-        if (progress >= 1) {
-            isJumping = false;
-            playerGroup.position.y = targetSurface; // Land on current surface
-            currentSurfaceHeight = targetSurface;
-            if (playerAnims.actions['jump']) {
-                playerAnims.actions['jump'].fadeOut(0.2);
-            }
-        }
-
-        // CRITICAL: Emit even if not moving horizontally during jump
-        broadcastMovement();
-    }
+    currentSurfaceHeight = targetSurface;
 
     // --- Manual input interrupts auto-walk ---
     if (keys.w || keys.a || keys.s || keys.d) {
@@ -2230,52 +2101,7 @@ function addMessageToChat(data) {
     }
 }
 
-function loadLocalModel(arrayBuffer) {
-    loadingIndicator.classList.remove('hidden');
-    const gltfLoader = new GLTFLoader();
-    gltfLoader.parse(arrayBuffer, '', (gltf) => {
-        while (playerGroup.children.length > 0) playerGroup.remove(playerGroup.children[0]);
-
-        characterMesh = gltf.scene;
-        characterMesh.traverse(child => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
-
-        // Apply local character color to 'clothes' material
-        applyCharacterColor(characterMesh, localUserColor);
-
-        // Center BEFORE parenting so Box3 is in local (model) space, not world space
-        characterMesh.position.set(0, 0, 0);
-        const box = new THREE.Box3().setFromObject(characterMesh);
-        const center = box.getCenter(new THREE.Vector3());
-        characterMesh.position.x = -center.x;
-        characterMesh.position.z = -center.z;
-        characterMesh.position.y = -box.min.y;
-
-        playerGroup.add(characterMesh);
-
-        // Setup Mixer for local player with buffer model
-        playerAnims.mixer = new THREE.AnimationMixer(characterMesh);
-        playerAnims.actions = {};
-        playerAnims.currentState = null;
-
-        if (gltf.animations && gltf.animations.length > 0) {
-            const states = ['idle', 'walk', 'jump', 'interact'];
-            gltf.animations.forEach(clip => {
-                const lowerName = clip.name.toLowerCase();
-                states.forEach(state => {
-                    if (lowerName.includes(state)) {
-                        playerAnims.actions[state] = playerAnims.mixer.clipAction(clip);
-                        if (state === 'idle') handleAnimationState(playerAnims, 'idle');
-                    }
-                });
-            });
-        }
-
-        loadingIndicator.classList.add('hidden');
-    }, (error) => {
-        console.error('Error parsing local model', error);
-        loadingIndicator.classList.add('hidden');
-    });
-}
+// Old model loading functions removed.
 
 function createCube(data) {
     const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -2319,124 +2145,6 @@ function createCube(data) {
                 clearInterval(intr);
             }
         }, 16);
-    });
-}
-
-function loadModelByUrl(url, animPaths = null) {
-    loadingIndicator.classList.remove('hidden');
-    const gltfLoader = new GLTFLoader();
-    gltfLoader.load(url, (gltf) => {
-        while (playerGroup.children.length > 0) playerGroup.remove(playerGroup.children[0]);
-
-        characterMesh = gltf.scene;
-        characterMesh.traverse(child => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
-
-        // Apply character color to 'clothes' material
-        applyCharacterColor(characterMesh, localUserColor);
-
-        // Center BEFORE parenting so Box3 is in local (model) space, not world space
-        characterMesh.position.set(0, 0, 0);
-        const box = new THREE.Box3().setFromObject(characterMesh);
-        const center = box.getCenter(new THREE.Vector3());
-        characterMesh.position.x = -center.x;
-        characterMesh.position.z = -center.z;
-        characterMesh.position.y = -box.min.y;
-
-        playerGroup.add(characterMesh);
-
-        // Setup Mixer
-        playerAnims.mixer = new THREE.AnimationMixer(characterMesh);
-        playerAnims.actions = {};
-        playerAnims.currentState = null;
-
-        // 1. Auto-detect embedded animations (actions from Blender)
-        if (gltf.animations && gltf.animations.length > 0) {
-            const states = ['idle', 'walk', 'jump', 'interact'];
-            gltf.animations.forEach(clip => {
-                const lowerName = clip.name.toLowerCase();
-                states.forEach(state => {
-                    if (lowerName.includes(state)) {
-                        playerAnims.actions[state] = playerAnims.mixer.clipAction(clip);
-                        if (state === 'idle') handleAnimationState(playerAnims, 'idle');
-                    }
-                });
-            });
-        }
-
-        // 2. Load external animations (as overrides if provided)
-        if (animPaths) {
-            Object.entries(animPaths).forEach(([name, path]) => {
-                gltfLoader.load(path, (animGltf) => {
-                    const clip = animGltf.animations[0];
-                    if (clip) {
-                        const action = playerAnims.mixer.clipAction(clip);
-                        playerAnims.actions[name] = action;
-                        if (name === 'idle') handleAnimationState(playerAnims, 'idle');
-                    }
-                });
-            });
-        }
-
-        loadingIndicator.classList.add('hidden');
-    });
-}
-
-function updateRemotePlayerModelByUrl(id, url, animPaths = null, color = '#3b82f6') {
-    const player = remotePlayers[id];
-    if (!player) return;
-    const gltfLoader = new GLTFLoader();
-    gltfLoader.load(url, (gltf) => {
-        // Use avatarContainer (visual child) — NOT group (network anchor)
-        const container = player.avatarContainer || player.group;
-        while (container.children.length > 0) container.remove(container.children[0]);
-        const mesh = gltf.scene;
-        mesh.traverse(child => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
-
-        // Center BEFORE parenting so Box3 is in local (model) space, not world space
-        mesh.position.set(0, 0, 0);
-        mesh.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(mesh);
-        const center = box.getCenter(new THREE.Vector3());
-        mesh.position.x = -center.x;
-        mesh.position.z = -center.z;
-        mesh.position.y = -box.min.y;
-
-        container.add(mesh);
-
-        // Apply character color to 'clothes' material
-        applyCharacterColor(mesh, color);
-
-        // Setup Mixer for remote
-        player.anims.mixer = new THREE.AnimationMixer(mesh);
-        player.anims.actions = {};
-        player.anims.currentState = null;
-
-        // 1. Embedded Animations
-        if (gltf.animations && gltf.animations.length > 0) {
-            const states = ['idle', 'walk', 'jump', 'interact'];
-            gltf.animations.forEach(clip => {
-                const lowerName = clip.name.toLowerCase();
-                states.forEach(state => {
-                    if (lowerName.includes(state)) {
-                        player.anims.actions[state] = player.anims.mixer.clipAction(clip);
-                        if (state === 'idle') handleAnimationState(player.anims, 'idle');
-                    }
-                });
-            });
-        }
-
-        // 2. External Animations
-        if (animPaths) {
-            Object.entries(animPaths).forEach(([name, path]) => {
-                gltfLoader.load(path, (animGltf) => {
-                    const clip = animGltf.animations[0];
-                    if (clip) {
-                        player.anims.actions[name] = player.anims.mixer.clipAction(clip);
-                        if (name === 'idle') handleAnimationState(player.anims, 'idle');
-                    }
-                });
-            });
-        }
     });
 }
 

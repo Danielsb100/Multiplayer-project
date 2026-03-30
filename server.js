@@ -178,6 +178,7 @@ io.on('connection', (socket) => {
             } else {
                 players[socket.id].name = data.name;
                 players[socket.id].color = data.color;
+                if (data.profilePicture) players[socket.id].profilePicture = data.profilePicture;
             }
             io.emit('playerUpdated', players[socket.id]);
         }
