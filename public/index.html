@@ -214,16 +214,19 @@
                 <div id="module-videos-grid" class="video-grid"></div>
             </div>
             <div id="module-tab-docs" class="tab-pane">
-                <div class="asset-list-container" style="max-height: none;">
-                    <table class="asset-table">
-                        <thead>
-                            <tr>
-                                <th>Documento</th>
-                                <th>Ação</th>
-                            </tr>
-                        </thead>
-                        <tbody id="module-docs-list"></tbody>
-                    </table>
+                <div class="inner-tabs" style="display: flex; gap: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.5rem; padding-bottom: 0.5rem;">
+                    <button type="button" class="inner-tab-btn module-doc-sub-tab active" data-type="pdf" onclick="switchModuleDocTab('pdf')" style="background: none; border: none; color: var(--primary); outline: none; padding: 0.3rem 0; cursor: pointer; border-bottom: 2px solid var(--primary); font-weight: 500;">PDF</button>
+                    <button type="button" class="inner-tab-btn module-doc-sub-tab" data-type="word" onclick="switchModuleDocTab('word')" style="background: none; border: none; color: var(--text-muted); outline: none; padding: 0.3rem 0; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500;">Word</button>
+                    <button type="button" class="inner-tab-btn module-doc-sub-tab" data-type="img" onclick="switchModuleDocTab('img')" style="background: none; border: none; color: var(--text-muted); outline: none; padding: 0.3rem 0; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500;">Imagens</button>
+                </div>
+                <div id="module-doc-pane-pdf" class="module-doc-sub-pane active">
+                    <ul id="module-pdf-list" class="content-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.8rem;"></ul>
+                </div>
+                <div id="module-doc-pane-word" class="module-doc-sub-pane hidden" style="display: none; opacity: 0; transition: opacity 0.2s;">
+                    <ul id="module-word-list" class="content-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.8rem;"></ul>
+                </div>
+                <div id="module-doc-pane-img" class="module-doc-sub-pane hidden" style="display: none; opacity: 0; transition: opacity 0.2s;">
+                    <div id="module-img-grid" class="asset-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 1rem;"></div>
                 </div>
             </div>
             <div id="module-tab-quiz" class="tab-pane">

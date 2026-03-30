@@ -2952,15 +2952,78 @@ function renderModuleVideos(videos) {
     if (!grid) return;
     grid.innerHTML = videos.length ? '' : '<p style="padding: 20px; color: #94a3b8;">Nenhum vídeo disponível.</p>';
     
+    grid.style.display = 'flex';
+    grid.style.flexDirection = 'column';
+    grid.style.gap = '1.5rem';
+    
     videos.forEach(v => {
         const card = document.createElement('div');
-        card.className = 'video-card';
-        card.innerHTML = `
-            <div class="video-thumb">📺</div>
-            <div class="video-info">
-                <h4>${v.title}</h4>
-            </div>
-        `;
+        card.style.background = 'rgba(255,255,255,0.05)';
+        card.style.borderRadius = '12px';
+        card.style.padding = '15px';
+        card.style.cursor = 'pointer';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.gap = '10px';
+        
+        const titleTop = document.createElement('h4');
+        titleTop.innerText = v.title;
+        titleTop.style.margin = '0';
+        titleTop.style.fontSize = '1.1rem';
+        titleTop.style.color = '#fff';
+
+        const thumb = document.createElement('div');
+        thumb.style.width = '100%';
+        thumb.style.height = '180px';
+        thumb.style.position = 'relative';
+        thumb.style.borderRadius = '8px';
+        thumb.style.overflow = 'hidden';
+        thumb.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        thumb.style.display = 'flex';
+        thumb.style.alignItems = 'center';
+        thumb.style.justifyContent = 'center';
+        
+        // Thumbnail generation
+        const ytMatch = v.url ? v.url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/) : null;
+        if (ytMatch) {
+            const img = document.createElement('img');
+            img.src = `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'cover';
+            thumb.appendChild(img);
+        } else {
+            const videoElem = document.createElement('video');
+            videoElem.src = v.url || `${AUTH_API}/api/documents/download/${v.documentId || v.id}`;
+            videoElem.crossOrigin = 'anonymous';
+            videoElem.currentTime = 1; // get frame at 1s
+            videoElem.onloadeddata = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = videoElem.videoWidth || 320;
+                    canvas.height = videoElem.videoHeight || 180;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(videoElem, 0, 0, canvas.width, canvas.height);
+                    const img = document.createElement('img');
+                    img.src = canvas.toDataURL();
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'cover';
+                    thumb.innerHTML = '';
+                    thumb.appendChild(img);
+                    thumb.appendChild(playIcon);
+                } catch(e) {}
+            };
+        }
+
+        const playIcon = document.createElement('div');
+        playIcon.innerHTML = '▶';
+        playIcon.style.cssText = 'position: absolute; color: white; font-size: 3rem; filter: drop-shadow(0 0 8px rgba(0,0,0,0.8)); top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; text-shadow: 0 0 10px rgba(0,0,0,0.5);';
+        thumb.appendChild(playIcon);
+
+        card.appendChild(titleTop);
+        card.appendChild(thumb);
+        
         card.onclick = () => {
             playModuleVideo(v);
             fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${v.id}/progress`, {
@@ -3015,30 +3078,168 @@ function playModuleVideo(video) {
     previewModal.classList.remove('hidden');
 }
 
-function renderModuleDocs(docs) {
-    const list = document.getElementById('module-docs-list');
-    if (!list) return;
-    list.innerHTML = docs.length ? '' : '<tr><td colspan="2" style="padding: 20px; text-align: center; color: #94a3b8;">Nenhum documento disponível.</td></tr>';
-    
-    docs.forEach(d => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${d.title}</td>
-            <td><button class="btn-sm">Download</button></td>
-        `;
-        tr.querySelector('button').onclick = () => {
-            window.downloadSharedAsset(d.documentId, d.title);
-            fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${d.id}/download`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
-            });
-        };
-        list.appendChild(tr);
+window.switchModuleDocTab = function(type) {
+    document.querySelectorAll('.module-doc-sub-tab').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.color = 'var(--text-muted)';
+        btn.style.borderBottomColor = 'transparent';
     });
+    
+    const activeBtn = document.querySelector(`.module-doc-sub-tab[data-type="${type}"]`);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.style.color = 'var(--primary)';
+        activeBtn.style.borderBottomColor = 'var(--primary)';
+    }
+
+    document.querySelectorAll('.module-doc-sub-pane').forEach(p => {
+        p.classList.remove('active');
+        p.classList.add('hidden');
+        p.style.display = 'none';
+        p.style.opacity = '0';
+    });
+    
+    const activePane = document.getElementById(`module-doc-pane-${type}`);
+    if (activePane) {
+        activePane.classList.remove('hidden');
+        activePane.classList.add('active');
+        activePane.style.display = 'block';
+        setTimeout(() => activePane.style.opacity = '1', 10);
+    }
+};
+
+function renderModuleDocs(docs) {
+    const pdfList = document.getElementById('module-pdf-list');
+    const wordList = document.getElementById('module-word-list');
+    const imgGrid = document.getElementById('module-img-grid');
+
+    if(!pdfList || !wordList || !imgGrid) return; 
+
+    pdfList.innerHTML = '';
+    wordList.innerHTML = '';
+    imgGrid.innerHTML = '';
+
+    docs.forEach(d => {
+        const ext = d.title ? d.title.split('.').pop().toLowerCase() : '';
+        const tType = (d.type || '').toLowerCase();
+        
+        const isPdf = tType === 'application/pdf' || ext === 'pdf';
+        const isWord = tType.includes('word') || tType.includes('officedocument.wordprocessingml') || ['doc', 'docx'].includes(ext);
+        const isImg = tType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+        
+        if (isPdf) {
+            const li = document.createElement('li');
+            li.style.display = 'flex';
+            li.style.justifyContent = 'space-between';
+            li.style.alignItems = 'center';
+            li.style.padding = '0.5rem';
+            li.style.background = 'rgba(255,255,255,0.05)';
+            li.style.borderRadius = '8px';
+            li.innerHTML = `
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="color: #ff4444; font-weight:bold;">📄 PDF</span>
+                    <span>${d.title}</span>
+                </div>
+                <button class="btn-sm" style="background: var(--primary); color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Download</button>
+            `;
+            li.querySelector('button').onclick = () => {
+                window.downloadSharedAsset(d.documentId || d.id, d.title);
+                fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${d.id}/download`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
+                });
+            };
+            pdfList.appendChild(li);
+        } else if (isWord) {
+            const li = document.createElement('li');
+            li.style.display = 'flex';
+            li.style.justifyContent = 'space-between';
+            li.style.alignItems = 'center';
+            li.style.padding = '0.5rem';
+            li.style.background = 'rgba(255,255,255,0.05)';
+            li.style.borderRadius = '8px';
+            li.innerHTML = `
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="color: #4488ff; font-weight:bold;">📝 Word</span>
+                    <span>${d.title}</span>
+                </div>
+                <button class="btn-sm" style="background: var(--primary); color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Download</button>
+            `;
+            li.querySelector('button').onclick = () => {
+                window.downloadSharedAsset(d.documentId || d.id, d.title);
+                fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${d.id}/download`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
+                });
+            };
+            wordList.appendChild(li);
+        } else if (isImg) {
+            const card = document.createElement('div');
+            card.style.position = 'relative';
+            card.style.background = 'rgba(255,255,255,0.05)';
+            card.style.padding = '0.5rem';
+            card.style.borderRadius = '8px';
+            card.style.cursor = 'pointer';
+
+            const thumb = document.createElement('div');
+            thumb.style.width = '100%';
+            thumb.style.height = '100px';
+            thumb.style.backgroundColor = 'rgba(0,0,0,0.5)';
+            thumb.style.borderRadius = '4px';
+            thumb.style.overflow = 'hidden';
+            thumb.style.display = 'flex';
+            thumb.style.alignItems = 'center';
+            thumb.style.justifyContent = 'center';
+
+            const img = document.createElement('img');
+            img.src = `${AUTH_API}/api/documents/download/${d.documentId || d.id}`;
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '100%';
+            img.style.objectFit = 'contain';
+            thumb.appendChild(img);
+
+            const name = document.createElement('span');
+            name.style.display = 'block';
+            name.style.marginTop = '0.5rem';
+            name.style.fontSize = '0.8rem';
+            name.style.textAlign = 'center';
+            name.style.whiteSpace = 'nowrap';
+            name.style.overflow = 'hidden';
+            name.style.textOverflow = 'ellipsis';
+            name.innerText = d.title;
+
+            card.appendChild(thumb);
+            card.appendChild(name);
+
+            card.onclick = () => {
+                previewContent.innerHTML = '';
+                const fullImg = document.createElement('img');
+                fullImg.src = `${AUTH_API}/api/documents/download/${d.documentId || d.id}`;
+                fullImg.style.maxWidth = '100%';
+                fullImg.style.maxHeight = '70vh';
+                fullImg.style.objectFit = 'contain';
+                previewContent.appendChild(fullImg);
+                
+                btnDownloadPreview.style.display = 'inline-block';
+                btnDownloadPreview.onclick = () => {
+                     window.downloadSharedAsset(d.documentId || d.id, d.title);
+                };
+                previewModal.classList.remove('hidden');
+            };
+
+            imgGrid.appendChild(card);
+        }
+    });
+
+    if (pdfList.innerHTML === '') pdfList.innerHTML = '<div style="color: #94a3b8; padding: 10px;">Nenhum arquivo PDF.</div>';
+    if (wordList.innerHTML === '') wordList.innerHTML = '<div style="color: #94a3b8; padding: 10px;">Nenhum arquivo Word.</div>';
+    if (imgGrid.innerHTML === '') imgGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #94a3b8; padding: 10px;">Nenhuma imagem.</div>';
+    
+    if (typeof window.switchModuleDocTab === 'function') {
+        window.switchModuleDocTab('pdf');
+    }
 }
 
 function renderModuleQuiz(quizzes) {
