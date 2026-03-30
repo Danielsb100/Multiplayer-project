@@ -264,8 +264,8 @@ joinBtn.addEventListener('click', async () => {
         // Emit initial user data
         socket.emit('setName', { name: localUsername, color: localUserColor, profilePicture: localProfilePicture });
 
-        // Load the static player character directly
-        const playerModelPath = 'assets/character/player.glb';
+        // Load the static player character directly (Bypass Cache for local updates)
+        const playerModelPath = 'assets/character/player.glb?v=' + Date.now();
         socket.emit('modelUpdate', { path: playerModelPath });
         loadPlayerModel(playerModelPath, localUserColor, playerGroup, true);
 
@@ -739,19 +739,24 @@ playerGroup.position.set(0, 0, 0);
 playerGroup.visible = false; // Hidden until join
 
 function createGametag(id, name, color, isLocal, profilePictureUrl = null) {
+    const resolveAvatarSrc = (url) => {
+        if (!url || typeof url !== 'string') return `https://ui-avatars.com/api/?name=${name}&background=random`;
+        return url.startsWith('http') ? url : `${AUTH_API}${url}`;
+    };
+
     if (gametags[id]) {
         gametags[id].element.querySelector('span.gametag-name').innerText = name;
         if (color) gametags[id].element.querySelector('span.gametag-name').style.color = color;
         const img = gametags[id].element.querySelector('.gametag-avatar');
-        if (img) img.src = profilePictureUrl || '/profile picture.png';
+        if (img) img.src = resolveAvatarSrc(profilePictureUrl);
         return;
     }
     const element = document.createElement('div');
     element.className = 'gametag';
-    const avatarSrc = profilePictureUrl || '/profile picture.png';
+    const avatarSrc = resolveAvatarSrc(profilePictureUrl);
     element.innerHTML = `
         <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: auto;">
-            <img src="${avatarSrc}" class="gametag-avatar" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid ${color || '#fff'}; object-fit: cover; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+            <img src="${avatarSrc}" class="gametag-avatar" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid ${color || '#fff'}; object-fit: cover; box-shadow: 0 2px 4px rgba(0,0,0,0.5);" onerror="this.src='https://ui-avatars.com/api/?name=${name}&background=random'">
             <div style="display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 12px;">
                 <span class="gametag-name" style="color: ${color || '#fff'}; font-weight: 500; font-size: 0.8rem; text-shadow: 1px 1px 0 #000;">${name}</span>
             </div>
@@ -979,9 +984,9 @@ function addOtherPlayer(playerInfo) {
     createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
 
     if (playerInfo.modelData && playerInfo.modelData.path) {
-        loadPlayerModel(playerInfo.modelData.path, playerInfo.color, remotePlayers[playerInfo.id].avatarContainer, false, playerInfo.id);
+        loadPlayerModel(playerInfo.modelData.path + '?v=' + Date.now(), playerInfo.color, remotePlayers[playerInfo.id].avatarContainer, false, playerInfo.id);
     } else {
-        const defaultModelPath = 'assets/character/player.glb';
+        const defaultModelPath = 'assets/character/player.glb?v=' + Date.now();
         loadPlayerModel(defaultModelPath, playerInfo.color, remotePlayers[playerInfo.id].avatarContainer, false, playerInfo.id);
     }
 }
