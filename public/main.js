@@ -2996,24 +2996,16 @@ function renderModuleVideos(videos) {
             const videoElem = document.createElement('video');
             videoElem.src = v.url || `${AUTH_API}/api/documents/download/${v.documentId || v.id}`;
             videoElem.crossOrigin = 'anonymous';
-            videoElem.currentTime = 1; // get frame at 1s
-            videoElem.onloadeddata = () => {
-                try {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = videoElem.videoWidth || 320;
-                    canvas.height = videoElem.videoHeight || 180;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(videoElem, 0, 0, canvas.width, canvas.height);
-                    const img = document.createElement('img');
-                    img.src = canvas.toDataURL();
-                    img.style.width = '100%';
-                    img.style.height = '100%';
-                    img.style.objectFit = 'cover';
-                    thumb.innerHTML = '';
-                    thumb.appendChild(img);
-                    thumb.appendChild(playIcon);
-                } catch(e) {}
-            };
+            videoElem.preload = 'metadata';
+            videoElem.muted = true;
+            videoElem.style.width = '100%';
+            videoElem.style.height = '100%';
+            videoElem.style.objectFit = 'cover';
+            videoElem.style.pointerEvents = 'none';
+            // Force load the first frame
+            videoElem.currentTime = 0.1;
+            
+            thumb.appendChild(videoElem);
         }
 
         const playIcon = document.createElement('div');
@@ -3041,9 +3033,14 @@ function renderModuleVideos(videos) {
 
 function playModuleVideo(video) {
     previewContent.innerHTML = '';
-    const url = video.url;
+    const url = video.url || `${AUTH_API}/api/documents/download/${video.documentId || video.id}`;
     
-    if (url.includes('/api/documents/download/')) {
+    if (!url) {
+        alert("URL do vídeo inválido.");
+        return;
+    }
+
+    if (url.includes('/api/documents/download/') || url.match(/\.(mp4|webm|ogg)$/i)) {
         const videoElement = document.createElement('video');
         videoElement.src = url;
         videoElement.controls = true;
@@ -3055,7 +3052,7 @@ function playModuleVideo(video) {
         btnDownloadPreview.onclick = () => {
              const parts = url.split('/');
              const id = parts[parts.length - 1];
-             window.downloadSharedAsset(id, video.title);
+             window.downloadSharedAsset(id, video.title || 'video');
         };
     } else {
         const ytMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.get_video_info|youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
