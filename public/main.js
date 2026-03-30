@@ -374,15 +374,24 @@ function setupSocketListeners() {
     });
 
     socket.on('playerUpdated', (playerInfo) => {
+        console.log("Player updated sync:", playerInfo.id, playerInfo.name);
         createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false, playerInfo.profilePicture);
         if (remotePlayers[playerInfo.id]) {
-            remotePlayers[playerInfo.id].name = playerInfo.name; // Keep name sync
+            remotePlayers[playerInfo.id].name = playerInfo.name;
             remotePlayers[playerInfo.id].color = playerInfo.color;
             if (remotePlayers[playerInfo.id].mainMesh) {
                 applyCharacterColor(remotePlayers[playerInfo.id].mainMesh, playerInfo.color);
             }
         }
         updatePlayerList();
+    });
+
+    socket.on('playerModelUpdated', (data) => {
+        console.log("Remote player model update:", data.id);
+        if (remotePlayers[data.id]) {
+            const path = data.modelData.path + '?v=' + Date.now();
+            loadPlayerModel(path, data.color || remotePlayers[data.id].color, remotePlayers[data.id].avatarContainer, false, data.id);
+        }
     });
 
     socket.on('playerDisconnected', (id) => {
@@ -1028,7 +1037,7 @@ function addOtherPlayer(playerInfo) {
         }
     };
 
-    createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false);
+    createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false, playerInfo.profilePicture);
 
     if (playerInfo.modelData && playerInfo.modelData.path) {
         loadPlayerModel(playerInfo.modelData.path + '?v=' + Date.now(), playerInfo.color, remotePlayers[playerInfo.id].avatarContainer, false, playerInfo.id);
@@ -1995,7 +2004,7 @@ function broadcastMovement() {
 
     if (socket) {
         socket.emit('playerMovement', {
-            position: playerGroup.position,
+            position: { x: playerGroup.position.x, y: playerGroup.position.y, z: playerGroup.position.z },
             rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
             animation: playerAnims.currentState,
             isJumping: isJumping,
