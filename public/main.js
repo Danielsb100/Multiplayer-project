@@ -278,6 +278,10 @@ joinBtn.addEventListener('click', async () => {
 
         playerListContainer.classList.remove('hidden');
         updatePlayerList();
+        
+        // Ensure no inputs are stealing focus
+        if (document.activeElement) document.activeElement.blur();
+        window.focus();
 
     } catch (err) {
         console.error("Login error:", err);
@@ -1862,6 +1866,7 @@ let moveSpeed = 0.05;
 let currentSurfaceHeight = 0;
 let autoWalkStuckTimer = 0;
 const lastStoredPosition = new THREE.Vector3();
+let lastLogTime = 0;
 
 function checkCollision(targetPosition) {
     // COMPACT COLLISION: Use a fixed small box for the player (0.4 units wide)
@@ -1975,6 +1980,10 @@ function updatePlayer(delta) {
     }
 
     if (moveX !== 0 || moveZ !== 0) {
+        if (Date.now() - lastLogTime > 1000) {
+            console.log(`Moving: ${moveX.toFixed(3)}, ${moveZ.toFixed(3)}`);
+            lastLogTime = Date.now();
+        }
         handleAnimationState(playerAnims, 'walk');
         const targetPos = playerGroup.position.clone();
         targetPos.x += moveX;
