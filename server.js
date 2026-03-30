@@ -199,20 +199,25 @@ io.on('connection', (socket) => {
     // Handle movement
     socket.on('playerMovement', (movementData) => {
         if (players[socket.id]) {
-            players[socket.id].position = movementData.position;
-            players[socket.id].rotation = movementData.rotation;
-            players[socket.id].animation = movementData.animation || 'idle';
-            // Use io.emit for movement to ensure maximum availability, then filter on client
-            io.emit('playerMoved', {
-                id: socket.id,
-                position: movementData.position,
-                rotation: movementData.rotation,
-                animation: movementData.animation,
-                isJumping: movementData.isJumping,
-                jumpAlpha: movementData.jumpAlpha,
-                didInteract: movementData.didInteract,
-                interactionPoint: movementData.interactionPoint
-            });
+            if (movementData && movementData.position) {
+                players[socket.id].position = movementData.position;
+                players[socket.id].rotation = movementData.rotation;
+                players[socket.id].animation = movementData.animation || 'idle';
+                
+                // Use io.emit for movement to ensure maximum availability, then filter on client
+                io.emit('playerMoved', {
+                    id: socket.id,
+                    position: movementData.position,
+                    rotation: movementData.rotation,
+                    animation: movementData.animation,
+                    isJumping: movementData.isJumping,
+                    jumpAlpha: movementData.jumpAlpha,
+                    didInteract: movementData.didInteract,
+                    interactionPoint: movementData.interactionPoint
+                });
+            } else {
+                console.warn(`[Movement] Invalid data from ${socket.id}:`, movementData);
+            }
         }
     });
 

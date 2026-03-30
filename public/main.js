@@ -337,6 +337,12 @@ if (registerBtn) {
 }
 
 function setupSocketListeners() {
+    socket.on('connect', () => {
+        console.log("Socket connected! ID:", socket.id);
+        // Sometimes currentPlayers might be sent by server before client's 'connect' event triggers locally
+        // but Socket.io ensures events are queued. Essential to have socket.id ready now.
+    });
+
     socket.on('connect_error', (err) => {
         console.error("Socket connection error:", err.message);
         loginError.innerText = "Connection failed: " + err.message;
@@ -350,8 +356,13 @@ function setupSocketListeners() {
     });
 
     socket.on('currentPlayers', (players) => {
+        console.log("Received currentPlayers count:", Object.keys(players).length);
         Object.keys(players).forEach((id) => {
-            if (id === socket.id) return;
+            // CRITICAL: Robust identity check. socket.id MUST be defined.
+            if (id === socket.id) {
+                console.log("Skipping local player in currentPlayers sync.");
+                return;
+            }
             addOtherPlayer(players[id]);
             if (players[id].peerId) peerIdToName[players[id].peerId] = players[id].name;
         });
@@ -360,6 +371,7 @@ function setupSocketListeners() {
 
     socket.on('newPlayer', (playerInfo) => {
         if (playerInfo.id === socket.id) return;
+        console.log("New player joined:", playerInfo.id, playerInfo.name);
         addOtherPlayer(playerInfo);
         updatePlayerList();
     });
@@ -396,16 +408,8 @@ function setupSocketListeners() {
         updatePlayerList();
     });
 
-    socket.on('playerModelUpdated', (data) => {
-        if (data.id === socket.id) return; // Ignore self
-        console.log("Remote player model update:", data.id);
-        if (remotePlayers[data.id]) {
-            const path = data.modelData.path + '?v=' + Date.now();
-            loadPlayerModel(path, data.color || remotePlayers[data.id].color, remotePlayers[data.id].avatarContainer, false, data.id);
-        }
-    });
-
     socket.on('playerDisconnected', (id) => {
+        console.log("Player disconnected:", id);
         if (remotePlayers[id]) {
             scene.remove(remotePlayers[id].group);
             delete remotePlayers[id];
@@ -423,13 +427,16 @@ function setupSocketListeners() {
     });
 
     socket.on('playerModelUpdated', (data) => {
+        if (data.id === socket.id) return; // Ignore self
+        console.log("Remote player model update received:", data.id);
         if (remotePlayers[data.id]) {
             const mData = data.modelData;
             if (mData) {
                 if (mData.buffer) {
                     loadModelFromBuffer(mData.buffer, remotePlayers[data.id], data.color);
                 } else if (mData.path) {
-                    updateRemotePlayerModelByUrl(data.id, mData.path, mData.animations, data.color);
+                    const pathWithCacheBuster = mData.path + '?v=' + Date.now();
+                    loadPlayerModel(pathWithCacheBuster, data.color || remotePlayers[data.id].color, remotePlayers[data.id].avatarContainer, false, data.id);
                 }
             }
         }
@@ -2008,8 +2015,8 @@ function broadcastMovement() {
     if (now - lastBroadcastTime < BROADCAST_INTERVAL) return;
     lastBroadcastTime = now;
 
-    if (socket) {
-        socket.emit('playerMovement', {
+    if (socket && socket.connected) {
+        const moveData = {
             position: { x: playerGroup.position.x, y: playerGroup.position.y, z: playerGroup.position.z },
             rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
             animation: playerAnims.currentState,
@@ -2017,7 +2024,9 @@ function broadcastMovement() {
             jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
             didInteract: didInteractThisFrame,
             interactionPoint: interactionPointGlobal
-        });
+        };
+        // console.log("[Replication] Sending movement:", moveData.position);
+        socket.emit('playerMovement', moveData);
     }
     didInteractThisFrame = false; // Reset for next emit
 }
