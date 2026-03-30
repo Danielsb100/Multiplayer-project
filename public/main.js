@@ -65,6 +65,10 @@ const LOGIN_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#e
 let localUserColor = LOGIN_COLORS[Math.floor(Math.random() * LOGIN_COLORS.length)];
 let interactionPointGlobal = null;
 let didInteractThisFrame = false; // Missing variable fix
+let isJumping = false;           // MISSING VARIABLE FIX (ROUND 2)
+let jumpTime = 0;                // MISSING VARIABLE FIX (ROUND 2)
+const JUMP_DURATION = 0.6;       // MISSING VARIABLE FIX (ROUND 2)
+let localPlayerSocketId = null;  // New to track identity robustly
 const loginColorOptions = document.querySelectorAll('.login-color-option');
 
 // Initialize login color selection
@@ -338,9 +342,8 @@ if (registerBtn) {
 
 function setupSocketListeners() {
     socket.on('connect', () => {
+        localPlayerSocketId = socket.id;
         console.log("Socket connected! ID:", socket.id);
-        // Sometimes currentPlayers might be sent by server before client's 'connect' event triggers locally
-        // but Socket.io ensures events are queued. Essential to have socket.id ready now.
     });
 
     socket.on('connect_error', (err) => {
@@ -358,9 +361,9 @@ function setupSocketListeners() {
     socket.on('currentPlayers', (players) => {
         console.log("Received currentPlayers count:", Object.keys(players).length);
         Object.keys(players).forEach((id) => {
-            // CRITICAL: Robust identity check. socket.id MUST be defined.
-            if (id === socket.id) {
-                console.log("Skipping local player in currentPlayers sync.");
+            // CRITICAL: Robust identity check using both socket.id and local tracker
+            if (id === socket.id || id === localPlayerSocketId) {
+                console.log("Skipping local player in currentPlayers sync:", id);
                 return;
             }
             addOtherPlayer(players[id]);
@@ -370,14 +373,14 @@ function setupSocketListeners() {
     });
 
     socket.on('newPlayer', (playerInfo) => {
-        if (playerInfo.id === socket.id) return;
+        if (playerInfo.id === socket.id || playerInfo.id === localPlayerSocketId) return;
         console.log("New player joined:", playerInfo.id, playerInfo.name);
         addOtherPlayer(playerInfo);
         updatePlayerList();
     });
 
     socket.on('playerMoved', (playerInfo) => {
-        if (playerInfo.id === socket.id) return; // Ignore self
+        if (playerInfo.id === socket.id || playerInfo.id === localPlayerSocketId) return; // Ignore self
         if (remotePlayers[playerInfo.id]) {
             const p = remotePlayers[playerInfo.id];
             
@@ -2025,7 +2028,12 @@ function broadcastMovement() {
             didInteract: didInteractThisFrame,
             interactionPoint: interactionPointGlobal
         };
-        // console.log("[Replication] Sending movement:", moveData.position);
+        
+        // Intensified logging for diagnostics
+        if (Math.random() < 0.01) { // 1% of frames to avoid lag
+            console.log("[Replication] Sending movement sample:", moveData.position);
+        }
+        
         socket.emit('playerMovement', moveData);
     }
     didInteractThisFrame = false; // Reset for next emit

@@ -197,6 +197,7 @@ io.on('connection', (socket) => {
     });
 
     // Handle movement
+    let movementLogCounter = 0;
     socket.on('playerMovement', (movementData) => {
         if (players[socket.id]) {
             if (movementData && movementData.position) {
@@ -204,6 +205,11 @@ io.on('connection', (socket) => {
                 players[socket.id].rotation = movementData.rotation;
                 players[socket.id].animation = movementData.animation || 'idle';
                 
+                movementLogCounter++;
+                if (movementLogCounter % 100 === 0) {
+                    console.log(`[Movement Sync] Player ${players[socket.id].name} (${socket.id}) at:`, movementData.position);
+                }
+
                 // Use io.emit for movement to ensure maximum availability, then filter on client
                 io.emit('playerMoved', {
                     id: socket.id,
