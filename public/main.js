@@ -707,6 +707,9 @@ function triggerInteract(animObj, targetPoint = null) {
 const remotePlayers = {}; // Stores meshes and groups
 const gametags = {}; // Stores UI elements
 
+// Polyfill for legacy animation calls
+let playerAnims = { mixer: null, actions: {}, currentAction: null, currentState: 'idle' };
+
 const playerGroup = new THREE.Group();
 let characterMesh = null;
 scene.add(playerGroup);
