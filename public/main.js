@@ -2984,7 +2984,12 @@ function renderModuleVideos(videos) {
         thumb.style.justifyContent = 'center';
         
         // Thumbnail generation
-        const ytMatch = v.url ? v.url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/) : null;
+        let fullUrl = v.url;
+        if (fullUrl && fullUrl.startsWith('/api/')) {
+            fullUrl = `${AUTH_API}${fullUrl}`;
+        }
+
+        const ytMatch = fullUrl ? fullUrl.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/) : null;
         if (ytMatch) {
             const img = document.createElement('img');
             img.src = `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
@@ -2994,7 +2999,7 @@ function renderModuleVideos(videos) {
             thumb.appendChild(img);
         } else {
             const videoElem = document.createElement('video');
-            videoElem.src = v.url || `${AUTH_API}/api/documents/download/${v.documentId || v.id}`;
+            videoElem.src = fullUrl || '';
             videoElem.crossOrigin = 'anonymous';
             videoElem.preload = 'metadata';
             videoElem.muted = true;
@@ -3033,8 +3038,12 @@ function renderModuleVideos(videos) {
 
 function playModuleVideo(video) {
     previewContent.innerHTML = '';
-    const url = video.url || `${AUTH_API}/api/documents/download/${video.documentId || video.id}`;
     
+    let url = video.url;
+    if (url && url.startsWith('/api/')) {
+        url = `${AUTH_API}${url}`;
+    }
+
     if (!url) {
         alert("URL do vídeo inválido.");
         return;
