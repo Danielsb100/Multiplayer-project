@@ -148,7 +148,7 @@ let isSelfModal = false;
 
 let selectedPlayerForAction = null;
 let selectedPlayerPeerId = null;
-const catalogCharBtn = document.getElementById('catalog-char-btn');
+// Char catalog button removed
 const menuCatalogModels = document.getElementById('menu-catalog-models');
 
 // Fetch catalog data immediately via HTTP
@@ -530,14 +530,7 @@ function setupSocketListeners() {
     });
 }
 
-catalogCharBtn.addEventListener('click', () => {
-    openCatalog('characters', (item) => {
-        selectedCatalogModelUrl = item.model;
-        selectedCatalogAnims = item.animations;
-        selectedModelBuffer = null;
-        loginFileName.innerText = item.name;
-    });
-});
+// Character selection hook removed
 
 closeCatalogBtn.addEventListener('click', () => catalogOverlay.classList.add('hidden'));
 
