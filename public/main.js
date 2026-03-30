@@ -652,12 +652,59 @@ mapLoader.load('assets/maps/map/map.glb', (gltf) => {
 // --- Animation Manager ---
 function applyCharacterColor(model, color) {
     if (!model) return;
+
+    // Build colors
+    const baseColor = new THREE.Color(color);
+    // Fresnel Color -> a brighter, 60% whiter mixture of the main theme color
+    const fresnelColor = baseColor.clone().lerp(new THREE.Color(0xffffff), 0.6);
+
+    const fresnelMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            baseColor: { value: baseColor },
+            fresnelColor: { value: fresnelColor },
+            fresnelPower: { value: 1.5 }
+        },
+        vertexShader: `
+            varying vec3 vNormal;
+            varying vec3 vViewDir;
+            
+            void main() {
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                vViewDir = normalize(-mvPosition.xyz);
+                vNormal = normalize(normalMatrix * normal);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `,
+        fragmentShader: `
+            uniform vec3 baseColor;
+            uniform vec3 fresnelColor;
+            uniform float fresnelPower;
+            
+            varying vec3 vNormal;
+            varying vec3 vViewDir;
+            
+            void main() {
+                vec3 lightDir = normalize(vec3(0.5, 1.0, 0.5));
+                float diffuse = max(dot(vNormal, lightDir), 0.0);
+                vec3 litColor = baseColor * (0.3 + 0.7 * diffuse);
+                
+                float f = 1.0 - max(dot(vViewDir, vNormal), 0.0);
+                float fresnel = pow(f, fresnelPower);
+                
+                vec3 finalColor = mix(litColor, fresnelColor, fresnel);
+                finalColor += fresnelColor * fresnel * 0.5;
+                
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `,
+        transparent: false
+    });
+
     model.traverse((child) => {
-        if (child.isMesh && child.material) {
-            const materials = Array.isArray(child.material) ? child.material : [child.material];
-            materials.forEach(mat => {
-                if (mat.color) mat.color.set(color);
-            });
+        if (child.isMesh) {
+            child.material = fresnelMaterial;
+            child.castShadow = true;
+            child.receiveShadow = true;
         }
     });
 }
