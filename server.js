@@ -203,7 +203,7 @@ io.on('connection', (socket) => {
             players[socket.id].rotation = movementData.rotation;
             players[socket.id].animation = movementData.animation || 'idle';
             
-            // Optimization: Broadcast only movement delta, excluding heavy data like modelData
+            console.log(`[Replication] Movement from ${socket.id}:`, movementData.position);
             socket.broadcast.emit('playerMoved', {
                 id: socket.id,
                 position: movementData.position,

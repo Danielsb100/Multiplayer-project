@@ -362,14 +362,18 @@ function setupSocketListeners() {
     socket.on('playerMoved', (playerInfo) => {
         if (remotePlayers[playerInfo.id]) {
             const p = remotePlayers[playerInfo.id];
-
-            // Set targets instead of immediate position
-            p.targetPosition.set(playerInfo.position.x, playerInfo.position.y, playerInfo.position.z);
-            p.targetRotation.set(
-                playerInfo.rotation.x,
-                playerInfo.rotation.y,
-                playerInfo.rotation.z
-            );
+            
+            if (playerInfo.position) {
+                console.log(`[Replication] Received move for ${playerInfo.id}:`, playerInfo.position);
+                p.targetPosition.set(playerInfo.position.x, playerInfo.position.y, playerInfo.position.z);
+            }
+            if (playerInfo.rotation) {
+                p.targetRotation.set(
+                    playerInfo.rotation.x,
+                    playerInfo.rotation.y,
+                    playerInfo.rotation.z
+                );
+            }
         }
     });
 
@@ -1005,6 +1009,10 @@ function removeOptimisticObject(id) {
 function syncChatHistory(history) { }
 
 function addOtherPlayer(playerInfo) {
+    if (remotePlayers[playerInfo.id]) {
+        console.warn("Player already exists, skipping addOtherPlayer:", playerInfo.id);
+        return;
+    }
     // Anchor group: holds only network position/rotation — never touched visually
     const anchorGroup = new THREE.Group();
     anchorGroup.position.set(playerInfo.position.x, playerInfo.position.y, playerInfo.position.z);
