@@ -45,10 +45,7 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('mousedown', () => customCursor.classList.add('clicking'));
 window.addEventListener('mouseup', () => customCursor.classList.remove('clicking'));
 
-// New Login GLB Elements
-const loginGlbUpload = document.getElementById('login-glb-upload');
-const loginFileName = document.getElementById('login-file-name');
-let selectedModelBuffer = null;
+// Input state vars removed
 
 // Advanced Cube Placement State
 const PlacementState = { NONE: 0, BASE: 1, HEIGHT: 2 };
@@ -217,17 +214,7 @@ function isOverUI(event) {
     return event.target.closest('.ui-layer') || event.target.closest('.context-menu');
 }
 
-loginGlbUpload.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        loginFileName.innerText = file.name;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            selectedModelBuffer = event.target.result;
-        };
-        reader.readAsArrayBuffer(file);
-    }
-});
+
 
 joinBtn.addEventListener('click', async () => {
     if (socket && socket.connected) {
