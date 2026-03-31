@@ -939,7 +939,7 @@ function updateGametags() {
     // Update local config
     if (gametags[socket.id] && localUsername !== '') {
         playerGroup.getWorldPosition(tempV);
-        tempV.y += 2.5; // Above head
+        tempV.y += 3.5; // Above head
         tempV.project(camera);
         const x = (tempV.x * .5 + .5) * window.innerWidth;
         const y = (tempV.y * -.5 + .5) * window.innerHeight;
@@ -951,7 +951,7 @@ function updateGametags() {
     for (const id in remotePlayers) {
         if (gametags[id]) {
             remotePlayers[id].group.getWorldPosition(tempV);
-            tempV.y += 2.5;
+            tempV.y += 3.5;
             tempV.project(camera);
             const x = (tempV.x * .5 + .5) * window.innerWidth;
             const y = (tempV.y * -.5 + .5) * window.innerHeight;
