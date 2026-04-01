@@ -221,10 +221,6 @@ function isOverUI(event) {
 
 
 joinBtn.addEventListener('click', async () => {
-    if (socket && socket.connected) {
-        console.warn("Socket already connected, skipping join logic.");
-        return;
-    }
     const email = emailInput.value.trim();
     const password = passwordInput.value.trim();
 
@@ -237,6 +233,7 @@ joinBtn.addEventListener('click', async () => {
     joinBtn.disabled = true;
     joinBtn.innerText = "Connecting...";
     loginError.classList.add('hidden');
+    
     try {
         const response = await fetch(`${AUTH_API}/auth/login`, {
             method: 'POST',
@@ -245,48 +242,9 @@ joinBtn.addEventListener('click', async () => {
         });
 
         const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Login failed");
 
-        if (!response.ok) {
-            throw new Error(result.message || "Login failed");
-        }
-
-        const token = result.token;
-        authToken = token; // Store globally
-        localUsername = result.user?.username || email.split('@')[0];
-        localProfilePicture = result.user?.profilePicture || null;
-        localUserRole = result.user?.role || 'USER'; // Store role
-
-        // Initialize socket with the received token
-        // @ts-ignore
-        socket = io({
-            auth: { token: authToken }
-        });
-
-        // Setup socket listeners
-        setupSocketListeners();
-
-        // Emit initial user data
-        socket.emit('setName', { name: localUsername, color: localUserColor, profilePicture: localProfilePicture });
-
-        // Load the static player character directly (Bypass Cache for local updates)
-        const playerModelPath = 'assets/character/player.glb?v=' + Date.now();
-        socket.emit('modelUpdate', { path: playerModelPath });
-        loadPlayerModel(playerModelPath, localUserColor, playerGroup, true);
-
-        playerGroup.visible = true;
-        loginScreen.classList.add('hidden');
-        createGametag(socket.id, localUsername, localUserColor, true, localProfilePicture);
-
-        // Initialize PeerJS for audio calls
-        initPeer();
-
-        playerListContainer.classList.remove('hidden');
-        updatePlayerList();
-        
-        // Ensure no inputs are stealing focus
-        if (document.activeElement) document.activeElement.blur();
-        window.focus();
-
+        await performJoin(result.token, result.user);
     } catch (err) {
         console.error("Login error:", err);
         loginError.innerText = err.message;
@@ -295,6 +253,92 @@ joinBtn.addEventListener('click', async () => {
         joinBtn.innerText = "Entrar no Mundo";
     }
 });
+
+/**
+ * Funçao centralizada para entrar no mundo após ter o token
+ */
+async function performJoin(token, user) {
+    if (socket && socket.connected) return;
+
+    authToken = token;
+    localUsername = user?.username || "Guest";
+    localProfilePicture = user?.profilePicture || null;
+    localUserRole = user?.role || 'USER';
+
+    // Initialize socket with the received token
+    // @ts-ignore
+    socket = io({
+        auth: { token: authToken }
+    });
+
+    // Setup socket listeners
+    setupSocketListeners();
+
+    // Emit initial user data
+    socket.emit('setName', { name: localUsername, color: localUserColor, profilePicture: localProfilePicture });
+
+    // Load the static player character directly
+    const playerModelPath = 'assets/character/player.glb?v=' + Date.now();
+    socket.emit('modelUpdate', { path: playerModelPath });
+    loadPlayerModel(playerModelPath, localUserColor, playerGroup, true);
+
+    playerGroup.visible = true;
+    loginScreen.classList.add('hidden');
+    
+    // We need to wait for socket.id to be available if possible, 
+    // but setupSocketListeners will handle it when connected.
+    // For local immediate feedback:
+    createGametag("local", localUsername, localUserColor, true, localProfilePicture);
+
+    // Initialize PeerJS for audio calls
+    initPeer();
+
+    playerListContainer.classList.remove('hidden');
+    updatePlayerList();
+    
+    if (document.activeElement) document.activeElement.blur();
+    window.focus();
+    
+    console.log(`Successfully joined as ${localUsername} (${localUserRole})`);
+}
+
+/**
+ * Verifica se há um token na URL para login automático
+ */
+async function checkAutoLogin() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    if (token) {
+        console.log("Auto-login token detected. Verifying...");
+        joinBtn.disabled = true;
+        joinBtn.innerText = "Auto-Authenticating...";
+        
+        try {
+            const response = await fetch(`${AUTH_API}/auth/verify`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const result = await response.json();
+            if (!response.ok) throw new Error("Invalid auto-login token");
+
+            await performJoin(token, result.user);
+            
+            // Clean up URL to hide token
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (err) {
+            console.error("Auto-login failed:", err);
+            loginError.innerText = "Sessão expirada. Faça login novamente.";
+            loginError.classList.remove('hidden');
+            joinBtn.disabled = false;
+            joinBtn.innerText = "Entrar no Mundo";
+        }
+    }
+}
+
+// Call auto-login check on start
+checkAutoLogin();
 
 // --- Handle Register ---
 async function handleRegister() {
