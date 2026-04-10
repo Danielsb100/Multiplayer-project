@@ -532,8 +532,12 @@ input[type="file"] {
 
 .chat-msg .name {
     font-weight: 700;
-    color: var(--accent-color);
+    color: #ef4444; /* Changed from accent color to red per user request */
     margin-right: 0.5rem;
+}
+
+.chat-msg .text {
+    color: #ef4444; /* Changed text color to red per user request */
 }
 
 .chat-msg .time {
