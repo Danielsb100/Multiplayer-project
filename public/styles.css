@@ -1,12 +1,12 @@
 /* Variáveis Globais de Cores e Estilos */
 :root {
-    --bg-color: #f3f4f6; /* Gray 100 */
-    --text-primary: #111827; /* Gray 900 */
-    --text-secondary: #4b5563; /* Gray 600 */
-    --accent-color: #d4af37; /* Gold/Beige */
-    --accent-hover: #c5a028; /* Darker Gold */
-    --panel-bg: rgba(0, 0, 0, 0.85); /* Light glass */
-    --panel-border: rgba(0, 0, 0, 0.1);
+    --bg-color: #0f172a;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent-color: #3b82f6;
+    --accent-hover: #2563eb;
+    --panel-bg: rgba(30, 41, 59, 0.6);
+    --panel-border: rgba(255, 255, 255, 0.08);
 }
 
 /* Reset básico para garantir que margens e paddings sejam consistentes */
@@ -102,7 +102,7 @@ body {
     font-weight: 700;
     letter-spacing: -0.02em;
     margin-bottom: 0.25rem;
-    background: linear-gradient(135deg, #111827, #374151);
+    background: linear-gradient(135deg, #ffffff, #94a3b8);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -128,26 +128,26 @@ input[type="file"] {
     gap: 0.75rem;
     width: 100%;
     padding: 1rem 1.5rem;
-    background: linear-gradient(135deg, var(--accent-color), #c5a028);
-    color: var(--text-primary);
+    background: linear-gradient(135deg, var(--accent-color), #2563eb);
+    color: white;
     border-radius: 12px;
     font-weight: 600;
     font-size: 1rem;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 4px 14px 0 rgba(212, 175, 55, 0.39);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39);
 }
 
 .upload-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
     background: linear-gradient(135deg, #4f46e5, var(--accent-color));
 }
 
 .upload-btn:active {
     transform: translateY(1px);
-    box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 /* Indicador de Carregamento centralizado */
@@ -160,7 +160,7 @@ input[type="file"] {
     color: var(--text-primary);
     font-size: 0.95rem;
     font-weight: 500;
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.2);
     padding: 0.75rem;
     border-radius: 8px;
 }
@@ -205,7 +205,7 @@ input[type="file"] {
 #controls-help strong {
     color: var(--text-primary);
     font-weight: 600;
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.1);
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.8rem;
@@ -218,7 +218,7 @@ input[type="file"] {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(255, 255, 255, 0.85); /* Fundo escuro com desfoque */
+    background: rgba(15, 23, 42, 0.85); /* Fundo escuro com desfoque */
     backdrop-filter: blur(10px);
     z-index: 100;
     display: flex;
@@ -254,7 +254,7 @@ input[type="file"] {
     font-size: 2rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
-    background: linear-gradient(135deg, #111827, #374151);
+    background: linear-gradient(135deg, #ffffff, #94a3b8);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -272,10 +272,10 @@ input[type="file"] {
 .login-box input[type="password"] {
     width: 100%;
     padding: 1rem 1.25rem;
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0,0,0,0.2);
     border: 1px solid var(--panel-border);
     border-radius: 12px;
-    color: var(--text-primary);
+    color: white;
     font-family: 'Inter', sans-serif;
     font-size: 1rem;
     margin-bottom: 1rem;
@@ -290,20 +290,20 @@ input[type="file"] {
 .login-box button {
     width: 100%;
     padding: 1rem;
-    background: linear-gradient(135deg, var(--accent-color), #c5a028);
-    color: var(--text-primary);
+    background: linear-gradient(135deg, var(--accent-color), #2563eb);
+    color: white;
     border: none;
     border-radius: 12px;
     font-weight: 600;
     font-size: 1rem;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 14px 0 rgba(212, 175, 55, 0.39);
+    box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39);
 }
 
 .login-box button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
 }
 
 /* Seção de Importação de GLB no Login */
@@ -360,7 +360,7 @@ input[type="file"] {
 }
 
 .login-color-option.active {
-    border-color: var(--text-primary);
+    border-color: white;
     transform: scale(1.2);
     box-shadow: 0 0 15px var(--accent-color);
 }
@@ -371,8 +371,8 @@ input[type="file"] {
 }
 
 .secondary-btn {
-    background: rgba(0, 0, 0, 0.1) !important;
-    color: var(--text-primary) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
 }
 
 /* --- Interface do Chat Global --- */
@@ -425,12 +425,12 @@ input[type="file"] {
     justify-content: space-between;
     padding: 0.75rem 1rem;
     border-radius: 10px;
-    background: rgba(0, 0, 0, 0.02);
+    background: rgba(255, 255, 255, 0.03);
     transition: background 0.2s;
 }
 
 .player-item:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .player-info {
@@ -462,7 +462,7 @@ input[type="file"] {
 .call-icon-btn {
     background: #10b981;
     border: none;
-    color: var(--text-primary);
+    color: white;
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -558,7 +558,7 @@ input[type="file"] {
     backdrop-filter: blur(16px);
     border: 1px solid var(--panel-border);
     border-radius: 12px;
-    color: var(--text-primary);
+    color: white;
     font-family: 'Inter', sans-serif;
     font-size: 0.9rem;
     outline: none;
@@ -567,8 +567,8 @@ input[type="file"] {
 
 #chat-input:focus {
     border-color: var(--accent-color);
-    background: rgba(243, 244, 246, 0.8);
-    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+    background: rgba(30, 41, 59, 0.8);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
 /* Animação suave para novas mensagens */
@@ -585,9 +585,9 @@ input[type="file"] {
     bottom: 0;
     left: 0;
     width: 480px;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(15, 23, 42, 0.95);
     backdrop-filter: blur(20px);
-    border-right: 1px solid rgba(0, 0, 0, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 5000;
     display: flex;
     flex-direction: column;
@@ -607,15 +607,15 @@ input[type="file"] {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-header h2 {
     margin: 0;
     font-size: 1.25rem;
     font-weight: 600;
-    color: var(--text-primary);
-    background: linear-gradient(90deg, #fff, #4b5563);
+    color: #fff;
+    background: linear-gradient(90deg, #fff, #94a3b8);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -625,8 +625,8 @@ input[type="file"] {
     display: flex;
     padding: 0 10px;
     gap: 15px;
-    background: rgba(0, 0, 0, 0.5);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    background: rgba(15, 23, 42, 0.5);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     overflow-x: auto;
     scrollbar-width: none;
 }
@@ -635,7 +635,7 @@ input[type="file"] {
 .module-tab-btn {
     background: transparent;
     border: none;
-    color: #4b5563;
+    color: #94a3b8;
     padding: 15px 5px;
     font-size: 0.9rem;
     font-weight: 500;
@@ -647,12 +647,12 @@ input[type="file"] {
 }
 
 .module-tab-btn:hover {
-    color: var(--text-primary);
+    color: #fff;
 }
 
 .module-tab-btn.active {
-    color: #e0c068;
-    border-bottom: 2px solid #e0c068;
+    color: #60a5fa;
+    border-bottom: 2px solid #60a5fa;
 }
 
 .sidebar-content {
@@ -660,7 +660,7 @@ input[type="file"] {
     overflow-y: auto;
     padding: 20px;
     scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
 .tab-pane {
@@ -679,7 +679,7 @@ input[type="file"] {
 
 .module-description {
     line-height: 1.6;
-    color: #374151;
+    color: #cbd5e1;
 }
 
 .video-grid {
@@ -690,8 +690,8 @@ input[type="file"] {
 }
 
 .video-card {
-    background: rgba(0, 0, 0, 0.02);
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
@@ -699,9 +699,9 @@ input[type="file"] {
 }
 
 .video-card:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.08);
     transform: translateY(-3px);
-    border-color: #e0c068;
+    border-color: #60a5fa;
 }
 
 .video-thumb {
@@ -721,15 +721,15 @@ input[type="file"] {
 .video-info h4 {
     margin: 0;
     font-size: 0.85rem;
-    color: #111827;
+    color: #f8fafc;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .btn-open {
-    background: #d4af37;
-    color: var(--text-primary);
+    background: #3b82f6;
+    color: #fff;
     border: none;
     padding: 6px 12px;
     border-radius: 6px;
@@ -738,7 +738,7 @@ input[type="file"] {
 }
 
 .btn-open:hover {
-    background: #c5a028;
+    background: #2563eb;
 }
 
 /* Sidebar Preview Banner */
@@ -763,14 +763,14 @@ input[type="file"] {
 .placement-badge {
     position: absolute;
     transform: translate(-50%, -100%);
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(15, 23, 42, 0.9);
     backdrop-filter: blur(4px);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     padding: 4px 10px;
     border-radius: 12px;
     font-size: 0.7rem;
     font-weight: 600;
-    color: var(--text-primary);
+    color: #fff;
     white-space: nowrap;
     pointer-events: none;
     z-index: 10;
@@ -786,7 +786,7 @@ input[type="file"] {
     border-radius: 50%;
 }
 
-.badge-none .badge-dot { background: #4b5563; }
+.badge-none .badge-dot { background: #94a3b8; }
 .badge-draft .badge-dot { background: #f59e0b; }
 .badge-published .badge-dot { background: #10b981; }
 .badge-archived .badge-dot { background: #ef4444; }
@@ -794,9 +794,9 @@ input[type="file"] {
 /* Menu de Contexto */
 .context-menu {
     position: fixed;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(15, 23, 42, 0.8);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     padding: 8px;
     min-width: 180px;
@@ -820,7 +820,7 @@ input[type="file"] {
 }
 
 .menu-item:hover {
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 /* Matriz de Cores */
@@ -829,9 +829,9 @@ input[type="file"] {
     position: absolute;
     left: 100%;
     top: 0;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(15, 23, 42, 0.95);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     padding: 8px;
     grid-template-columns: repeat(4, 1fr);
@@ -847,7 +847,7 @@ input[type="file"] {
     width: 24px;
     height: 24px;
     border-radius: 4px;
-    border: 1px solid rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     cursor: pointer;
     transition: transform 0.1s;
 }
@@ -863,8 +863,8 @@ input[type="file"] {
 /* --- Gametags (Nomes em cima dos personagens) --- */
 .gametag {
     position: absolute;
-    color: var(--text-primary);
-    background: rgba(0, 0, 0, 0.05);
+    color: white;
+    background: rgba(0, 0, 0, 0.6);
     padding: 4px 10px;
     border-radius: 20px;
     font-family: 'Inter', sans-serif;
@@ -876,7 +876,7 @@ input[type="file"] {
     white-space: nowrap;
     z-index: 5;
     backdrop-filter: blur(4px);
-    border: 1px solid rgba(0,0,0,0.1);
+    border: 1px solid rgba(255,255,255,0.1);
     box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
 
@@ -887,7 +887,7 @@ input[type="file"] {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(8px);
     z-index: 100000;
     display: flex;
@@ -897,8 +897,8 @@ input[type="file"] {
 }
 
 .catalog-card {
-    background: rgba(0, 0, 0, 0.05); /* Very subtle white for glass */
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.05); /* Very subtle white for glass */
+    border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     backdrop-filter: blur(20px);
     border-radius: 20px;
@@ -918,7 +918,7 @@ input[type="file"] {
 
 .catalog-header {
     padding: 20px 30px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -927,20 +927,20 @@ input[type="file"] {
 .catalog-header h2 {
     margin: 0;
     font-family: 'Outfit', sans-serif;
-    color: var(--text-primary);
+    color: white;
 }
 
 #close-catalog {
     background: none;
     border: none;
-    color: rgba(0, 0, 0, 0.6);
+    color: rgba(255, 255, 255, 0.6);
     font-size: 30px;
     cursor: pointer;
     transition: color 0.2s;
 }
 
 #close-catalog:hover {
-    color: var(--text-primary);
+    color: white;
 }
 
 .catalog-grid {
@@ -953,8 +953,8 @@ input[type="file"] {
 }
 
 .catalog-item {
-    background: rgba(0, 0, 0, 0.05);
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 12px;
     padding: 15px;
     display: flex;
@@ -965,8 +965,8 @@ input[type="file"] {
 }
 
 .catalog-item:hover {
-    background: rgba(0, 0, 0, 0.1);
-    border-color: #d4af37;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #3b82f6;
     transform: translateY(-5px);
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
 }
@@ -977,11 +977,11 @@ input[type="file"] {
     object-fit: cover;
     border-radius: 8px;
     margin-bottom: 12px;
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.2);
 }
 
 .catalog-item span {
-    color: rgba(0, 0, 0, 0.9);
+    color: rgba(255, 255, 255, 0.9);
     font-size: 14px;
     font-weight: 500;
     text-align: center;
@@ -992,9 +992,9 @@ input[type="file"] {
 }
 
 .secondary-btn {
-    background: rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
     padding: 12px 20px;
     border-radius: 10px;
     cursor: pointer;
@@ -1002,7 +1002,7 @@ input[type="file"] {
 }
 
 .secondary-btn:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .login-actions {
@@ -1040,19 +1040,19 @@ input[type="file"] {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    border: 2px solid rgba(0, 0, 0, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .login-color-option:hover {
     transform: scale(1.2);
-    border-color: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.3);
 }
 
 .login-color-option.active {
     transform: scale(1.2);
-    border-color: var(--text-primary);
+    border-color: white;
     box-shadow: 0 0 15px currentColor;
 }
 /* --- Audio Call UI (New) --- */
@@ -1110,7 +1110,7 @@ input[type="file"] {
 .video-grid {
     width: 100%;
     aspect-ratio: 16/9;
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(0, 0, 0, 0.4);
     border-radius: 12px;
     overflow: hidden;
     position: relative;
@@ -1134,7 +1134,7 @@ input[type="file"] {
     height: 60px;
     object-fit: cover;
     border-radius: 8px;
-    border: 1px solid rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
     background: #000;
 }
@@ -1163,13 +1163,13 @@ input[type="file"] {
 }
 
 #btn-mute {
-    background: rgba(0, 0, 0, 0.1);
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
 }
 
 #btn-hangup {
     background: #ef4444;
-    color: var(--text-primary);
+    color: white;
 }
 
 #btn-hangup:hover {
@@ -1184,7 +1184,7 @@ input[type="file"] {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(15, 23, 42, 0.7);
     backdrop-filter: blur(8px);
     z-index: 200;
     display: flex;
@@ -1216,19 +1216,19 @@ input[type="file"] {
 
 .success-btn {
     background: #10b981;
-    color: var(--text-primary);
+    color: white;
 }
 
 .danger-btn {
     background: #ef4444;
-    color: var(--text-primary);
+    color: white;
 }
 
 .glass {
-    background: rgba(243, 244, 246, 0.7);
+    background: rgba(30, 41, 59, 0.7);
     backdrop-filter: blur(16px);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    color: var(--text-primary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
 }
 /* --- Player Interaction & Asset Sharing --- */
 
@@ -1237,7 +1237,7 @@ input[type="file"] {
 }
 
 .menu-header {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.05);
     padding: 6px 14px;
     font-weight: 700;
     font-size: 0.75rem;
@@ -1255,7 +1255,7 @@ input[type="file"] {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(15, 23, 42, 0.8);
     backdrop-filter: blur(8px);
     z-index: 100001;
     display: flex;
@@ -1291,7 +1291,7 @@ input[type="file"] {
 .modal-header h2 {
     font-family: 'Outfit', sans-serif;
     font-size: 1.5rem;
-    background: linear-gradient(135deg, #111827, #374151);
+    background: linear-gradient(135deg, #ffffff, #94a3b8);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -1331,14 +1331,14 @@ input[type="file"] {
 
 .asset-table td {
     padding: 1rem 0.75rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .asset-table .btn-sm {
     padding: 4px 12px;
     border-radius: 6px;
     font-size: 0.8rem;
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--panel-border);
     color: var(--text-primary);
     cursor: pointer;
@@ -1346,7 +1346,7 @@ input[type="file"] {
 }
 
 .asset-table .btn-sm:hover {
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .asset-table .btn-danger {
@@ -1397,7 +1397,7 @@ input[type="file"] {
 
 .tab-btn.active {
     background: var(--accent-color);
-    color: var(--text-primary);
+    color: white;
     border-radius: 6px;
     border-bottom: none;
 }
@@ -1413,7 +1413,7 @@ input[type="file"] {
 }
 
 .asset-card {
-    background: rgba(0, 0, 0, 0.02);
+    background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--panel-border);
     border-radius: 12px;
     padding: 8px;
@@ -1427,7 +1427,7 @@ input[type="file"] {
 }
 
 .asset-card:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.08);
     transform: translateY(-2px);
     border-color: var(--accent-color);
 }
@@ -1439,7 +1439,7 @@ input[type="file"] {
     width: 24px;
     height: 24px;
     background: #ef4444;
-    color: var(--text-primary);
+    color: white;
     border-radius: 50%;
     display: none;
     justify-content: center;
@@ -1465,7 +1465,7 @@ input[type="file"] {
     aspect-ratio: 1/1;
     border-radius: 8px;
     overflow: hidden;
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.2);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1495,7 +1495,7 @@ input[type="file"] {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(15, 23, 42, 0.9);
     backdrop-filter: blur(12px);
     z-index: 100005;
     display: flex;
@@ -1526,8 +1526,8 @@ input[type="file"] {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    background: rgba(0, 0, 0, 0.1);
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
     border: none;
     width: 60px;
     height: 60px;
@@ -1542,7 +1542,7 @@ input[type="file"] {
 }
 
 .nav-arrow:hover {
-    background: rgba(0, 0, 0, 0.25);
+    background: rgba(255, 255, 255, 0.25);
     transform: translateY(-50%) scale(1.1);
 }
 
@@ -1594,14 +1594,14 @@ input[type="file"] {
     justify-content: center;
     gap: 8px;
     background: var(--accent-color);
-    color: var(--text-primary);
+    color: white;
     border: none;
     border-radius: 8px;
     padding: 0.6rem 1.2rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
     font-family: 'Outfit', sans-serif;
 }
 
@@ -1611,7 +1611,7 @@ input[type="file"] {
 
 .upload-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.6);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
     filter: brightness(1.1);
 }
 
@@ -1626,7 +1626,7 @@ input[type="file"] {
 /* --- Auth Tabs & Section Polish --- */
 .auth-tabs {
     display: flex;
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
     padding: 4px;
     margin-bottom: 2rem;
@@ -1637,7 +1637,7 @@ input[type="file"] {
     padding: 0.8rem;
     border: none;
     background: transparent;
-    color: rgba(0, 0, 0, 0.6);
+    color: rgba(255, 255, 255, 0.6);
     cursor: pointer;
     font-weight: 600;
     font-family: 'Outfit', sans-serif;
@@ -1647,7 +1647,7 @@ input[type="file"] {
 
 .auth-tab.active {
     background: var(--accent-color);
-    color: var(--text-primary);
+    color: white;
 }
 
 .error-msg {

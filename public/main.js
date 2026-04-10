@@ -61,7 +61,7 @@ let lastStateChangeTime = 0;
 const STATE_CHANGE_DEBOUNCE = 300; // ms
 
 // User Color Logic
-const LOGIN_COLORS = ['#ffffff', '#f3f4f6', '#d1d5db', '#9ca3af', '#4b5563', '#1f2937', '#d4af37', '#e0c068'];
+const LOGIN_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ffffff', '#94a3b8'];
 let localUserColor = LOGIN_COLORS[Math.floor(Math.random() * LOGIN_COLORS.length)];
 let interactionPointGlobal = null;
 let didInteractThisFrame = false; // Missing variable fix
@@ -647,8 +647,8 @@ function openCatalog(type, onSelect) {
 // --- 1. Scene Setup ---
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#f3f4f6');
-scene.fog = new THREE.FogExp2('#f3f4f6', 0.005); // Relaxed fog for production visibility
+scene.background = new THREE.Color('#0f172a');
+scene.fog = new THREE.FogExp2('#0f172a', 0.005); // Relaxed fog for production visibility
 
 const clock = new THREE.Clock(); // For animations
 
@@ -835,7 +835,7 @@ const playerGroup = new THREE.Group();
 let characterMesh = null;
 scene.add(playerGroup);
 
-function createDefaultAvatar(color = '#d4af37') {
+function createDefaultAvatar(color = '#3b82f6') {
     const group = new THREE.Group();
     const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
     const bodyMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3, metalness: 0.2 });
@@ -845,7 +845,7 @@ function createDefaultAvatar(color = '#d4af37') {
     group.add(body);
 
     const eyeGeo = new THREE.BoxGeometry(0.5, 0.2, 0.2);
-    const eyeMat = new THREE.MeshStandardMaterial({ color: '#111827' });
+    const eyeMat = new THREE.MeshStandardMaterial({ color: '#ffffff' });
     const eyes = new THREE.Mesh(eyeGeo, eyeMat);
     eyes.position.set(0, 1.3, 0.35);
     group.add(eyes);
@@ -877,9 +877,9 @@ function createGametag(id, name, color, isLocal, profilePictureUrl = null) {
     const avatarSrc = resolveAvatarSrc(profilePictureUrl);
     element.innerHTML = `
         <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: auto;">
-            <img src="${avatarSrc}" class="gametag-avatar" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid ${color || '#111827'}; object-fit: cover; box-shadow: 0 2px 4px rgba(0,0,0,0.5);" onerror="this.src='https://ui-avatars.com/api/?name=${name}&background=random'">
+            <img src="${avatarSrc}" class="gametag-avatar" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid ${color || '#fff'}; object-fit: cover; box-shadow: 0 2px 4px rgba(0,0,0,0.5);" onerror="this.src='https://ui-avatars.com/api/?name=${name}&background=random'">
             <div style="display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 12px;">
-                <span class="gametag-name" style="color: ${color || '#111827'}; font-weight: 500; font-size: 0.8rem; text-shadow: 1px 1px 0 #000;">${name}</span>
+                <span class="gametag-name" style="color: ${color || '#fff'}; font-weight: 500; font-size: 0.8rem; text-shadow: 1px 1px 0 #000;">${name}</span>
             </div>
         </div>
     `;
@@ -959,7 +959,7 @@ function updatePlayerList() {
         infoDiv.className = 'player-info';
         infoDiv.style.cursor = 'pointer';
         infoDiv.innerHTML = `
-            <div class="player-status-dot" style="background: ${player.peerId ? '#9ca3af' : '#64748b'}"></div>
+            <div class="player-status-dot" style="background: ${player.peerId ? '#10b981' : '#64748b'}"></div>
             <span class="player-name">${name}</span>
             ${!player.peerId ? '<span style="font-size: 0.7rem; color: #94a3b8; margin-left: 5px;">(sem voz)</span>' : ''}
         `;
@@ -1223,11 +1223,11 @@ directionalLight.shadow.mapSize.height = 2048;
 directionalLight.shadow.bias = -0.0001;
 scene.add(directionalLight);
 
-const fillLight = new THREE.DirectionalLight(0xfff0c2, 0.6);
+const fillLight = new THREE.DirectionalLight(0x88bbff, 0.6);
 fillLight.position.set(-10, 5, -10);
 scene.add(fillLight);
 
-const gridHelper = new THREE.GridHelper(100, 100, 0xd1d5db, 0xe5e7eb);
+const gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
 gridHelper.position.y = -0.01;
 scene.add(gridHelper);
 
@@ -2376,7 +2376,7 @@ function createModulePlacement(data) {
         modelGroup.clear();
         // Base - Cylinder
         const baseGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.1, 32);
-        const baseMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8, roughness: 0.2 });
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x60a5fa, metalness: 0.8, roughness: 0.2 });
         const base = new THREE.Mesh(baseGeo, baseMat);
         base.position.y = 0.05;
         modelGroup.add(base);
@@ -2384,8 +2384,8 @@ function createModulePlacement(data) {
         // Floating Icon - Octahedron
         const iconGeo = new THREE.OctahedronGeometry(0.3);
         const iconMat = new THREE.MeshStandardMaterial({ 
-            color: 0xd4af37,
-            emissive: 0xc5a028,
+            color: 0x60a5fa, 
+            emissive: 0x3b82f6, 
             emissiveIntensity: 0.5,
             transparent: true,
             opacity: 0.8
@@ -2398,7 +2398,7 @@ function createModulePlacement(data) {
         // Light beam/Glow
         const beamGeo = new THREE.CylinderGeometry(0.3, 0.3, 1, 32, 1, true);
         const beamMat = new THREE.MeshBasicMaterial({ 
-            color: 0xd4af37,
+            color: 0x60a5fa, 
             transparent: true, 
             opacity: 0.2, 
             side: THREE.DoubleSide 
@@ -2702,24 +2702,24 @@ function createPlacementBadge(parentGroup) {
         const isMaster = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
         
         let label = moduleTitle || (isMaster ? 'Sem Módulo' : 'Interativo');
-        let color = '#d4af37'; // Default blue
+        let color = '#3b82f6'; // Default blue
 
         if (status === 'DRAFT') { 
-            color = '#6b7280';
+            color = '#f59e0b'; 
             if (isMaster) label = `[Rascunho] ${moduleTitle || ''}`.trim();
         }
         else if (status === 'PUBLISHED') { 
-            color = '#9ca3af';
+            color = '#10b981'; 
         }
         else if (status === 'ARCHIVED') { 
-            color = '#374151';
+            color = '#ef4444'; 
             if (isMaster) label = `[Arquivado] ${moduleTitle || ''}`.trim();
         }
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         // Background capsule
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
         roundRect(ctx, 5, 10, 246, 44, 22, true);
         
         // Dot
@@ -2729,7 +2729,7 @@ function createPlacementBadge(parentGroup) {
         ctx.fill();
 
         // Text (with basic truncation if too long)
-        ctx.fillStyle = '#111827';
+        ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 18px Inter, sans-serif';
         const displayLabel = label.length > 20 ? label.substring(0, 17) + '...' : label;
         ctx.fillText(displayLabel, 40, 40);
@@ -3079,7 +3079,7 @@ function renderModuleQuiz(quizzes) {
         quizBox.style.borderRadius = '12px';
         quizBox.style.background = 'rgba(255,255,255,0.05)';
         
-        quizBox.innerHTML = `<h3 style="color: var(--accent-color); margin-bottom: 15px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px;">${quiz.title}</h3>`;
+        quizBox.innerHTML = `<h3 style="color: var(--accent-color); margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">${quiz.title}</h3>`;
         
         quiz.questions.forEach((q, qIdx) => {
             const qDiv = document.createElement('div');
@@ -3183,10 +3183,10 @@ function renderModuleReports(module) {
         container.innerHTML = `
             <div style="padding: 20px; text-align: center;">
                 <p style="color: #94a3b8;">Seu progresso neste módulo será exibido aqui em breve.</p>
-                <div style="margin-top: 20px; height: 10px; background: rgba(0,0,0,0.1); border-radius: 5px; overflow: hidden;">
-                    <div style="width: 30%; height: 100%; background: #e0c068;"></div>
+                <div style="margin-top: 20px; height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden;">
+                    <div style="width: 30%; height: 100%; background: #60a5fa;"></div>
                 </div>
-                <p style="font-size: 0.75rem; margin-top: 10px; color: #e0c068;">30% Concluído</p>
+                <p style="font-size: 0.75rem; margin-top: 10px; color: #60a5fa;">30% Concluído</p>
             </div>
         `;
     }
@@ -3420,7 +3420,7 @@ btnMute.onclick = () => {
     const enabled = localStream.getAudioTracks()[0].enabled;
     localStream.getAudioTracks()[0].enabled = !enabled;
     btnMute.innerText = !enabled ? '🎤' : '🔇';
-    btnMute.style.background = !enabled ? 'rgba(255, 255, 255, 0.1)' : '#374151';
+    btnMute.style.background = !enabled ? 'rgba(255, 255, 255, 0.1)' : '#ef4444';
 };
 
 btnCamera.onclick = async () => {
@@ -3522,8 +3522,8 @@ async function showAssetModal(username) {
         }
     } catch (err) {
         console.error("Error fetching assets:", err);
-        assetListBody.innerHTML = `<tr><td colspan="2" style="color: #374151; text-align:center; padding:20px;">Erro: ${err.message}</td></tr>`;
-        assetGridContainer.innerHTML = `<div style="color: #374151; padding: 2rem;">Erro: ${err.message}</div>`;
+        assetListBody.innerHTML = `<tr><td colspan="2" style="color: #ef4444; text-align:center; padding:20px;">Erro: ${err.message}</td></tr>`;
+        assetGridContainer.innerHTML = `<div style="color: #ef4444; padding: 2rem;">Erro: ${err.message}</div>`;
     }
 }
 
@@ -3606,8 +3606,8 @@ async function loadSelfAssets() {
         currentLoadedAssets = data.documents || [];
         renderCurrentTab();
     } catch (err) {
-        assetListBody.innerHTML = `<tr><td colspan="3" style="color: #374151;">Erro: ${err.message}</td></tr>`;
-        assetGridContainer.innerHTML = `<div style="color: #374151; padding: 2rem;">Erro: ${err.message}</div>`;
+        assetListBody.innerHTML = `<tr><td colspan="3" style="color: #ef4444;">Erro: ${err.message}</td></tr>`;
+        assetGridContainer.innerHTML = `<div style="color: #ef4444; padding: 2rem;">Erro: ${err.message}</div>`;
     }
 }
 
