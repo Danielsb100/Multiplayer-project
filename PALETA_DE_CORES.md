@@ -79,3 +79,17 @@ Aqui estão as cores extraídas do código-fonte (CSS e JS):
 - `0x222222` (equivale a `#222222`) <span style="display:inline-block; width:20px; height:20px; background-color:#222222; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
 - `0x60a5fa` (equivale a `#60a5fa`) <span style="display:inline-block; width:20px; height:20px; background-color:#60a5fa; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
 - `0x3b82f6` (equivale a `#3b82f6`) <span style="display:inline-block; width:20px; height:20px; background-color:#3b82f6; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
+
+## Escala de Cinza (Grayscale Palette)
+
+- `#000000` <span style="display:inline-block; width:20px; height:20px; background-color:#000000; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
+- `#1a1a1a` <span style="display:inline-block; width:20px; height:20px; background-color:#1a1a1a; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
+- `#333333` <span style="display:inline-block; width:20px; height:20px; background-color:#333333; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
+- `#4d4d4d` <span style="display:inline-block; width:20px; height:20px; background-color:#4d4d4d; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
+- `#666666` <span style="display:inline-block; width:20px; height:20px; background-color:#666666; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
+- `#808080` <span style="display:inline-block; width:20px; height:20px; background-color:#808080; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
+- `#999999` <span style="display:inline-block; width:20px; height:20px; background-color:#999999; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
+- `#b3b3b3` <span style="display:inline-block; width:20px; height:20px; background-color:#b3b3b3; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
+- `#cccccc` <span style="display:inline-block; width:20px; height:20px; background-color:#cccccc; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
+- `#e6e6e6` <span style="display:inline-block; width:20px; height:20px; background-color:#e6e6e6; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
+- `#ffffff` <span style="display:inline-block; width:20px; height:20px; background-color:#ffffff; border:1px solid #ccc; vertical-align:middle; margin-left:5px;"></span>
