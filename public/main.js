@@ -356,7 +356,7 @@ async function handleRegister() {
         registerBtn.disabled = true;
         registerBtn.innerText = 'Criando conta...';
 
-        const response = await fetch(`${AUTH_API}/api/auth/register`, {
+        const response = await fetch(`${AUTH_API}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, email, password })
@@ -366,7 +366,7 @@ async function handleRegister() {
         if (!response.ok) throw new Error(data.error || 'Erro no registro');
 
         // Post-register: clear inputs and switch to login with a success message
-        alert('Conta criada com sucesso! Faça login para entrar.');
+        alert('Conta criada com sucesso! Verifique seu email ou tente fazer login.');
         regUsernameInput.value = '';
         regEmailInput.value = '';
         regPasswordInput.value = '';
