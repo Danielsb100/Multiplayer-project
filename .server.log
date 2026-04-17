@@ -1,0 +1,97 @@
+
+> threejs-viewer@1.0.0 start
+> node server.js
+
+========================================
+SERVER STARTING UP
+Time: 2026-04-17T14:06:19.758Z
+Port: 3001
+Binding: 0.0.0.0
+========================================
+[2026-04-17T14:06:30.653Z] GET /app-config.js
+[2026-04-17T14:07:21.336Z] GET /app-config.js
+[2026-04-17T14:10:56.531Z] GET /app-config.js
+[2026-04-17T14:11:29.090Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6OSwidXNlcm5hbWUiOiJpZGVudGl0eTIwMjYwNDE3MTQwNzIxIiwiZW1haWwiOiJpZGVudGl0eTIwMjYwNDE3MTQwNzIxQGV4YW1wbGUuY29tIiwicm9sZSI6IlVTRVIiLCJsZWdhY3lSb2xlIjoiVVNFUiIsInJvbGVzIjpbIlRVVE9SIiwiU1RVREVOVCJdLCJwcmltYXJ5Um9sZSI6IlRVVE9SIiwiaWF0IjoxNzc2NDM0OTI0LCJleHAiOjE3NzY1MjEzMjR9.UeKLMOnC1A35Wmg3zV2EWu2SB6jZ1-RXIDTDCso2b68
+[2026-04-17T14:11:29.119Z] GET /styles.css
+[2026-04-17T14:11:29.148Z] GET /app-config.js?v=1
+[2026-04-17T14:11:29.150Z] GET /main.js?v=1.3.2
+[2026-04-17T14:11:30.294Z] GET /api/catalog
+[2026-04-17T14:11:30.339Z] GET /assets/maps/map/map.glb
+[2026-04-17T14:11:30.472Z] GET /favicon.ico
+[2026-04-17T14:11:30.505Z] GET /assets/character/player.glb?v=1776435090486
+[2026-04-17T14:11:30.804Z] GET /favicon.ico
+User connected: FZofe2wuOJyCzX6ZAAAB
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player Identity Test User (FZofe2wuOJyCzX6ZAAAB) at: { x: 0, y: 0, z: 0 }
+User disconnected: FZofe2wuOJyCzX6ZAAAB

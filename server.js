@@ -4,6 +4,15 @@ const { Server } = require('socket.io');
 const fs = require('fs');
 const path = require('path');
 
+const DEFAULT_PRODUCTION_AUTH_API_URL = 'https://login-system-production-84c6.up.railway.app';
+const DEFAULT_LOCAL_AUTH_API_URL = 'http://127.0.0.1:3000';
+const DEFAULT_AUTH_API_URL =
+    process.env.NODE_ENV === 'production'
+        ? DEFAULT_PRODUCTION_AUTH_API_URL
+        : DEFAULT_LOCAL_AUTH_API_URL;
+const AUTH_API_URL = process.env.AUTH_API_URL || DEFAULT_AUTH_API_URL;
+const PUBLIC_LOGIN_URL = process.env.PUBLIC_LOGIN_URL || AUTH_API_URL;
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -81,6 +90,17 @@ app.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
 
+app.get('/app-config.js', (req, res) => {
+    const runtimeConfig = {
+        authApiUrl: AUTH_API_URL,
+        loginAppUrl: PUBLIC_LOGIN_URL
+    };
+
+    res.type('application/javascript');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(`window.__APP_CONFIG__ = Object.freeze(${JSON.stringify(runtimeConfig)});`);
+});
+
 // Serve static files from the 'public' directory
 app.use(express.static('public'));
 
@@ -113,12 +133,12 @@ io.use(async (socket, next) => {
   // Check cache first
   const cached = tokenCache.get(token);
   if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-    socket.decoded = cached.data;
+    socket.identity = cached.data;
     return next();
   }
 
   try {
-    const response = await fetch('https://login-system-production-84c6.up.railway.app/auth/verify', {
+    const response = await fetch(`${AUTH_API_URL}/auth/verify`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -131,13 +151,17 @@ io.use(async (socket, next) => {
       return next(new Error('Invalid token'));
     }
 
-    // Cache the result
+    const identity = result.user;
+    if (!identity) {
+      return next(new Error('Invalid token payload'));
+    }
+
     tokenCache.set(token, {
-      data: result,
+      data: identity,
       timestamp: Date.now()
     });
 
-    socket.decoded = result;
+    socket.identity = identity;
     next();
   } catch (err) {
     console.error('Auth verification error:', err);
@@ -147,11 +171,21 @@ io.use(async (socket, next) => {
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
+    const identity = socket.identity || {};
+    const displayName = identity.displayName || identity.username || ('Guest_' + Math.floor(Math.random() * 1000));
 
     // Create a new player
     players[socket.id] = {
         id: socket.id,
-        name: 'Guest_' + Math.floor(Math.random() * 1000),
+        userId: identity.id || null,
+        username: identity.username || null,
+        displayName,
+        name: displayName,
+        headline: identity.headline || '',
+        primaryRole: identity.primaryRole || identity.role || 'USER',
+        legacyRole: identity.legacyRole || identity.role || 'USER',
+        roles: Array.isArray(identity.roles) ? identity.roles : [identity.primaryRole || identity.role || 'USER'],
+        profilePicture: identity.profilePicture || null,
         color: '#3b82f6', // Default color
         position: { x: 0, y: 0, z: 0 },
         rotation: { x: 0, y: 0, z: 0 },
@@ -175,8 +209,10 @@ io.on('connection', (socket) => {
         if (players[socket.id]) {
             if (typeof data === 'string') {
                 players[socket.id].name = data;
+                players[socket.id].displayName = data;
             } else {
                 players[socket.id].name = data.name;
+                players[socket.id].displayName = data.displayName || data.name;
                 players[socket.id].color = data.color;
                 if (data.profilePicture) players[socket.id].profilePicture = data.profilePicture;
             }
@@ -324,8 +360,8 @@ io.on('connection', (socket) => {
             status: data.status || 'NONE',
             position: data.position,
             rotation: data.rotation || { x: 0, y: 0, z: 0 },
-            ownerMasterId: socket.decoded?.id,
-            ownerUsername: socket.decoded?.username
+            ownerMasterId: socket.identity?.id,
+            ownerUsername: socket.identity?.username
         };
         placedModulePlacements.push(newPlacement);
         io.emit('modulePlacementAdded', newPlacement);

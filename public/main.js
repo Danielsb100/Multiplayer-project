@@ -13,13 +13,27 @@ let socket = null;
 let localUsername = '';
 let localProfilePicture = null;
 let authToken = '';
-let localUserRole = 'USER'; // New: Store user role
+let localUserId = null;
+let localUserRole = 'USER';
+let localLegacyRole = 'USER';
+let localUserRoles = ['USER'];
+const APP_CONFIG = window.__APP_CONFIG__ || {};
 const loginScreen = document.getElementById('login-screen');
 const joinBtn = document.getElementById('join-btn');
 const emailInput = document.getElementById('email-input');
 const passwordInput = document.getElementById('password-input');
 const loginError = document.getElementById('login-error');
-const AUTH_API = 'https://login-system-production-84c6.up.railway.app';
+const createAccountLink = document.getElementById('create-account-link');
+const DEFAULT_LOCAL_AUTH_API_URL =
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://127.0.0.1:3000'
+        : 'https://login-system-production-84c6.up.railway.app';
+const AUTH_API = APP_CONFIG.authApiUrl || DEFAULT_LOCAL_AUTH_API_URL;
+const LOGIN_APP_URL = APP_CONFIG.loginAppUrl || AUTH_API;
+
+if (createAccountLink) {
+    createAccountLink.href = `${LOGIN_APP_URL}/`;
+}
 
 // Auth Elements
 const authTabs = document.querySelector('.auth-tabs');
@@ -129,6 +143,7 @@ const closeCatalogBtn = document.getElementById('close-catalog');
 const playerActionMenu = document.getElementById('player-action-menu');
 const actionMenuName = document.getElementById('action-menu-name');
 const btnCallPlayer = document.getElementById('btn-call-player');
+const btnViewProfile = document.getElementById('btn-view-profile');
 const btnViewAssets = document.getElementById('btn-view-assets');
 
 const assetModalOverlay = document.getElementById('asset-modal-overlay');
@@ -145,6 +160,9 @@ const tabBtns = document.querySelectorAll('.tab-btn');
 const closeAssetModalBtn = document.getElementById('close-asset-modal');
 const btnUploadAsset = document.getElementById('btn-upload-asset');
 const selfAssetUploadInput = document.getElementById('self-asset-upload');
+const profileCardOverlay = document.getElementById('profile-card-overlay');
+const profileCardContent = document.getElementById('profile-card-content');
+const closeProfileCardBtn = document.getElementById('close-profile-card');
 
 let currentAssetTab = 'image';
 let currentLoadedAssets = [];
@@ -152,8 +170,22 @@ let isSelfModal = false;
 
 let selectedPlayerForAction = null;
 let selectedPlayerPeerId = null;
+let selectedPlayerForActionData = null;
 // Char catalog button removed
 const menuCatalogModels = document.getElementById('menu-catalog-models');
+
+function formatRoleLabel(role) {
+    return String(role || 'GUEST')
+        .toLowerCase()
+        .split('_')
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+}
+
+function hasWorldManagementRole() {
+    const userRoles = new Set([localUserRole, localLegacyRole, ...localUserRoles].filter(Boolean));
+    return ['MASTER', 'ADMIN', 'SUPER_ADMIN', 'TEACHER', 'COORDINATOR'].some(role => userRoles.has(role));
+}
 
 // Fetch catalog data immediately via HTTP
 fetch('/api/catalog')
@@ -261,9 +293,12 @@ async function performJoin(token, user) {
     if (socket && socket.connected) return;
 
     authToken = token;
-    localUsername = user?.username || "Guest";
+    localUserId = user?.id || null;
+    localUsername = user?.displayName || user?.username || "Guest";
     localProfilePicture = user?.profilePicture || null;
-    localUserRole = user?.role || 'USER';
+    localUserRole = user?.primaryRole || user?.role || 'USER';
+    localLegacyRole = user?.legacyRole || user?.role || 'USER';
+    localUserRoles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [localUserRole];
 
     // Initialize socket with the received token
     // @ts-ignore
@@ -275,7 +310,12 @@ async function performJoin(token, user) {
     setupSocketListeners();
 
     // Emit initial user data
-    socket.emit('setName', { name: localUsername, color: localUserColor, profilePicture: localProfilePicture });
+    socket.emit('setName', {
+        name: localUsername,
+        displayName: localUsername,
+        color: localUserColor,
+        profilePicture: localProfilePicture
+    });
 
     // Load the static player character directly
     const playerModelPath = 'assets/character/player.glb?v=' + Date.now();
@@ -356,7 +396,7 @@ async function handleRegister() {
         registerBtn.disabled = true;
         registerBtn.innerText = 'Criando conta...';
 
-        const response = await fetch(`${AUTH_API}/api/auth/register`, {
+        const response = await fetch(`${AUTH_API}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, email, password })
@@ -366,7 +406,12 @@ async function handleRegister() {
         if (!response.ok) throw new Error(data.error || 'Erro no registro');
 
         // Post-register: clear inputs and switch to login with a success message
-        alert('Conta criada com sucesso! Faça login para entrar.');
+        const verificationHint = data.debugVerificationCode
+            ? ` Código local de teste: ${data.debugVerificationCode}`
+            : '';
+        alert(data.needsVerification
+            ? `Conta criada com sucesso! Verifique o email antes de entrar.${verificationHint}`
+            : 'Conta criada com sucesso! Faça login para entrar.');
         regUsernameInput.value = '';
         regEmailInput.value = '';
         regPasswordInput.value = '';
@@ -447,7 +492,16 @@ function setupSocketListeners() {
         createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false, playerInfo.profilePicture);
         if (remotePlayers[playerInfo.id]) {
             remotePlayers[playerInfo.id].name = playerInfo.name;
+            remotePlayers[playerInfo.id].displayName = playerInfo.displayName || playerInfo.name;
             remotePlayers[playerInfo.id].color = playerInfo.color;
+            remotePlayers[playerInfo.id].profilePicture = playerInfo.profilePicture || remotePlayers[playerInfo.id].profilePicture;
+            remotePlayers[playerInfo.id].headline = playerInfo.headline || remotePlayers[playerInfo.id].headline;
+            remotePlayers[playerInfo.id].primaryRole = playerInfo.primaryRole || remotePlayers[playerInfo.id].primaryRole;
+            remotePlayers[playerInfo.id].legacyRole = playerInfo.legacyRole || remotePlayers[playerInfo.id].legacyRole;
+            remotePlayers[playerInfo.id].roles = Array.isArray(playerInfo.roles) && playerInfo.roles.length
+                ? playerInfo.roles
+                : remotePlayers[playerInfo.id].roles;
+            remotePlayers[playerInfo.id].userId = playerInfo.userId || remotePlayers[playerInfo.id].userId;
             if (remotePlayers[playerInfo.id].mainMesh) {
                 applyCharacterColor(remotePlayers[playerInfo.id].mainMesh, playerInfo.color);
             }
@@ -941,7 +995,7 @@ function updatePlayerList() {
     // 2. Add Others
     for (const id in remotePlayers) {
         const player = remotePlayers[id];
-        let name = player.name || 'Desconhecido';
+        let name = player.displayName || player.name || 'Desconhecido';
 
         // Final fallback: if state name is Guest or Desconhecido, check gametag
         if ((!player.name || player.name.includes('Guest')) && gametags[id]) {
@@ -961,13 +1015,15 @@ function updatePlayerList() {
         infoDiv.innerHTML = `
             <div class="player-status-dot" style="background: ${player.peerId ? '#10b981' : '#64748b'}"></div>
             <span class="player-name">${name}</span>
+            <span style="font-size: 0.7rem; color: #94a3b8; margin-left: 5px;">${formatRoleLabel(player.primaryRole || player.legacyRole || 'USER')}</span>
             ${!player.peerId ? '<span style="font-size: 0.7rem; color: #94a3b8; margin-left: 5px;">(sem voz)</span>' : ''}
         `;
 
         infoDiv.addEventListener('click', (e) => {
             e.stopPropagation();
             selectedPlayerPeerId = player.peerId; // Track peerId for the menu
-            showPlayerActionMenu(name, e);
+            selectedPlayerForActionData = { id, ...player, name };
+            showPlayerActionMenu(player, e);
         });
 
         playerDiv.appendChild(infoDiv);
@@ -1089,12 +1145,20 @@ function addOtherPlayer(playerInfo) {
     avatarContainer.add(avatar.group);
 
     remotePlayers[playerInfo.id] = {
+        userId: playerInfo.userId || null,
+        username: playerInfo.username || null,
+        displayName: playerInfo.displayName || playerInfo.name,
+        headline: playerInfo.headline || '',
+        primaryRole: playerInfo.primaryRole || playerInfo.role || 'USER',
+        legacyRole: playerInfo.legacyRole || playerInfo.role || 'USER',
+        roles: Array.isArray(playerInfo.roles) && playerInfo.roles.length ? playerInfo.roles : [playerInfo.primaryRole || playerInfo.role || 'USER'],
         name: playerInfo.name,       // Store real name or Guest
         group: anchorGroup,          // anchor: use this for position/rotation from network
         avatarContainer: avatarContainer, // visual container: use this for model loading
         mainMesh: avatar.bodyMesh,
         color: playerInfo.color,
         peerId: playerInfo.peerId || null, // FIX: Store PeerJS ID for audio calls
+        profilePicture: playerInfo.profilePicture || null,
         // --- Interpolation Targets ---
         targetPosition: anchorGroup.position.clone(),
         targetRotation: anchorGroup.rotation.clone(),
@@ -1345,7 +1409,7 @@ window.addEventListener('contextmenu', (event) => {
                 menuGroundSection.classList.remove('hidden');
                 
                 // Role-based visibility for Module Placement
-                if (localUserRole === 'MASTER' || localUserRole === 'ADMIN') {
+                if (hasWorldManagementRole()) {
                     menuPlaceModule.classList.remove('hidden');
                     menuPlaceModule.style.display = 'block';
                 } else {
@@ -1360,7 +1424,7 @@ window.addEventListener('contextmenu', (event) => {
                     menuModelSection.classList.remove('hidden');
                 } else if (contextMenuTarget.userData.isPlacement) {
                     // Show assignment/delete only for MASTERs
-                    if (localUserRole === 'MASTER' || localUserRole === 'ADMIN') {
+                    if (hasWorldManagementRole()) {
                         menuPlacementSection.classList.remove('hidden');
                     }
                 }
@@ -2621,7 +2685,7 @@ moduleTabBtns.forEach(btn => {
 });
 
 async function openModuleSidebar(placementId, moduleId) {
-    const isOwner = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
+    const isOwner = hasWorldManagementRole();
     
     if (!moduleId) {
         if (isOwner) {
@@ -2699,7 +2763,7 @@ function createPlacementBadge(parentGroup) {
 
     const updateBadge = () => {
         const { status, moduleTitle } = parentGroup.userData;
-        const isMaster = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
+        const isMaster = hasWorldManagementRole();
         
         let label = moduleTitle || (isMaster ? 'Sem Módulo' : 'Interativo');
         let color = '#3b82f6'; // Default blue
@@ -3152,7 +3216,7 @@ function renderModuleForum(moduleId) {
     container.innerHTML = `
         <div style="text-align: center; padding: 40px 20px;">
             <p style="color: #94a3b8; margin-bottom: 20px;">Participe das discussões deste módulo.</p>
-            <button class="upload-btn" onclick="window.open('${AUTH_API.replace('api', '')}', '_blank')">Abrir Fórum</button>
+            <button class="upload-btn" onclick="window.open('${LOGIN_APP_URL}/', '_blank')">Abrir Fórum</button>
         </div>
     `;
 }
@@ -3160,7 +3224,7 @@ function renderModuleForum(moduleId) {
 function renderModuleReports(module) {
     const container = document.getElementById('module-reports-container');
     if (!container) return;
-    const isMaster = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
+    const isMaster = hasWorldManagementRole();
 
     if (isMaster) {
         container.innerHTML = `
@@ -3176,7 +3240,7 @@ function renderModuleReports(module) {
                         <div style="font-size: 1.5rem; font-weight: bold;">--</div>
                     </div>
                 </div>
-                <button class="upload-btn" style="width: 100%;" onclick="window.open('${AUTH_API.replace('api', '')}/dashboard', '_blank')">Ver Relatórios Completos</button>
+                <button class="upload-btn" style="width: 100%;" onclick="window.open('${LOGIN_APP_URL}/dashboard.html', '_blank')">Ver Relatórios Completos</button>
             </div>
         `;
     } else {
@@ -3463,9 +3527,10 @@ btnCamera.onclick = async () => {
 
 // --- Player Interaction Menu & Asset Modal ---
 
-function showPlayerActionMenu(username, event) {
-    selectedPlayerForAction = username;
-    actionMenuName.innerText = username;
+function showPlayerActionMenu(player, event) {
+    selectedPlayerForAction = player.username || player.name || player.displayName || 'Player';
+    selectedPlayerForActionData = player;
+    actionMenuName.innerText = player.displayName || player.name || player.username || 'Player';
 
     playerActionMenu.style.left = event.clientX + 'px';
     playerActionMenu.style.top = event.clientY + 'px';
@@ -3487,9 +3552,97 @@ btnCallPlayer.addEventListener('click', () => {
     }
 });
 
+if (btnViewProfile) {
+    btnViewProfile.addEventListener('click', async () => {
+        if (!selectedPlayerForActionData?.userId) {
+            alert('Este perfil ainda não está disponível.');
+            return;
+        }
+
+        try {
+            profileCardOverlay.classList.remove('hidden');
+            profileCardContent.innerHTML = '<div class="identity-empty">Carregando perfil...</div>';
+
+            const response = await fetch(`${AUTH_API}/api/users/${selectedPlayerForActionData.userId}/profile-card`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Falha ao carregar perfil.');
+
+            const profileCard = result.profileCard;
+            const roles = Array.isArray(profileCard.roles) ? profileCard.roles : [];
+            const roleMarkup = roles.length
+                ? roles.map(role => `<span class="profile-chip">${formatRoleLabel(role)}</span>`).join('')
+                : `<span class="profile-chip">${formatRoleLabel(profileCard.primaryRole)}</span>`;
+            const portfolioMarkup = (profileCard.portfolio || []).length
+                ? profileCard.portfolio.map(item => `
+                    <div class="profile-card-portfolio-item">
+                        <strong>${item.title}</strong>
+                        <div style="color: var(--text-secondary); font-size: 0.82rem; margin-top: 0.35rem;">${item.description || 'Sem descrição.'}</div>
+                        ${item.url ? `<a href="${item.url}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 0.65rem;">${item.url}</a>` : ''}
+                    </div>
+                `).join('')
+                : '<div class="identity-empty">Nenhum item público de portfólio.</div>';
+
+            const avatarUrl = profileCard.profilePicture
+                ? (profileCard.profilePicture.startsWith('http') ? profileCard.profilePicture : `${AUTH_API}${profileCard.profilePicture}`)
+                : `https://ui-avatars.com/api/?name=${encodeURIComponent(profileCard.displayName || profileCard.username)}&background=random`;
+
+            profileCardContent.innerHTML = `
+                <div class="profile-card-hero">
+                    <img src="${avatarUrl}" alt="Avatar">
+                    <div>
+                        <h3 style="margin: 0 0 0.35rem;">${profileCard.displayName || profileCard.username}</h3>
+                        <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">${profileCard.headline || 'Sem headline cadastrada.'}</div>
+                        <div class="profile-card-roles">${roleMarkup}</div>
+                    </div>
+                </div>
+                <div class="profile-card-grid">
+                    <div class="profile-card-block">
+                        <strong>Bio</strong>
+                        <div>${profileCard.bio || profileCard.message || 'Sem bio disponível.'}</div>
+                    </div>
+                    <div class="profile-card-block">
+                        <strong>Contexto</strong>
+                        <div>${profileCard.organization || 'Organização não informada'}</div>
+                        <div>${profileCard.course || 'Trilha não informada'}</div>
+                        <div>${profileCard.location || 'Localização não informada'}</div>
+                    </div>
+                </div>
+                <div class="profile-card-block">
+                    <strong>Interesses</strong>
+                    <div>${(profileCard.interests || []).length ? profileCard.interests.join(', ') : 'Nenhum interesse público cadastrado.'}</div>
+                </div>
+                <div class="profile-card-block">
+                    <strong>Portfólio</strong>
+                    <div class="profile-card-portfolio">${portfolioMarkup}</div>
+                </div>
+            `;
+        } catch (error) {
+            profileCardContent.innerHTML = `<div class="identity-empty" style="color:#ef4444;">${error.message}</div>`;
+        }
+    });
+}
+
 btnViewAssets.addEventListener('click', () => {
     showAssetModal(selectedPlayerForAction);
 });
+
+if (closeProfileCardBtn) {
+    closeProfileCardBtn.addEventListener('click', () => {
+        profileCardOverlay.classList.add('hidden');
+    });
+}
+
+if (profileCardOverlay) {
+    profileCardOverlay.addEventListener('click', (event) => {
+        if (event.target === profileCardOverlay) {
+            profileCardOverlay.classList.add('hidden');
+        }
+    });
+}
 
 async function showAssetModal(username) {
     console.log("Attempting to fetch assets for username:", username);
