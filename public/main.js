@@ -19,7 +19,7 @@ const joinBtn = document.getElementById('join-btn');
 const emailInput = document.getElementById('email-input');
 const passwordInput = document.getElementById('password-input');
 const loginError = document.getElementById('login-error');
-const AUTH_API = 'https://login-system-production-84c6.up.railway.app';
+let AUTH_API = 'https://login-system-production-84c6.up.railway.app';
 
 // Auth Elements
 const authTabs = document.querySelector('.auth-tabs');
@@ -337,8 +337,24 @@ async function checkAutoLogin() {
     }
 }
 
-// Call auto-login check on start
-checkAutoLogin();
+// Fetch dynamic config from server on start
+fetch('/api/config')
+    .then(res => res.json())
+    .then(data => {
+        if (data.LOGIN_SYSTEM_URL) {
+            AUTH_API = data.LOGIN_SYSTEM_URL;
+        }
+        const registerLink = document.getElementById('register-link');
+        if (registerLink) {
+            registerLink.href = AUTH_API; // Set the href dynamically
+        }
+        // Call auto-login check on start
+        checkAutoLogin();
+    })
+    .catch(err => {
+        console.error("Failed to load config, falling back to default.", err);
+        checkAutoLogin();
+    });
 
 // --- Handle Register ---
 async function handleRegister() {

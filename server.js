@@ -101,6 +101,13 @@ app.get('/api/catalog', (req, res) => {
     });
 });
 
+// Expose configuration variables to the frontend
+app.get('/api/config', (req, res) => {
+    res.json({
+        LOGIN_SYSTEM_URL: process.env.LOGIN_SYSTEM_URL || 'https://login-system-production-84c6.up.railway.app'
+    });
+});
+
 // Setup socket authentication middleware
 // --- Auth Caching ---
 const tokenCache = new Map();
