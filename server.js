@@ -118,7 +118,8 @@ io.use(async (socket, next) => {
   }
 
   try {
-    const response = await fetch('https://login-system-production-84c6.up.railway.app/auth/verify', {
+    const loginSystemUrl = process.env.LOGIN_SYSTEM_URL || 'https://login-system-production-84c6.up.railway.app';
+    const response = await fetch(`${loginSystemUrl}/auth/verify`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`
