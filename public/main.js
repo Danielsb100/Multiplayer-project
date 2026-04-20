@@ -213,9 +213,77 @@ const localVideo = document.getElementById('local-video');
 // Player List DOM
 const playerListContainer = document.getElementById('player-list-container');
 const playerListContent = document.getElementById('player-list-content');
+const worldOperationsCard = document.getElementById('world-operations-card');
+const worldOperationsUnread = document.getElementById('world-operations-unread');
+const worldOperationsUrgent = document.getElementById('world-operations-urgent');
+const worldOperationsList = document.getElementById('world-operations-list');
+const worldOperationsLink = document.getElementById('world-operations-link');
+let worldOperationsRefreshTimer = null;
 
 function isOverUI(event) {
     return event.target.closest('.ui-layer') || event.target.closest('.context-menu');
+}
+
+function escapeWorldHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderWorldOperationsSummary(summary) {
+    if (!worldOperationsCard || !worldOperationsList || !summary?.counts) return;
+
+    const hasPending = summary.counts.unread > 0 || summary.counts.totalPending > 0 || summary.counts.remindersOpen > 0;
+    worldOperationsCard.classList.toggle('hidden', !hasPending);
+    if (!hasPending) return;
+
+    worldOperationsUnread.textContent = `${summary.counts.unread} não lidas`;
+    worldOperationsUrgent.textContent = `${summary.counts.urgent} urgências`;
+    if (worldOperationsLink) {
+        worldOperationsLink.href = `${AUTH_API}/dashboard.html`;
+    }
+
+    const highlightedItems = [
+        ...(summary.operational?.urgent || []),
+        ...(summary.operational?.today || []),
+        ...(summary.inbox || []).filter((item) => item.status === 'UNREAD')
+    ].slice(0, 3);
+
+    if (!highlightedItems.length) {
+        worldOperationsList.innerHTML = '<li class="world-operations-empty">Sem pendências no momento.</li>';
+        return;
+    }
+
+    worldOperationsList.innerHTML = highlightedItems.map((item) => `
+        <li class="world-operations-item">
+            <strong>${escapeWorldHtml(item.title || 'Pendência operacional')}</strong>
+            <span>${escapeWorldHtml(item.summary || item.message || 'Abra o dashboard para acompanhar os detalhes.')}</span>
+        </li>
+    `).join('');
+}
+
+async function refreshWorldOperationsSummary() {
+    if (!authToken || !AUTH_API) return;
+
+    try {
+        const response = await fetch(`${AUTH_API}/api/notifications/summary`, {
+            headers: {
+                Authorization: `Bearer ${authToken}`
+            }
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Falha ao carregar resumo operacional');
+        }
+
+        renderWorldOperationsSummary(result);
+    } catch (error) {
+        console.error('Failed to refresh world operations summary:', error);
+    }
 }
 
 
@@ -295,6 +363,9 @@ async function performJoin(token, user) {
 
     playerListContainer.classList.remove('hidden');
     updatePlayerList();
+    await refreshWorldOperationsSummary();
+    if (worldOperationsRefreshTimer) clearInterval(worldOperationsRefreshTimer);
+    worldOperationsRefreshTimer = setInterval(refreshWorldOperationsSummary, 60000);
     
     if (document.activeElement) document.activeElement.blur();
     window.focus();
