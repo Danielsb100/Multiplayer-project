@@ -20,6 +20,8 @@ const emailInput = document.getElementById('email-input');
 const passwordInput = document.getElementById('password-input');
 const loginError = document.getElementById('login-error');
 let AUTH_API = 'https://login-system-production-84c6.up.railway.app';
+const COURSE_ID_FROM_URL = Number(new URLSearchParams(window.location.search).get('courseId')) || null;
+window.__courseWorldContext = { courseId: COURSE_ID_FROM_URL, runtime: null };
 
 // Auth Elements
 const authTabs = document.querySelector('.auth-tabs');
@@ -240,8 +242,8 @@ function renderWorldOperationsSummary(summary) {
     worldOperationsCard.classList.toggle('hidden', !hasPending);
     if (!hasPending) return;
 
-    worldOperationsUnread.textContent = `${summary.counts.unread} não lidas`;
-    worldOperationsUrgent.textContent = `${summary.counts.urgent} urgências`;
+    worldOperationsUnread.textContent = `${summary.counts.unread} unread`;
+    worldOperationsUrgent.textContent = `${summary.counts.urgent} urgent`;
     if (worldOperationsLink) {
         worldOperationsLink.href = `${AUTH_API}/dashboard.html`;
     }
@@ -253,14 +255,14 @@ function renderWorldOperationsSummary(summary) {
     ].slice(0, 3);
 
     if (!highlightedItems.length) {
-        worldOperationsList.innerHTML = '<li class="world-operations-empty">Sem pendências no momento.</li>';
+        worldOperationsList.innerHTML = '<li class="world-operations-empty">No pending items right now.</li>';
         return;
     }
 
     worldOperationsList.innerHTML = highlightedItems.map((item) => `
         <li class="world-operations-item">
-            <strong>${escapeWorldHtml(item.title || 'Pendência operacional')}</strong>
-            <span>${escapeWorldHtml(item.summary || item.message || 'Abra o dashboard para acompanhar os detalhes.')}</span>
+            <strong>${escapeWorldHtml(item.title || 'Operational item')}</strong>
+            <span>${escapeWorldHtml(item.summary || item.message || 'Open the dashboard to follow the details.')}</span>
         </li>
     `).join('');
 }
@@ -277,7 +279,7 @@ async function refreshWorldOperationsSummary() {
 
         const result = await response.json();
         if (!response.ok) {
-            throw new Error(result.error || 'Falha ao carregar resumo operacional');
+            throw new Error(result.error || 'Failed to load operational summary');
         }
 
         renderWorldOperationsSummary(result);
@@ -318,7 +320,7 @@ joinBtn.addEventListener('click', async () => {
         loginError.innerText = err.message;
         loginError.classList.remove('hidden');
         joinBtn.disabled = false;
-        joinBtn.innerText = "Entrar no Mundo";
+        joinBtn.innerText = "Enter the World";
     }
 });
 
@@ -400,10 +402,10 @@ async function checkAutoLogin() {
             window.history.replaceState({}, document.title, window.location.pathname);
         } catch (err) {
             console.error("Auto-login failed:", err);
-            loginError.innerText = "Sessão expirada. Faça login novamente.";
+            loginError.innerText = "Session expired. Please log in again.";
             loginError.classList.remove('hidden');
             joinBtn.disabled = false;
-            joinBtn.innerText = "Entrar no Mundo";
+            joinBtn.innerText = "Enter the World";
         }
     }
 }
@@ -453,7 +455,7 @@ async function handleRegister() {
         if (!response.ok) throw new Error(data.error || 'Erro no registro');
 
         // Post-register: clear inputs and switch to login with a success message
-        alert('Conta criada com sucesso! Faça login para entrar.');
+        alert('Account created successfully! Log in to enter.');
         regUsernameInput.value = '';
         regEmailInput.value = '';
         regPasswordInput.value = '';
@@ -486,7 +488,7 @@ function setupSocketListeners() {
         loginScreen.classList.remove('hidden');
         playerGroup.visible = false;
         joinBtn.disabled = false;
-        joinBtn.innerText = "Entrar no Mundo";
+        joinBtn.innerText = "Enter the World";
     });
 
     socket.on('currentPlayers', (players) => {
@@ -585,16 +587,21 @@ function setupSocketListeners() {
     });
 
     socket.on('initialModulePlacements', (placements) => {
+        if (COURSE_ID_FROM_URL) {
+            return;
+        }
         if (placements) placements.forEach(p => createModulePlacement(p));
         // Also fetch from DB in case some are not in transient memory
         fetchModulePlacements();
     });
 
     socket.on('modulePlacementAdded', (data) => {
+        if (COURSE_ID_FROM_URL) return;
         createModulePlacement(data);
     });
 
     socket.on('modulePlacementUpdated', (data) => {
+        if (COURSE_ID_FROM_URL) return;
         let obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
         if (!obj) {
             // Fallback: search by id in userData
@@ -609,6 +616,7 @@ function setupSocketListeners() {
     });
 
     socket.on('modulePlacementDeleted', (id) => {
+        if (COURSE_ID_FROM_URL) return;
         const uuid = idToUuid[id];
         let obj = uuid ? scene.getObjectByProperty('uuid', uuid) : null;
         if (!obj) {
@@ -700,7 +708,7 @@ function renderCatalog(type, onSelect) {
 
     if (type === 'characters') catalogTitle.innerText = 'Escolher Avatar';
     else if (type === 'structures') catalogTitle.innerText = 'Elementos de Estrutura';
-    else catalogTitle.innerText = 'Catálogo de Objetos';
+    else catalogTitle.innerText = 'Object Catalog';
 
     catalogData[type].forEach(item => {
         const div = document.createElement('div');
@@ -984,7 +992,7 @@ function createGametag(id, name, color, isLocal, profilePictureUrl = null) {
             if (player && player.peerId) {
                 makeCall(player.peerId, name);
             } else {
-                alert('Jogador ainda não configurou canal de voz.');
+                alert('This player has not configured a voice channel yet.');
             }
         };
         element.querySelector('div > div:nth-child(2)').appendChild(callBtn);
@@ -1014,7 +1022,7 @@ function updatePlayerList() {
     meInfoDiv.innerHTML = `
         <div class="player-status-dot"></div>
         <span class="player-name">${localUsername}</span>
-        <span class="is-me">VOCÊ</span>
+        <span class="is-me">YOU</span>
     `;
 
     meInfoDiv.onclick = (e) => {
@@ -1541,8 +1549,8 @@ placementModelUpload.addEventListener('change', async (e) => {
     if (!file || !contextMenuTarget) return;
 
     const id = contextMenuTarget.userData.id;
-    const idleAnim = prompt("Nome da animação IDLE (opcional):", "idle");
-    const interactedAnim = prompt("Nome da animação INTERAÇÃO (opcional):", "interacted");
+    const idleAnim = prompt("IDLE animation name (optional):", "idle");
+    const interactedAnim = prompt("INTERACTION animation name (optional):", "interacted");
 
     const formData = new FormData();
     formData.append('model', file);
@@ -1675,7 +1683,7 @@ function rotateObject(target, angle) {
     if (checkOverlap(newBox, target.userData.id)) {
         target.rotation.y = oldRotationY;
         target.updateMatrixWorld(true);
-        alert("Não é possível girar: Espaço ocupado!");
+        alert("Cannot rotate: space occupied!");
         return;
     }
 
@@ -1738,7 +1746,11 @@ window.addEventListener('mousedown', (event) => {
                 let root = hit.object;
                 while (root && root !== scene) {
                     if (root.userData && root.userData.isPlacement) {
-                        openModuleSidebar(root.userData.id, root.userData.moduleId);
+                        if (root.userData.isLocked) {
+                            alert('This module is still locked by the course path.');
+                            return;
+                        }
+                        openModuleSidebar(root.userData.id, root.userData.moduleId, root.userData.courseModuleId);
                         
                         // Trigger interacted animation if present
                         const mixerInfo = placementMixers[root.userData.id];
@@ -2445,6 +2457,13 @@ function createPlacedModel(data) {
 }
 
 function createModulePlacement(data) {
+    const existingUuid = idToUuid[data.id];
+    if (existingUuid) {
+        const existing = scene.getObjectByProperty('uuid', existingUuid);
+        if (existing) scene.remove(existing);
+        delete idToUuid[data.id];
+    }
+
     const group = new THREE.Group();
     const modelGroup = new THREE.Group();
     group.add(modelGroup);
@@ -2452,9 +2471,12 @@ function createModulePlacement(data) {
     // Initial state
     group.userData.id = data.id;
     group.userData.moduleId = data.moduleId;
+    group.userData.courseModuleId = data.courseModuleId || null;
     group.userData.moduleTitle = data.moduleTitle || '';
     group.userData.status = data.status || 'NONE'; 
     group.userData.isPlacement = true;
+    group.userData.isLocked = Boolean(data.isLocked);
+    group.userData.isCompleted = Boolean(data.isCompleted);
     group.userData.idleAnimName = data.idleAnim || 'idle';
     group.userData.interactedAnimName = data.interactedAnim || 'interacted';
 
@@ -2707,7 +2729,7 @@ moduleTabBtns.forEach(btn => {
     };
 });
 
-async function openModuleSidebar(placementId, moduleId) {
+async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
     const isOwner = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
     
     if (!moduleId) {
@@ -3208,14 +3230,14 @@ function renderModuleQuiz(quizzes) {
 
                 try {
                     submitBtn.disabled = true;
-                    submitBtn.innerText = 'Enviando...';
+                    submitBtn.innerText = 'Submitting...';
                     const res = await fetch(`${AUTH_API}/modules/${currentModuleId}/quiz/submit`, {
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${authToken}`
                         },
-                        body: JSON.stringify({ answers, source: 'MULTIPLAYER_WORLD' })
+                        body: JSON.stringify({ answers, source: 'MULTIPLAYER_WORLD', courseId: window.__courseWorldContext?.courseId || null })
                     });
                     const result = await res.json();
                     if (!res.ok) throw new Error(result.error || 'Erro ao enviar');
@@ -3280,6 +3302,7 @@ function renderModuleReports(module) {
 }
 
 async function fetchModulePlacements() {
+    if (COURSE_ID_FROM_URL) return;
     try {
         const response = await fetch(`${AUTH_API}/world/placements?sceneId=level1`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
@@ -3978,3 +4001,29 @@ assetModalOverlay.addEventListener('click', (e) => {
         assetModalOverlay.classList.add('hidden');
     }
 });
+
+window.__worldBridge = {
+    getAuthToken: () => authToken,
+    getAuthApi: () => AUTH_API,
+    getCourseId: () => COURSE_ID_FROM_URL,
+    getPlayerRole: () => localUserRole,
+    createModulePlacement,
+    openModuleSidebar,
+    teleportTo(position) {
+        if (!position) return;
+        playerGroup.position.set(position.x, position.y ?? playerGroup.position.y, position.z);
+        controls.target.set(position.x, 0, position.z);
+        controls.update();
+        if (socket) {
+            socket.emit('playerMovement', {
+                position: { x: playerGroup.position.x, y: playerGroup.position.y, z: playerGroup.position.z },
+                rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
+                animation: 'idle',
+                isJumping: false,
+                jumpAlpha: 0,
+                didInteract: false,
+                interactionPoint: null
+            });
+        }
+    }
+};

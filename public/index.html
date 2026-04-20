@@ -60,7 +60,7 @@
 
                 <!-- Seleção de Cor do Usuário -->
                 <div class="login-color-section">
-                    <span>Escolha sua cor:</span>
+                    <span>Choose your color:</span>
                     <div id="login-color-options" class="login-color-grid">
                         <div class="login-color-option" style="background: #ef4444;" data-color="#ef4444"></div>
                         <div class="login-color-option" style="background: #3b82f6;" data-color="#3b82f6"></div>
@@ -74,7 +74,7 @@
                 </div>
 
                 <div class="login-actions">
-                    <button id="join-btn">Entrar no Mundo</button>
+                    <button id="join-btn">Enter the World</button>
                 </div>
             </div>
 
@@ -124,7 +124,7 @@
             </div>
             <div class="asset-tabs">
                 <button class="tab-btn active" data-tab="image">Imagens</button>
-                <button class="tab-btn" data-tab="video">Vídeos</button>
+                <button class="tab-btn" data-tab="video">Videos</button>
                 <button class="tab-btn" data-tab="pdf">PDF</button>
                 <button class="tab-btn" data-tab="word">Word</button>
             </div>
@@ -134,7 +134,7 @@
                         <tr>
                             <th>Arquivo</th>
                             <th id="asset-th-date" class="hidden">Data</th>
-                            <th>Ação</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="asset-list-body">
@@ -170,7 +170,7 @@
     <!-- Player List Container -->
     <div id="player-list-container" class="ui-layer hidden">
         <div class="player-list-header">
-            <h3>Jogadores Online</h3>
+            <h3>Online Players</h3>
         </div>
         <div id="player-list-content"></div>
     </div>
@@ -178,34 +178,44 @@
     <div id="world-operations-card" class="ui-layer world-operations-card hidden">
         <div class="world-operations-header">
             <div>
-                <span class="world-operations-eyebrow">Agenda Operacional</span>
-                <h3>Ações pendentes</h3>
+                <span class="world-operations-eyebrow">Operational Agenda</span>
+                <h3>Pending actions</h3>
             </div>
-            <a id="world-operations-link" href="#" target="_blank">Abrir dashboard</a>
+            <a id="world-operations-link" href="#" target="_blank">Open dashboard</a>
         </div>
         <div class="world-operations-counts">
-            <span id="world-operations-unread" class="world-operations-pill">0 não lidas</span>
-            <span id="world-operations-urgent" class="world-operations-pill warning">0 urgências</span>
+            <span id="world-operations-unread" class="world-operations-pill">0 unread</span>
+            <span id="world-operations-urgent" class="world-operations-pill warning">0 urgent</span>
         </div>
         <ul id="world-operations-list" class="world-operations-list">
-            <li class="world-operations-empty">Sem pendências no momento.</li>
+            <li class="world-operations-empty">No pending items right now.</li>
         </ul>
     </div>
 
+    <aside id="course-trail-panel" class="ui-layer hidden" style="position:fixed; left:20px; top:110px; width:320px; max-height:70vh; overflow:auto; padding:1rem; border-radius:20px; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.08); box-shadow:0 20px 60px rgba(0,0,0,0.35); backdrop-filter:blur(18px);">
+        <div style="display:flex; flex-direction:column; gap:0.35rem; margin-bottom:1rem;">
+            <span style="font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase; color:#60a5fa;">Course world</span>
+            <h3 id="course-trail-title" style="margin:0; font-size:1.15rem;">Course trail</h3>
+            <p id="course-trail-summary" style="margin:0; font-size:0.85rem; color:#94a3b8;">Loading course trail...</p>
+        </div>
+        <div id="course-trail-progress" style="margin-bottom:1rem; font-size:0.82rem; color:#cbd5e1;">0% complete</div>
+        <div id="course-trail-list" style="display:flex; flex-direction:column; gap:0.75rem;"></div>
+    </aside>
+
     <!-- Module Sidebar -->
     <div id="module-sidebar" class="ui-layer hidden module-sidebar">
-        <div id="sidebar-preview-banner" class="preview-banner">MODO PREVIEW: Módulo não publicado</div>
+        <div id="sidebar-preview-banner" class="preview-banner">PREVIEW MODE: Unpublished module</div>
         <div class="sidebar-header">
-            <h2 id="module-sidebar-title">Nome do Módulo</h2>
+            <h2 id="module-sidebar-title">Module Name</h2>
             <button id="close-module-sidebar" class="close-btn">&times;</button>
         </div>
         <div class="sidebar-tabs">
-            <button class="module-tab-btn active" data-tab="general">Geral</button>
-            <button class="module-tab-btn" data-tab="videos">Vídeos</button>
+            <button class="module-tab-btn active" data-tab="general">General</button>
+            <button class="module-tab-btn" data-tab="videos">Videos</button>
             <button class="module-tab-btn" data-tab="docs">Documentos</button>
             <button class="module-tab-btn" data-tab="quiz">Quiz</button>
-            <button class="module-tab-btn" data-tab="forum">Fórum</button>
-            <button class="module-tab-btn" data-tab="reports">Relatórios</button>
+            <button class="module-tab-btn" data-tab="forum">Forum</button>
+            <button class="module-tab-btn" data-tab="reports">Reports</button>
         </div>
         <div class="sidebar-content">
             <div id="module-tab-general" class="tab-pane active">
@@ -232,7 +242,7 @@
             </div>
             <div id="module-tab-quiz" class="tab-pane">
                 <div id="module-quiz-container" class="quiz-container"></div>
-                <button id="btn-submit-quiz" class="btn-open" style="margin-top: 20px;">Enviar Respostas</button>
+                <button id="btn-submit-quiz" class="btn-open" style="margin-top: 20px;">Submit Answers</button>
             </div>
             <div id="module-tab-forum" class="tab-pane">
                 <div id="module-forum-container" class="forum-container"></div>
@@ -256,9 +266,9 @@
     <!-- Menu de Contexto (Botão Direito) -->
     <div id="context-menu" class="context-menu hidden">
         <div id="menu-ground-section">
-            <div id="menu-create-block" class="menu-item">📦 Colocar Cubo</div>
-            <div id="menu-place-module" class="menu-item">🎓 Colocar Módulo Interativo</div>
-            <div id="menu-catalog-models" class="menu-item">🧱 Catálogo de Objetos</div>
+            <div id="menu-create-block" class="menu-item">📦 Place Cube</div>
+            <div id="menu-place-module" class="menu-item">🎓 Place Interactive Module</div>
+            <div id="menu-catalog-models" class="menu-item">🧱 Object Catalog</div>
             <div class="menu-item" id="menu-import-glb">📦 Importar Local (.glb)</div>
         </div>
         <div id="menu-cube-section" class="hidden">
@@ -285,9 +295,9 @@
         </div>
         <!-- Section for Module Placement -->
         <div id="menu-placement-section" class="hidden">
-            <div class="menu-item" id="menu-assign-module">🎯 Vincular Módulo</div>
+            <div class="menu-item" id="menu-assign-module">🎯 Link Module</div>
             <div class="menu-item" id="menu-import-placement-glb">📦 Importar GLB</div>
-            <div class="menu-item" id="menu-delete-placement" style="color: #ef4444;">🗑️ Excluir</div>
+            <div class="menu-item" id="menu-delete-placement" style="color: #ef4444;">🗑️ Delete</div>
         </div>
     </div>
 
@@ -340,11 +350,11 @@
 
     <audio id="remote-audio" autoplay></audio>
 
-    <!-- Catálogo de Assets (Overlay) -->
+    <!-- Catalog de Assets (Overlay) -->
     <div id="catalog-overlay" class="hidden ui-layer">
         <div class="catalog-card">
             <div class="catalog-header">
-                <h2 id="catalog-title">Catálogo</h2>
+                <h2 id="catalog-title">Catalog</h2>
                 <button id="close-catalog">×</button>
             </div>
             <div id="catalog-grid" class="catalog-grid">
@@ -355,6 +365,7 @@
 
     <!-- Main Logic -->
     <script type="module" src="main.js?v=1.3.1"></script>
+    <script src="course-world.js?v=1"></script>
     <div style="position: fixed; bottom: 5px; right: 5px; font-size: 0.6rem; color: #475569; z-index: 1000; pointer-events: none;">v1.3.1</div>
 </body>
 </html>
