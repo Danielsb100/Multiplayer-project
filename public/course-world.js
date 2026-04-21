@@ -179,9 +179,16 @@
             btnLanding.onclick = () => {
                 if (runtime.landingPage.compiledCss && landingCssEl) {
                     landingCssEl.innerHTML = runtime.landingPage.compiledCss;
-                } else if (landingCssEl && bridge.getAuthApi) {
-                    const cssUrl = bridge.getAuthApi().replace('/api', '/css/modular-style.css');
-                    landingCssEl.innerHTML = `@import url('${cssUrl}');\n#course-landing-content { background: white !important; }`;
+                } else if (bridge.getAuthApi) {
+                    let link = document.getElementById('dynamic-landing-css');
+                    if (!link) {
+                        const cssUrl = bridge.getAuthApi() + '/css/modular-style.css';
+                        link = document.createElement('link');
+                        link.id = 'dynamic-landing-css';
+                        link.rel = 'stylesheet';
+                        link.href = cssUrl;
+                        document.head.appendChild(link);
+                    }
                 }
                 if (landingContentEl) {
                     landingContentEl.innerHTML = `<div id="landing-page-builder-section" class="view-mode" style="min-height: 100%;">${runtime.landingPage.compiledHtml}</div>`;
