@@ -7,6 +7,24 @@
     let latestRuntime = null;
     let lastRenderedActiveModuleId = null;
 
+    // Course Landing Modal
+    const btnLanding = document.getElementById('btn-show-course-landing');
+    const modalLanding = document.getElementById('course-landing-modal');
+    const closeLandingBtn = document.getElementById('close-course-landing');
+    const landingCssEl = document.getElementById('course-landing-custom-css');
+    const landingContentEl = document.getElementById('course-landing-content');
+
+    if (closeLandingBtn && modalLanding) {
+        closeLandingBtn.addEventListener('click', () => {
+            modalLanding.classList.add('hidden');
+        });
+        modalLanding.addEventListener('click', (e) => {
+            if (e.target === modalLanding) {
+                modalLanding.classList.add('hidden');
+            }
+        });
+    }
+
     function escapeHtml(value) {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -155,6 +173,19 @@
             throw new Error(runtime.error || 'Failed to load course runtime.');
         }
         window.__courseWorldContext.runtime = runtime;
+
+        if (runtime.landingPage && runtime.landingPage.compiledHtml && btnLanding) {
+            btnLanding.classList.remove('hidden');
+            btnLanding.onclick = () => {
+                if (runtime.landingPage.compiledCss && landingCssEl) {
+                    landingCssEl.innerHTML = runtime.landingPage.compiledCss;
+                }
+                if (landingContentEl) {
+                    landingContentEl.innerHTML = runtime.landingPage.compiledHtml;
+                }
+                modalLanding.classList.remove('hidden');
+            };
+        }
 
         (runtime.modules || []).forEach((module, index) => {
             const placement = normalizePlacement(module, index);
