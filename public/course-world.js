@@ -4,13 +4,15 @@
     const summaryEl = document.getElementById('course-trail-summary');
     const progressEl = document.getElementById('course-trail-progress');
     const listEl = document.getElementById('course-trail-list');
+    let latestRuntime = null;
+    let lastRenderedActiveModuleId = null;
 
     function escapeHtml(value) {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
+            .replace(/\"/g, '&quot;')
             .replace(/'/g, '&#39;');
     }
 
@@ -38,32 +40,54 @@
 
     function renderTrail(runtime, bridge) {
         if (!panel || !titleEl || !summaryEl || !progressEl || !listEl) return;
+        latestRuntime = runtime;
         panel.classList.remove('hidden');
         titleEl.textContent = runtime.title;
         summaryEl.textContent = runtime.description || 'Follow the rooms in order and complete the required modules to unlock the next ones.';
         progressEl.textContent = `${runtime.progressPercent || 0}% complete • ${runtime.completedCount || 0}/${(runtime.modules || []).length} modules completed`;
 
+        const activeModuleId = bridge.getActiveCourseRoomModuleId?.() || null;
+        lastRenderedActiveModuleId = activeModuleId;
+        const actionButtonStyle = 'padding:0.58rem 0.9rem; border:none; border-radius:12px; cursor:pointer; font-weight:700; letter-spacing:0.01em; transition:transform 120ms ease, opacity 120ms ease;';
         listEl.innerHTML = (runtime.modules || []).map((module, index) => {
-            const statusLabel = module.completed ? 'Completed' : (module.unlocked ? 'Available' : 'Locked');
+            const statusLabel = module.completed ? 'Done' : (module.unlocked ? 'Ready' : 'Locked');
             const statusColor = module.completed ? '#10b981' : (module.unlocked ? '#60a5fa' : '#ef4444');
+            const stepIcon = module.completed ? '✓' : (module.unlocked ? '•' : '⨯');
+            const isCurrentRoom = activeModuleId === module.moduleId;
             return `
-                <article data-course-trail-module="${module.moduleId}" style="padding:0.9rem; border-radius:16px; background:rgba(30,41,59,0.75); border:1px solid rgba(255,255,255,0.06); display:flex; flex-direction:column; gap:0.65rem;">
+                <article data-course-trail-module="${module.moduleId}" style="padding:1rem; border-radius:18px; background:${isCurrentRoom ? 'linear-gradient(135deg, rgba(37,99,235,0.34), rgba(14,165,233,0.22))' : 'rgba(30,41,59,0.78)'}; border:2px solid ${isCurrentRoom ? 'rgba(125,211,252,0.95)' : 'rgba(255,255,255,0.06)'}; display:flex; flex-direction:column; gap:0.7rem; box-shadow:${isCurrentRoom ? '0 0 0 2px rgba(56,189,248,0.18), 0 18px 38px rgba(2,132,199,0.18)' : 'none'}; transform:${isCurrentRoom ? 'translateX(-4px) scale(1.01)' : 'none'}; transition:all 160ms ease;">
                     <div style="display:flex; justify-content:space-between; gap:0.75rem; align-items:flex-start;">
-                        <div>
-                            <strong style="display:block; margin-bottom:0.25rem;">${index + 1}. ${escapeHtml(module.title)}</strong>
-                            <span style="font-size:0.8rem; color:#94a3b8;">${escapeHtml(module.roomLabel || 'Module room')}</span>
+                        <div style="display:flex; gap:0.75rem; align-items:flex-start;">
+                            <span style="display:inline-flex; width:30px; height:30px; border-radius:999px; align-items:center; justify-content:center; background:${isCurrentRoom ? 'rgba(186,230,253,0.22)' : (module.completed ? 'rgba(16,185,129,0.18)' : 'rgba(148,163,184,0.16)')}; color:${isCurrentRoom ? '#e0f2fe' : (module.completed ? '#34d399' : '#cbd5e1')}; font-weight:800; flex:0 0 30px;">${stepIcon}</span>
+                            <div>
+                                <strong style="display:block; margin-bottom:0.25rem; color:${isCurrentRoom ? '#f8fafc' : 'white'};">Room ${index + 1}. ${escapeHtml(module.title)}</strong>
+                                <span style="font-size:0.8rem; color:${isCurrentRoom ? '#dbeafe' : '#94a3b8'};">${escapeHtml(module.roomLabel || 'Module room')}</span>
+                            </div>
                         </div>
-                        <span style="font-size:0.74rem; color:white; background:${statusColor}; border-radius:999px; padding:0.25rem 0.6rem;">${statusLabel}</span>
+                        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:0.4rem;">
+                            ${isCurrentRoom ? '<span style="font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase; color:#e0f2fe; background:rgba(14,165,233,0.22); border:1px solid rgba(125,211,252,0.55); border-radius:999px; padding:0.22rem 0.55rem; font-weight:800;">You are here</span>' : ''}
+                            <span style="font-size:0.74rem; color:white; background:${statusColor}; border-radius:999px; padding:0.25rem 0.6rem;">${statusLabel}</span>
+                        </div>
                     </div>
-                    <div style="font-size:0.8rem; color:#cbd5e1;">${module.isRequired ? 'Required' : 'Optional'} • ${escapeHtml(module.moduleStatus || 'DRAFT')}</div>
-                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                        <button type="button" data-course-trail-action="teleport" data-module-id="${module.moduleId}" class="btn btn-secondary btn-sm" style="padding:0.45rem 0.75rem;">Go to room</button>
-                        ${module.unlocked ? `<button type="button" data-course-trail-action="open" data-module-id="${module.moduleId}" class="btn btn-secondary btn-sm" style="padding:0.45rem 0.75rem;">Open module</button>` : ''}
-                        ${module.unlocked && !module.completed ? `<button type="button" data-course-trail-action="complete" data-module-id="${module.moduleId}" class="btn btn-secondary btn-sm" style="padding:0.45rem 0.75rem;">Mark complete</button>` : ''}
+                    <div style="font-size:0.8rem; color:${isCurrentRoom ? '#e2e8f0' : '#cbd5e1'}; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                        <span>${module.isRequired ? 'Required' : 'Optional'}</span>
+                        <span>•</span>
+                        <span>${escapeHtml(module.moduleStatus || 'DRAFT')}</span>
+                        ${isCurrentRoom ? '<span>•</span><strong style="color:#e0f2fe;">Current room</strong>' : ''}
+                    </div>
+                    <div style="display:flex; gap:0.55rem; flex-wrap:wrap;">
+                        ${!isCurrentRoom ? `<button type="button" data-course-trail-action="teleport" data-module-id="${module.moduleId}" style="${actionButtonStyle} background:linear-gradient(135deg, #2563eb, #38bdf8); color:white; box-shadow:0 10px 24px rgba(37,99,235,0.28);">Go to room</button>` : ''}
+                        ${module.unlocked ? `<button type="button" data-course-trail-action="open" data-module-id="${module.moduleId}" style="${actionButtonStyle} background:rgba(255,255,255,0.1); color:#f8fafc; border:1px solid rgba(255,255,255,0.14);">Open module</button>` : ''}
+                        ${module.unlocked && !module.completed ? `<button type="button" data-course-trail-action="complete" data-module-id="${module.moduleId}" style="${actionButtonStyle} background:rgba(16,185,129,0.16); color:#d1fae5; border:1px solid rgba(52,211,153,0.25);">Mark done</button>` : ''}
                     </div>
                 </article>
             `;
         }).join('');
+
+        if (activeModuleId) {
+            const activeCard = listEl.querySelector(`[data-course-trail-module="${activeModuleId}"]`);
+            activeCard?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
 
         listEl.querySelectorAll('[data-course-trail-action]').forEach((button) => {
             button.addEventListener('click', async () => {
@@ -74,12 +98,14 @@
 
                 if (button.dataset.courseTrailAction === 'teleport') {
                     bridge.teleportTo(placement.position);
+                    requestAnimationFrame(() => renderTrail(runtime, bridge));
                     return;
                 }
 
                 if (button.dataset.courseTrailAction === 'open') {
                     bridge.teleportTo(placement.position);
                     bridge.openModuleSidebar(placement.id, module.moduleId, module.courseModuleId);
+                    requestAnimationFrame(() => renderTrail(runtime, bridge));
                     return;
                 }
 
@@ -109,6 +135,17 @@
         });
     }
 
+    function startActiveRoomSync(bridge) {
+        const tick = () => {
+            const activeModuleId = bridge.getActiveCourseRoomModuleId?.() || null;
+            if (latestRuntime && !panel?.classList.contains('hidden') && activeModuleId !== lastRenderedActiveModuleId) {
+                renderTrail(latestRuntime, bridge);
+            }
+            window.requestAnimationFrame(tick);
+        };
+        window.requestAnimationFrame(tick);
+    }
+
     async function loadRuntime(bridge) {
         const response = await fetch(`${bridge.getAuthApi()}/courses/${window.__courseWorldContext.courseId}/runtime`, {
             headers: { Authorization: `Bearer ${bridge.getAuthToken()}` }
@@ -134,6 +171,7 @@
             });
         });
 
+        bridge.renderCourseRoomShells?.(runtime);
         renderTrail(runtime, bridge);
     }
 
@@ -149,6 +187,7 @@
 
         try {
             await loadRuntime(bridge);
+            startActiveRoomSync(bridge);
         } catch (error) {
             console.error('Failed to initialize course world:', error);
             if (summaryEl) {

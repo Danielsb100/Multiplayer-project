@@ -22,6 +22,12 @@ const loginError = document.getElementById('login-error');
 let AUTH_API = 'https://login-system-production-84c6.up.railway.app';
 const COURSE_ID_FROM_URL = Number(new URLSearchParams(window.location.search).get('courseId')) || null;
 window.__courseWorldContext = { courseId: COURSE_ID_FROM_URL, runtime: null };
+const courseRoomContextCard = document.getElementById('course-room-context');
+const courseRoomContextCourse = document.getElementById('course-room-context-course');
+const courseRoomContextRoom = document.getElementById('course-room-context-room');
+let courseRoomShells = [];
+let courseRoomColliderIds = [];
+let activeCourseRoomModuleId = null;
 
 // Auth Elements
 const authTabs = document.querySelector('.auth-tabs');
@@ -773,50 +779,253 @@ controls.minZoom = 0.001; // Guard against scene disappearance
 controls.target.set(0, 0, 0);
 controls.enableRotate = false; // Keep isometric view
 
-// --- Environment Map Loading ---
-const mapLoader = new GLTFLoader();
-mapLoader.load('assets/maps/map/map.glb', (gltf) => {
-    const environmentMap = gltf.scene;
-    scene.add(environmentMap);
+function createCourseModeBaseEnvironment() {
+    const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(220, 220),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95, metalness: 0.05 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    floor.userData.id = 'course_floor';
+    scene.add(floor);
 
-    environmentMap.traverse((child) => {
-        if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
+    const grid = new THREE.GridHelper(220, 22, 0x334155, 0x1e293b);
+    grid.position.y = 0.01;
+    scene.add(grid);
+}
 
-            const name = child.name ? child.name.toLowerCase() : '';
-
-            // NavMesh Extraction
-            if (name.includes('navmesh')) {
-                child.visible = false;
-                child.updateMatrixWorld(true);
-                const geo = child.geometry.clone();
-                geo.applyMatrix4(child.matrixWorld);
-                _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(geo));
-                return; // Skip collision and render for navmesh
-            }
-
-            if (name.includes('collision')) {
-                child.visible = false;
-            } else if (name.includes('wall')) {
-                // Important for Occlusion Logic (makes walls transparent)
-                child.userData.isStructure = true;
-                // Clone material so fading one wall doesn't fade all walls sharing the same material
-                if (child.material) {
-                    child.material = child.material.clone();
-                    child.material.transparent = true;
-                }
-            }
-
-            // ALL map geometry is now used for precise physical collisions
-            child.userData.id = 'env_mesh_' + child.uuid;
-            preciseColliders.push(child);
+function clearCourseRoomShells() {
+    courseRoomShells.forEach((room) => {
+        if (room.group?.parent) {
+            scene.remove(room.group);
         }
     });
-    console.log("Environment map loaded successfully.");
-}, undefined, (error) => {
-    console.warn("Notice: No default map found or error loading map.glb");
-});
+    if (courseRoomColliderIds.length) {
+        for (let i = wallBoxes.length - 1; i >= 0; i -= 1) {
+            if (courseRoomColliderIds.includes(wallBoxes[i].relatedId)) {
+                wallBoxes.splice(i, 1);
+            }
+        }
+    }
+    courseRoomColliderIds = [];
+    courseRoomShells = [];
+}
+
+function updateCourseRoomContext() {
+    if (!COURSE_ID_FROM_URL || !courseRoomContextCard || !courseRoomContextCourse || !courseRoomContextRoom) return;
+    const runtime = window.__courseWorldContext?.runtime;
+    if (!runtime) return;
+
+    courseRoomContextCard.classList.remove('hidden');
+    courseRoomContextCourse.textContent = runtime.title || 'Course world';
+
+    const currentRoom = courseRoomShells.find((room) => {
+        const dx = Math.abs(playerGroup.position.x - room.center.x);
+        const dz = Math.abs(playerGroup.position.z - room.center.z);
+        return dx <= room.halfWidth && dz <= room.halfDepth;
+    }) || null;
+
+    if (!currentRoom) {
+        activeCourseRoomModuleId = null;
+        courseRoomContextRoom.textContent = 'Between rooms';
+        return;
+    }
+
+    if (activeCourseRoomModuleId !== currentRoom.moduleId) {
+        activeCourseRoomModuleId = currentRoom.moduleId;
+    }
+    courseRoomContextRoom.textContent = `Room Module ${currentRoom.index + 1} — ${currentRoom.title}`;
+}
+
+function renderCourseRoomShells(runtime) {
+    if (!COURSE_ID_FROM_URL) return;
+    clearCourseRoomShells();
+    if (!runtime?.modules?.length) {
+        updateCourseRoomContext();
+        return;
+    }
+
+    const roomWidth = 10;
+    const roomDepth = 8;
+    const wallHeight = 3;
+    const wallThickness = 0.25;
+    const doorWidth = 2.4;
+    const corridorWidth = 2.8;
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95, metalness: 0.05 });
+    const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x1d4ed8, emissiveIntensity: 0.12 });
+    const corridorMaterial = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, emissive: 0x1d4ed8, emissiveIntensity: 0.08, roughness: 0.92, metalness: 0.04 });
+    const centers = runtime.modules.map((module, index) => module.placement?.position || { x: Math.floor(index / 2) * 18, y: 0, z: index % 2 === 0 ? 0 : 10 });
+
+    const getDirection = (from, to) => {
+        if (!from || !to) return null;
+        const dx = to.x - from.x;
+        const dz = to.z - from.z;
+        if (Math.abs(dx) >= Math.abs(dz)) {
+            return dx >= 0 ? 'east' : 'west';
+        }
+        return dz >= 0 ? 'south' : 'north';
+    };
+
+    const registerCourseCollider = (mesh, relatedId) => {
+        mesh.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(mesh);
+        box.relatedId = relatedId;
+        wallBoxes.push(box);
+        courseRoomColliderIds.push(relatedId);
+    };
+
+    const buildWallWithDoor = (group, center, orientation, hasDoor, colliderBaseId) => {
+        let segmentCounter = 0;
+        const addSegment = (width, depth, x, z) => {
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(width, wallHeight, depth), wallMaterial.clone());
+            wall.position.set(x, wallHeight / 2, z);
+            group.add(wall);
+            registerCourseCollider(wall, `${colliderBaseId}_${orientation}_${segmentCounter++}`);
+        };
+
+        if (orientation === 'north' || orientation === 'south') {
+            const z = center.z + (orientation === 'south' ? roomDepth / 2 : -roomDepth / 2);
+            if (!hasDoor) {
+                addSegment(roomWidth, wallThickness, center.x, z);
+                return;
+            }
+            const segmentWidth = (roomWidth - doorWidth) / 2;
+            const offset = doorWidth / 2 + segmentWidth / 2;
+            addSegment(segmentWidth, wallThickness, center.x - offset, z);
+            addSegment(segmentWidth, wallThickness, center.x + offset, z);
+            return;
+        }
+
+        const x = center.x + (orientation === 'east' ? roomWidth / 2 : -roomWidth / 2);
+        if (!hasDoor) {
+            addSegment(wallThickness, roomDepth, x, center.z);
+            return;
+        }
+        const segmentDepth = (roomDepth - doorWidth) / 2;
+        const offset = doorWidth / 2 + segmentDepth / 2;
+        addSegment(wallThickness, segmentDepth, x, center.z - offset);
+        addSegment(wallThickness, segmentDepth, x, center.z + offset);
+    };
+
+    const buildCorridor = (from, to, direction, colliderBaseId) => {
+        if (!from || !to || !direction) return;
+        const corridor = new THREE.Mesh(
+            new THREE.BoxGeometry(
+                direction === 'east' || direction === 'west' ? Math.abs(to.x - from.x) - roomWidth : corridorWidth,
+                0.05,
+                direction === 'north' || direction === 'south' ? Math.abs(to.z - from.z) - roomDepth : corridorWidth
+            ),
+            corridorMaterial.clone()
+        );
+        corridor.receiveShadow = true;
+        corridor.position.set((from.x + to.x) / 2, 0.03, (from.z + to.z) / 2);
+        scene.add(corridor);
+
+        const isHorizontal = direction === 'east' || direction === 'west';
+        const railLength = isHorizontal ? corridor.geometry.parameters.width : corridor.geometry.parameters.depth;
+        const railOffset = corridorWidth / 2;
+        for (const side of [-1, 1]) {
+            const rail = new THREE.Mesh(
+                new THREE.BoxGeometry(isHorizontal ? railLength : wallThickness, 1.2, isHorizontal ? wallThickness : railLength),
+                wallMaterial.clone()
+            );
+            rail.position.set(
+                corridor.position.x + (isHorizontal ? 0 : side * railOffset),
+                0.6,
+                corridor.position.z + (isHorizontal ? side * railOffset : 0)
+            );
+            scene.add(rail);
+            registerCourseCollider(rail, `${colliderBaseId}_rail_${side === -1 ? 'left' : 'right'}`);
+        }
+    };
+
+    runtime.modules.forEach((module, index) => {
+        const center = centers[index];
+        const previousCenter = centers[index - 1] || null;
+        const nextCenter = centers[index + 1] || null;
+        const hasOpenPreviousConnection = Boolean(module.unlocked && previousCenter);
+        const hasOpenNextConnection = Boolean(runtime.modules[index + 1]?.unlocked && nextCenter);
+        const openPrev = hasOpenPreviousConnection ? getDirection(center, previousCenter) : null;
+        const openNext = hasOpenNextConnection ? getDirection(center, nextCenter) : null;
+        const openings = new Set([openPrev, openNext].filter(Boolean));
+        const roomGroup = new THREE.Group();
+        roomGroup.userData.courseRoom = true;
+        roomGroup.userData.moduleId = module.moduleId;
+        const colliderBaseId = `course_room_${module.moduleId}`;
+
+        const floor = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, 0.08, roomDepth), accentMaterial.clone());
+        floor.position.set(center.x, 0.04, center.z);
+        floor.receiveShadow = true;
+        roomGroup.add(floor);
+
+        buildWallWithDoor(roomGroup, center, 'north', openings.has('north'), colliderBaseId);
+        buildWallWithDoor(roomGroup, center, 'south', openings.has('south'), colliderBaseId);
+        buildWallWithDoor(roomGroup, center, 'east', openings.has('east'), colliderBaseId);
+        buildWallWithDoor(roomGroup, center, 'west', openings.has('west'), colliderBaseId);
+
+        scene.add(roomGroup);
+        courseRoomShells.push({
+            group: roomGroup,
+            moduleId: module.moduleId,
+            title: module.title,
+            index,
+            center,
+            halfWidth: roomWidth / 2,
+            halfDepth: roomDepth / 2
+        });
+
+        if (hasOpenNextConnection) {
+            buildCorridor(center, nextCenter, getDirection(center, nextCenter), `${colliderBaseId}_to_${runtime.modules[index + 1].moduleId}`);
+        }
+    });
+
+    updateCourseRoomContext();
+}
+
+// --- Environment Map Loading ---
+if (COURSE_ID_FROM_URL) {
+    createCourseModeBaseEnvironment();
+} else {
+    const mapLoader = new GLTFLoader();
+    mapLoader.load('assets/maps/map/map.glb', (gltf) => {
+        const environmentMap = gltf.scene;
+        scene.add(environmentMap);
+
+        environmentMap.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                const name = child.name ? child.name.toLowerCase() : '';
+
+                if (name.includes('navmesh')) {
+                    child.visible = false;
+                    child.updateMatrixWorld(true);
+                    const geo = child.geometry.clone();
+                    geo.applyMatrix4(child.matrixWorld);
+                    _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(geo));
+                    return;
+                }
+
+                if (name.includes('collision')) {
+                    child.visible = false;
+                } else if (name.includes('wall')) {
+                    child.userData.isStructure = true;
+                    if (child.material) {
+                        child.material = child.material.clone();
+                        child.material.transparent = true;
+                    }
+                }
+
+                child.userData.id = 'env_mesh_' + child.uuid;
+                preciseColliders.push(child);
+            }
+        });
+        console.log("Environment map loaded successfully.");
+    }, undefined, (error) => {
+        console.warn("Notice: No default map found or error loading map.glb");
+    });
+}
 
 // --- Animation Manager ---
 function applyCharacterColor(model, color) {
@@ -2273,6 +2482,7 @@ function animate() {
         updatePlayer(delta);
         updateOcclusion();
         updateGametags();
+        updateCourseRoomContext();
 
         // Diagnostic & Force Fixes
         if (camera.zoom <= 0) camera.zoom = 0.1; // Guard against scene disappearance
@@ -4009,6 +4219,8 @@ window.__worldBridge = {
     getPlayerRole: () => localUserRole,
     createModulePlacement,
     openModuleSidebar,
+    renderCourseRoomShells,
+    getActiveCourseRoomModuleId: () => activeCourseRoomModuleId,
     teleportTo(position) {
         if (!position) return;
         playerGroup.position.set(position.x, position.y ?? playerGroup.position.y, position.z);
