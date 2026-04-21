@@ -179,9 +179,12 @@
             btnLanding.onclick = () => {
                 if (runtime.landingPage.compiledCss && landingCssEl) {
                     landingCssEl.innerHTML = runtime.landingPage.compiledCss;
+                } else if (landingCssEl && bridge.getAuthApi) {
+                    const cssUrl = bridge.getAuthApi().replace('/api', '/css/modular-style.css');
+                    landingCssEl.innerHTML = `@import url('${cssUrl}');\n#course-landing-content { background: white !important; }`;
                 }
                 if (landingContentEl) {
-                    landingContentEl.innerHTML = runtime.landingPage.compiledHtml;
+                    landingContentEl.innerHTML = `<div id="landing-page-builder-section" class="view-mode" style="min-height: 100%;">${runtime.landingPage.compiledHtml}</div>`;
                 }
                 modalLanding.classList.remove('hidden');
             };
