@@ -1656,3 +1656,112 @@ input[type="file"] {
     margin: 10px 0;
     text-align: center;
 }
+
+.world-operations-card {
+    position: absolute;
+    top: 2rem;
+    right: 2rem;
+    z-index: 15;
+    width: min(360px, calc(100vw - 2rem));
+    padding: 1rem 1.1rem;
+    border-radius: 20px;
+    background: rgba(15, 23, 42, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 20px 40px rgba(2, 6, 23, 0.35);
+}
+
+.world-operations-card.hidden {
+    display: none;
+}
+
+.world-operations-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.world-operations-header h3 {
+    margin: 0.2rem 0 0;
+    font-size: 1.05rem;
+}
+
+.world-operations-header a {
+    color: #93c5fd;
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.world-operations-eyebrow {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.world-operations-counts {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 0.9rem;
+}
+
+.world-operations-pill {
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: rgba(59, 130, 246, 0.16);
+    border: 1px solid rgba(96, 165, 250, 0.24);
+}
+
+.world-operations-pill.warning {
+    background: rgba(248, 113, 113, 0.16);
+    border-color: rgba(248, 113, 113, 0.28);
+    color: #fecaca;
+}
+
+.world-operations-list {
+    margin: 1rem 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.world-operations-item {
+    padding: 0.8rem 0.9rem;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.world-operations-item strong {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.9rem;
+}
+
+.world-operations-item span {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.world-operations-empty {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+@media (max-width: 900px) {
+    .world-operations-card {
+        top: auto;
+        right: 1rem;
+        bottom: 1rem;
+        left: 1rem;
+        width: auto;
+    }
+}

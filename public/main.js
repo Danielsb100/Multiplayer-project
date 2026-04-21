@@ -20,6 +20,14 @@ const emailInput = document.getElementById('email-input');
 const passwordInput = document.getElementById('password-input');
 const loginError = document.getElementById('login-error');
 let AUTH_API = 'https://login-system-production-84c6.up.railway.app';
+const COURSE_ID_FROM_URL = Number(new URLSearchParams(window.location.search).get('courseId')) || null;
+window.__courseWorldContext = { courseId: COURSE_ID_FROM_URL, runtime: null };
+const courseRoomContextCard = document.getElementById('course-room-context');
+const courseRoomContextCourse = document.getElementById('course-room-context-course');
+const courseRoomContextRoom = document.getElementById('course-room-context-room');
+let courseRoomShells = [];
+let courseRoomColliderIds = [];
+let activeCourseRoomModuleId = null;
 
 // Auth Elements
 const authTabs = document.querySelector('.auth-tabs');
@@ -213,9 +221,77 @@ const localVideo = document.getElementById('local-video');
 // Player List DOM
 const playerListContainer = document.getElementById('player-list-container');
 const playerListContent = document.getElementById('player-list-content');
+const worldOperationsCard = document.getElementById('world-operations-card');
+const worldOperationsUnread = document.getElementById('world-operations-unread');
+const worldOperationsUrgent = document.getElementById('world-operations-urgent');
+const worldOperationsList = document.getElementById('world-operations-list');
+const worldOperationsLink = document.getElementById('world-operations-link');
+let worldOperationsRefreshTimer = null;
 
 function isOverUI(event) {
     return event.target.closest('.ui-layer') || event.target.closest('.context-menu');
+}
+
+function escapeWorldHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderWorldOperationsSummary(summary) {
+    if (!worldOperationsCard || !worldOperationsList || !summary?.counts) return;
+
+    const hasPending = summary.counts.unread > 0 || summary.counts.totalPending > 0 || summary.counts.remindersOpen > 0;
+    worldOperationsCard.classList.toggle('hidden', !hasPending);
+    if (!hasPending) return;
+
+    worldOperationsUnread.textContent = `${summary.counts.unread} unread`;
+    worldOperationsUrgent.textContent = `${summary.counts.urgent} urgent`;
+    if (worldOperationsLink) {
+        worldOperationsLink.href = `${AUTH_API}/dashboard.html`;
+    }
+
+    const highlightedItems = [
+        ...(summary.operational?.urgent || []),
+        ...(summary.operational?.today || []),
+        ...(summary.inbox || []).filter((item) => item.status === 'UNREAD')
+    ].slice(0, 3);
+
+    if (!highlightedItems.length) {
+        worldOperationsList.innerHTML = '<li class="world-operations-empty">No pending items right now.</li>';
+        return;
+    }
+
+    worldOperationsList.innerHTML = highlightedItems.map((item) => `
+        <li class="world-operations-item">
+            <strong>${escapeWorldHtml(item.title || 'Operational item')}</strong>
+            <span>${escapeWorldHtml(item.summary || item.message || 'Open the dashboard to follow the details.')}</span>
+        </li>
+    `).join('');
+}
+
+async function refreshWorldOperationsSummary() {
+    if (!authToken || !AUTH_API) return;
+
+    try {
+        const response = await fetch(`${AUTH_API}/api/notifications/summary`, {
+            headers: {
+                Authorization: `Bearer ${authToken}`
+            }
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to load operational summary');
+        }
+
+        renderWorldOperationsSummary(result);
+    } catch (error) {
+        console.error('Failed to refresh world operations summary:', error);
+    }
 }
 
 
@@ -250,7 +326,7 @@ joinBtn.addEventListener('click', async () => {
         loginError.innerText = err.message;
         loginError.classList.remove('hidden');
         joinBtn.disabled = false;
-        joinBtn.innerText = "Entrar no Mundo";
+        joinBtn.innerText = "Enter the World";
     }
 });
 
@@ -295,6 +371,9 @@ async function performJoin(token, user) {
 
     playerListContainer.classList.remove('hidden');
     updatePlayerList();
+    await refreshWorldOperationsSummary();
+    if (worldOperationsRefreshTimer) clearInterval(worldOperationsRefreshTimer);
+    worldOperationsRefreshTimer = setInterval(refreshWorldOperationsSummary, 60000);
     
     if (document.activeElement) document.activeElement.blur();
     window.focus();
@@ -329,10 +408,10 @@ async function checkAutoLogin() {
             window.history.replaceState({}, document.title, window.location.pathname);
         } catch (err) {
             console.error("Auto-login failed:", err);
-            loginError.innerText = "Sessão expirada. Faça login novamente.";
+            loginError.innerText = "Session expired. Please log in again.";
             loginError.classList.remove('hidden');
             joinBtn.disabled = false;
-            joinBtn.innerText = "Entrar no Mundo";
+            joinBtn.innerText = "Enter the World";
         }
     }
 }
@@ -382,7 +461,7 @@ async function handleRegister() {
         if (!response.ok) throw new Error(data.error || 'Erro no registro');
 
         // Post-register: clear inputs and switch to login with a success message
-        alert('Conta criada com sucesso! Faça login para entrar.');
+        alert('Account created successfully! Log in to enter.');
         regUsernameInput.value = '';
         regEmailInput.value = '';
         regPasswordInput.value = '';
@@ -415,7 +494,7 @@ function setupSocketListeners() {
         loginScreen.classList.remove('hidden');
         playerGroup.visible = false;
         joinBtn.disabled = false;
-        joinBtn.innerText = "Entrar no Mundo";
+        joinBtn.innerText = "Enter the World";
     });
 
     socket.on('currentPlayers', (players) => {
@@ -514,16 +593,21 @@ function setupSocketListeners() {
     });
 
     socket.on('initialModulePlacements', (placements) => {
+        if (COURSE_ID_FROM_URL) {
+            return;
+        }
         if (placements) placements.forEach(p => createModulePlacement(p));
         // Also fetch from DB in case some are not in transient memory
         fetchModulePlacements();
     });
 
     socket.on('modulePlacementAdded', (data) => {
+        if (COURSE_ID_FROM_URL) return;
         createModulePlacement(data);
     });
 
     socket.on('modulePlacementUpdated', (data) => {
+        if (COURSE_ID_FROM_URL) return;
         let obj = scene.getObjectByProperty('uuid', idToUuid[data.id]);
         if (!obj) {
             // Fallback: search by id in userData
@@ -538,6 +622,7 @@ function setupSocketListeners() {
     });
 
     socket.on('modulePlacementDeleted', (id) => {
+        if (COURSE_ID_FROM_URL) return;
         const uuid = idToUuid[id];
         let obj = uuid ? scene.getObjectByProperty('uuid', uuid) : null;
         if (!obj) {
@@ -629,7 +714,7 @@ function renderCatalog(type, onSelect) {
 
     if (type === 'characters') catalogTitle.innerText = 'Escolher Avatar';
     else if (type === 'structures') catalogTitle.innerText = 'Elementos de Estrutura';
-    else catalogTitle.innerText = 'Catálogo de Objetos';
+    else catalogTitle.innerText = 'Object Catalog';
 
     catalogData[type].forEach(item => {
         const div = document.createElement('div');
@@ -694,50 +779,253 @@ controls.minZoom = 0.001; // Guard against scene disappearance
 controls.target.set(0, 0, 0);
 controls.enableRotate = false; // Keep isometric view
 
-// --- Environment Map Loading ---
-const mapLoader = new GLTFLoader();
-mapLoader.load('assets/maps/map/map.glb', (gltf) => {
-    const environmentMap = gltf.scene;
-    scene.add(environmentMap);
+function createCourseModeBaseEnvironment() {
+    const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(220, 220),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95, metalness: 0.05 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    floor.userData.id = 'course_floor';
+    scene.add(floor);
 
-    environmentMap.traverse((child) => {
-        if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
+    const grid = new THREE.GridHelper(220, 22, 0x334155, 0x1e293b);
+    grid.position.y = 0.01;
+    scene.add(grid);
+}
 
-            const name = child.name ? child.name.toLowerCase() : '';
-
-            // NavMesh Extraction
-            if (name.includes('navmesh')) {
-                child.visible = false;
-                child.updateMatrixWorld(true);
-                const geo = child.geometry.clone();
-                geo.applyMatrix4(child.matrixWorld);
-                _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(geo));
-                return; // Skip collision and render for navmesh
-            }
-
-            if (name.includes('collision')) {
-                child.visible = false;
-            } else if (name.includes('wall')) {
-                // Important for Occlusion Logic (makes walls transparent)
-                child.userData.isStructure = true;
-                // Clone material so fading one wall doesn't fade all walls sharing the same material
-                if (child.material) {
-                    child.material = child.material.clone();
-                    child.material.transparent = true;
-                }
-            }
-
-            // ALL map geometry is now used for precise physical collisions
-            child.userData.id = 'env_mesh_' + child.uuid;
-            preciseColliders.push(child);
+function clearCourseRoomShells() {
+    courseRoomShells.forEach((room) => {
+        if (room.group?.parent) {
+            scene.remove(room.group);
         }
     });
-    console.log("Environment map loaded successfully.");
-}, undefined, (error) => {
-    console.warn("Notice: No default map found or error loading map.glb");
-});
+    if (courseRoomColliderIds.length) {
+        for (let i = wallBoxes.length - 1; i >= 0; i -= 1) {
+            if (courseRoomColliderIds.includes(wallBoxes[i].relatedId)) {
+                wallBoxes.splice(i, 1);
+            }
+        }
+    }
+    courseRoomColliderIds = [];
+    courseRoomShells = [];
+}
+
+function updateCourseRoomContext() {
+    if (!COURSE_ID_FROM_URL || !courseRoomContextCard || !courseRoomContextCourse || !courseRoomContextRoom) return;
+    const runtime = window.__courseWorldContext?.runtime;
+    if (!runtime) return;
+
+    courseRoomContextCard.classList.remove('hidden');
+    courseRoomContextCourse.textContent = runtime.title || 'Course world';
+
+    const currentRoom = courseRoomShells.find((room) => {
+        const dx = Math.abs(playerGroup.position.x - room.center.x);
+        const dz = Math.abs(playerGroup.position.z - room.center.z);
+        return dx <= room.halfWidth && dz <= room.halfDepth;
+    }) || null;
+
+    if (!currentRoom) {
+        activeCourseRoomModuleId = null;
+        courseRoomContextRoom.textContent = 'Between rooms';
+        return;
+    }
+
+    if (activeCourseRoomModuleId !== currentRoom.moduleId) {
+        activeCourseRoomModuleId = currentRoom.moduleId;
+    }
+    courseRoomContextRoom.textContent = `Room Module ${currentRoom.index + 1} — ${currentRoom.title}`;
+}
+
+function renderCourseRoomShells(runtime) {
+    if (!COURSE_ID_FROM_URL) return;
+    clearCourseRoomShells();
+    if (!runtime?.modules?.length) {
+        updateCourseRoomContext();
+        return;
+    }
+
+    const roomWidth = 10;
+    const roomDepth = 8;
+    const wallHeight = 3;
+    const wallThickness = 0.25;
+    const doorWidth = 2.4;
+    const corridorWidth = 2.8;
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95, metalness: 0.05 });
+    const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x1d4ed8, emissiveIntensity: 0.12 });
+    const corridorMaterial = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, emissive: 0x1d4ed8, emissiveIntensity: 0.08, roughness: 0.92, metalness: 0.04 });
+    const centers = runtime.modules.map((module, index) => module.placement?.position || { x: Math.floor(index / 2) * 18, y: 0, z: index % 2 === 0 ? 0 : 10 });
+
+    const getDirection = (from, to) => {
+        if (!from || !to) return null;
+        const dx = to.x - from.x;
+        const dz = to.z - from.z;
+        if (Math.abs(dx) >= Math.abs(dz)) {
+            return dx >= 0 ? 'east' : 'west';
+        }
+        return dz >= 0 ? 'south' : 'north';
+    };
+
+    const registerCourseCollider = (mesh, relatedId) => {
+        mesh.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(mesh);
+        box.relatedId = relatedId;
+        wallBoxes.push(box);
+        courseRoomColliderIds.push(relatedId);
+    };
+
+    const buildWallWithDoor = (group, center, orientation, hasDoor, colliderBaseId) => {
+        let segmentCounter = 0;
+        const addSegment = (width, depth, x, z) => {
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(width, wallHeight, depth), wallMaterial.clone());
+            wall.position.set(x, wallHeight / 2, z);
+            group.add(wall);
+            registerCourseCollider(wall, `${colliderBaseId}_${orientation}_${segmentCounter++}`);
+        };
+
+        if (orientation === 'north' || orientation === 'south') {
+            const z = center.z + (orientation === 'south' ? roomDepth / 2 : -roomDepth / 2);
+            if (!hasDoor) {
+                addSegment(roomWidth, wallThickness, center.x, z);
+                return;
+            }
+            const segmentWidth = (roomWidth - doorWidth) / 2;
+            const offset = doorWidth / 2 + segmentWidth / 2;
+            addSegment(segmentWidth, wallThickness, center.x - offset, z);
+            addSegment(segmentWidth, wallThickness, center.x + offset, z);
+            return;
+        }
+
+        const x = center.x + (orientation === 'east' ? roomWidth / 2 : -roomWidth / 2);
+        if (!hasDoor) {
+            addSegment(wallThickness, roomDepth, x, center.z);
+            return;
+        }
+        const segmentDepth = (roomDepth - doorWidth) / 2;
+        const offset = doorWidth / 2 + segmentDepth / 2;
+        addSegment(wallThickness, segmentDepth, x, center.z - offset);
+        addSegment(wallThickness, segmentDepth, x, center.z + offset);
+    };
+
+    const buildCorridor = (from, to, direction, colliderBaseId) => {
+        if (!from || !to || !direction) return;
+        const corridor = new THREE.Mesh(
+            new THREE.BoxGeometry(
+                direction === 'east' || direction === 'west' ? Math.abs(to.x - from.x) - roomWidth : corridorWidth,
+                0.05,
+                direction === 'north' || direction === 'south' ? Math.abs(to.z - from.z) - roomDepth : corridorWidth
+            ),
+            corridorMaterial.clone()
+        );
+        corridor.receiveShadow = true;
+        corridor.position.set((from.x + to.x) / 2, 0.03, (from.z + to.z) / 2);
+        scene.add(corridor);
+
+        const isHorizontal = direction === 'east' || direction === 'west';
+        const railLength = isHorizontal ? corridor.geometry.parameters.width : corridor.geometry.parameters.depth;
+        const railOffset = corridorWidth / 2;
+        for (const side of [-1, 1]) {
+            const rail = new THREE.Mesh(
+                new THREE.BoxGeometry(isHorizontal ? railLength : wallThickness, 1.2, isHorizontal ? wallThickness : railLength),
+                wallMaterial.clone()
+            );
+            rail.position.set(
+                corridor.position.x + (isHorizontal ? 0 : side * railOffset),
+                0.6,
+                corridor.position.z + (isHorizontal ? side * railOffset : 0)
+            );
+            scene.add(rail);
+            registerCourseCollider(rail, `${colliderBaseId}_rail_${side === -1 ? 'left' : 'right'}`);
+        }
+    };
+
+    runtime.modules.forEach((module, index) => {
+        const center = centers[index];
+        const previousCenter = centers[index - 1] || null;
+        const nextCenter = centers[index + 1] || null;
+        const hasOpenPreviousConnection = Boolean(module.unlocked && previousCenter);
+        const hasOpenNextConnection = Boolean(runtime.modules[index + 1]?.unlocked && nextCenter);
+        const openPrev = hasOpenPreviousConnection ? getDirection(center, previousCenter) : null;
+        const openNext = hasOpenNextConnection ? getDirection(center, nextCenter) : null;
+        const openings = new Set([openPrev, openNext].filter(Boolean));
+        const roomGroup = new THREE.Group();
+        roomGroup.userData.courseRoom = true;
+        roomGroup.userData.moduleId = module.moduleId;
+        const colliderBaseId = `course_room_${module.moduleId}`;
+
+        const floor = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, 0.08, roomDepth), accentMaterial.clone());
+        floor.position.set(center.x, 0.04, center.z);
+        floor.receiveShadow = true;
+        roomGroup.add(floor);
+
+        buildWallWithDoor(roomGroup, center, 'north', openings.has('north'), colliderBaseId);
+        buildWallWithDoor(roomGroup, center, 'south', openings.has('south'), colliderBaseId);
+        buildWallWithDoor(roomGroup, center, 'east', openings.has('east'), colliderBaseId);
+        buildWallWithDoor(roomGroup, center, 'west', openings.has('west'), colliderBaseId);
+
+        scene.add(roomGroup);
+        courseRoomShells.push({
+            group: roomGroup,
+            moduleId: module.moduleId,
+            title: module.title,
+            index,
+            center,
+            halfWidth: roomWidth / 2,
+            halfDepth: roomDepth / 2
+        });
+
+        if (hasOpenNextConnection) {
+            buildCorridor(center, nextCenter, getDirection(center, nextCenter), `${colliderBaseId}_to_${runtime.modules[index + 1].moduleId}`);
+        }
+    });
+
+    updateCourseRoomContext();
+}
+
+// --- Environment Map Loading ---
+if (COURSE_ID_FROM_URL) {
+    createCourseModeBaseEnvironment();
+} else {
+    const mapLoader = new GLTFLoader();
+    mapLoader.load('assets/maps/map/map.glb', (gltf) => {
+        const environmentMap = gltf.scene;
+        scene.add(environmentMap);
+
+        environmentMap.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                const name = child.name ? child.name.toLowerCase() : '';
+
+                if (name.includes('navmesh')) {
+                    child.visible = false;
+                    child.updateMatrixWorld(true);
+                    const geo = child.geometry.clone();
+                    geo.applyMatrix4(child.matrixWorld);
+                    _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(geo));
+                    return;
+                }
+
+                if (name.includes('collision')) {
+                    child.visible = false;
+                } else if (name.includes('wall')) {
+                    child.userData.isStructure = true;
+                    if (child.material) {
+                        child.material = child.material.clone();
+                        child.material.transparent = true;
+                    }
+                }
+
+                child.userData.id = 'env_mesh_' + child.uuid;
+                preciseColliders.push(child);
+            }
+        });
+        console.log("Environment map loaded successfully.");
+    }, undefined, (error) => {
+        console.warn("Notice: No default map found or error loading map.glb");
+    });
+}
 
 // --- Animation Manager ---
 function applyCharacterColor(model, color) {
@@ -913,7 +1201,7 @@ function createGametag(id, name, color, isLocal, profilePictureUrl = null) {
             if (player && player.peerId) {
                 makeCall(player.peerId, name);
             } else {
-                alert('Jogador ainda não configurou canal de voz.');
+                alert('This player has not configured a voice channel yet.');
             }
         };
         element.querySelector('div > div:nth-child(2)').appendChild(callBtn);
@@ -943,7 +1231,7 @@ function updatePlayerList() {
     meInfoDiv.innerHTML = `
         <div class="player-status-dot"></div>
         <span class="player-name">${localUsername}</span>
-        <span class="is-me">VOCÊ</span>
+        <span class="is-me">YOU</span>
     `;
 
     meInfoDiv.onclick = (e) => {
@@ -1470,8 +1758,8 @@ placementModelUpload.addEventListener('change', async (e) => {
     if (!file || !contextMenuTarget) return;
 
     const id = contextMenuTarget.userData.id;
-    const idleAnim = prompt("Nome da animação IDLE (opcional):", "idle");
-    const interactedAnim = prompt("Nome da animação INTERAÇÃO (opcional):", "interacted");
+    const idleAnim = prompt("IDLE animation name (optional):", "idle");
+    const interactedAnim = prompt("INTERACTION animation name (optional):", "interacted");
 
     const formData = new FormData();
     formData.append('model', file);
@@ -1604,7 +1892,7 @@ function rotateObject(target, angle) {
     if (checkOverlap(newBox, target.userData.id)) {
         target.rotation.y = oldRotationY;
         target.updateMatrixWorld(true);
-        alert("Não é possível girar: Espaço ocupado!");
+        alert("Cannot rotate: space occupied!");
         return;
     }
 
@@ -1667,7 +1955,11 @@ window.addEventListener('mousedown', (event) => {
                 let root = hit.object;
                 while (root && root !== scene) {
                     if (root.userData && root.userData.isPlacement) {
-                        openModuleSidebar(root.userData.id, root.userData.moduleId);
+                        if (root.userData.isLocked) {
+                            alert('This module is still locked by the course path.');
+                            return;
+                        }
+                        openModuleSidebar(root.userData.id, root.userData.moduleId, root.userData.courseModuleId);
                         
                         // Trigger interacted animation if present
                         const mixerInfo = placementMixers[root.userData.id];
@@ -2190,6 +2482,7 @@ function animate() {
         updatePlayer(delta);
         updateOcclusion();
         updateGametags();
+        updateCourseRoomContext();
 
         // Diagnostic & Force Fixes
         if (camera.zoom <= 0) camera.zoom = 0.1; // Guard against scene disappearance
@@ -2374,6 +2667,13 @@ function createPlacedModel(data) {
 }
 
 function createModulePlacement(data) {
+    const existingUuid = idToUuid[data.id];
+    if (existingUuid) {
+        const existing = scene.getObjectByProperty('uuid', existingUuid);
+        if (existing) scene.remove(existing);
+        delete idToUuid[data.id];
+    }
+
     const group = new THREE.Group();
     const modelGroup = new THREE.Group();
     group.add(modelGroup);
@@ -2381,9 +2681,12 @@ function createModulePlacement(data) {
     // Initial state
     group.userData.id = data.id;
     group.userData.moduleId = data.moduleId;
+    group.userData.courseModuleId = data.courseModuleId || null;
     group.userData.moduleTitle = data.moduleTitle || '';
     group.userData.status = data.status || 'NONE'; 
     group.userData.isPlacement = true;
+    group.userData.isLocked = Boolean(data.isLocked);
+    group.userData.isCompleted = Boolean(data.isCompleted);
     group.userData.idleAnimName = data.idleAnim || 'idle';
     group.userData.interactedAnimName = data.interactedAnim || 'interacted';
 
@@ -2636,7 +2939,7 @@ moduleTabBtns.forEach(btn => {
     };
 });
 
-async function openModuleSidebar(placementId, moduleId) {
+async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
     const isOwner = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
     
     if (!moduleId) {
@@ -3137,14 +3440,14 @@ function renderModuleQuiz(quizzes) {
 
                 try {
                     submitBtn.disabled = true;
-                    submitBtn.innerText = 'Enviando...';
+                    submitBtn.innerText = 'Submitting...';
                     const res = await fetch(`${AUTH_API}/modules/${currentModuleId}/quiz/submit`, {
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${authToken}`
                         },
-                        body: JSON.stringify({ answers, source: 'MULTIPLAYER_WORLD' })
+                        body: JSON.stringify({ answers, source: 'MULTIPLAYER_WORLD', courseId: window.__courseWorldContext?.courseId || null })
                     });
                     const result = await res.json();
                     if (!res.ok) throw new Error(result.error || 'Erro ao enviar');
@@ -3209,6 +3512,7 @@ function renderModuleReports(module) {
 }
 
 async function fetchModulePlacements() {
+    if (COURSE_ID_FROM_URL) return;
     try {
         const response = await fetch(`${AUTH_API}/world/placements?sceneId=level1`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
@@ -3907,3 +4211,31 @@ assetModalOverlay.addEventListener('click', (e) => {
         assetModalOverlay.classList.add('hidden');
     }
 });
+
+window.__worldBridge = {
+    getAuthToken: () => authToken,
+    getAuthApi: () => AUTH_API,
+    getCourseId: () => COURSE_ID_FROM_URL,
+    getPlayerRole: () => localUserRole,
+    createModulePlacement,
+    openModuleSidebar,
+    renderCourseRoomShells,
+    getActiveCourseRoomModuleId: () => activeCourseRoomModuleId,
+    teleportTo(position) {
+        if (!position) return;
+        playerGroup.position.set(position.x, position.y ?? playerGroup.position.y, position.z);
+        controls.target.set(position.x, 0, position.z);
+        controls.update();
+        if (socket) {
+            socket.emit('playerMovement', {
+                position: { x: playerGroup.position.x, y: playerGroup.position.y, z: playerGroup.position.z },
+                rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
+                animation: 'idle',
+                isJumping: false,
+                jumpAlpha: 0,
+                didInteract: false,
+                interactionPoint: null
+            });
+        }
+    }
+};
