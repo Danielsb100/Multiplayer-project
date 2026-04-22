@@ -192,13 +192,13 @@
         </ul>
     </div>
 
-    <div id="course-room-context" class="ui-layer hidden" style="position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:1200; padding:0.85rem 1.25rem; border-radius:16px; background:rgba(15,23,42,0.92); border:1px solid rgba(255,255,255,0.08); box-shadow:0 20px 60px rgba(0,0,0,0.35); backdrop-filter:blur(18px); min-width:320px; text-align:center;">
+    <div id="course-room-context" class="ui-layer hidden" style="position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:1200; width:min(760px, calc(100vw - 24px)); padding:0.85rem 1.25rem; border-radius:16px; background:rgba(15,23,42,0.92); border:1px solid rgba(255,255,255,0.08); box-shadow:0 20px 60px rgba(0,0,0,0.35); backdrop-filter:blur(18px); text-align:center;">
         <div id="course-room-context-course" style="font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase; color:#60a5fa; margin-bottom:0.25rem;">Course world</div>
         <div id="course-room-context-room" style="font-size:1rem; font-weight:700; color:white;">Entering course world...</div>
         <button id="btn-show-course-landing" class="hidden" style="margin-top: 0.6rem; background: linear-gradient(135deg, #2563eb, #3b82f6); color: white; border: 1px solid rgba(96,165,250,0.5); padding: 0.35rem 1.2rem; border-radius: 999px; cursor: pointer; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; transition: all 150ms ease;">Ver Landing Page</button>
     </div>
 
-    <aside id="course-trail-panel" class="ui-layer hidden" style="position:fixed; right:20px; top:110px; width:360px; max-height:72vh; overflow:auto; padding:1rem; border-radius:20px; background:rgba(15,23,42,0.94); border:1px solid rgba(255,255,255,0.08); box-shadow:0 20px 60px rgba(0,0,0,0.35); backdrop-filter:blur(18px); z-index:1150;">
+    <aside id="course-trail-panel" class="ui-layer hidden" style="position:fixed; right:16px; top:96px; bottom:16px; width:min(360px, calc(100vw - 24px)); overflow:auto; padding:1rem; border-radius:20px; background:rgba(15,23,42,0.94); border:1px solid rgba(255,255,255,0.08); box-shadow:0 20px 60px rgba(0,0,0,0.35); backdrop-filter:blur(18px); overscroll-behavior:contain; z-index:1150;">
         <div style="display:flex; flex-direction:column; gap:0.35rem; margin-bottom:1rem;">
             <span style="font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase; color:#60a5fa;">Course world</span>
             <h3 id="course-trail-title" style="margin:0; font-size:1.15rem;">Course trail</h3>

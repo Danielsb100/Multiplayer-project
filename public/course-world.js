@@ -45,14 +45,11 @@
     }
 
     function normalizePlacement(module, index) {
-        if (module.placement) {
-            return module.placement;
-        }
         return {
-            id: `course-${window.__courseWorldContext.courseId}-module-${module.moduleId}`,
-            label: module.roomLabel || `Module Room ${index + 1}`,
-            position: { x: Math.floor(index / 2) * 18, y: 0, z: index % 2 === 0 ? 0 : 10 },
-            rotation: { x: 0, y: 0, z: 0 }
+            id: module.placement?.id || `course-${window.__courseWorldContext.courseId}-module-${module.moduleId}`,
+            label: module.roomLabel || module.placement?.label || `Module Room ${index + 1}`,
+            position: { x: index * 10, y: module.placement?.position?.y ?? 0, z: 0 },
+            rotation: module.placement?.rotation || { x: 0, y: 0, z: 0 }
         };
     }
 

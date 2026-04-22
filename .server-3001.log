@@ -1,0 +1,147 @@
+
+> threejs-viewer@1.0.0 start
+> node server.js
+
+========================================
+SERVER STARTING UP
+Time: 2026-04-22T15:55:28.465Z
+Port: 3001
+Binding: 0.0.0.0
+========================================
+[2026-04-22T15:55:47.197Z] GET /api/config
+[2026-04-22T15:58:20.087Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY4NzM0NjMsImV4cCI6MTc3Njk1OTg2M30.m22k-Tbgw8KJJt5vxx-Aoy7x6AK14cXarheY2mtITbM&courseId=1
+[2026-04-22T15:58:20.110Z] GET /styles.css
+[2026-04-22T15:58:20.198Z] GET /main.js?v=1.3.1
+[2026-04-22T15:58:20.210Z] GET /course-world.js?v=1
+[2026-04-22T15:58:21.810Z] GET /api/catalog
+[2026-04-22T15:58:21.834Z] GET /api/config
+[2026-04-22T15:58:22.102Z] GET /favicon.ico
+[2026-04-22T15:58:22.473Z] GET /favicon.ico
+[2026-04-22T15:58:22.475Z] GET /assets/character/player.glb?v=1776873502372
+User connected: XT8oAZfOS60fmPQlAAAB
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0.02014070746350966, y: 0, z: -0.22409674674762536 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 0.3289648885706577, y: 0, z: -3.6602468635445504 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 3.5566296609781576, y: 0, z: 0.0679321445340706 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 2.273218980038858, y: 0, z: 3.671192060783647 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 2.273218980038858, y: 0, z: 3.671192060783647 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 10, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 10, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 10, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 10, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 10, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 10, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 10, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 10, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 10, y: 0, z: 0 }
+[Movement Sync] Player admin (XT8oAZfOS60fmPQlAAAB) at: { x: 10, y: 0, z: 0 }
+User disconnected: XT8oAZfOS60fmPQlAAAB
+[2026-04-22T16:10:23.971Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY4NzM0NjMsImV4cCI6MTc3Njk1OTg2M30.m22k-Tbgw8KJJt5vxx-Aoy7x6AK14cXarheY2mtITbM&courseId=1
+[2026-04-22T16:10:23.989Z] GET /styles.css
+[2026-04-22T16:10:24.045Z] GET /main.js?v=1.3.1
+[2026-04-22T16:10:24.054Z] GET /course-world.js?v=1
+[2026-04-22T16:10:24.909Z] GET /api/catalog
+[2026-04-22T16:10:24.909Z] GET /api/config
+[2026-04-22T16:10:25.272Z] GET /favicon.ico
+[2026-04-22T16:10:25.797Z] GET /assets/character/player.glb?v=1776874225793
+[2026-04-22T16:10:25.946Z] GET /favicon.ico
+User connected: fn6auvGjohVot8_pAAAD
+[Movement Sync] Player admin (fn6auvGjohVot8_pAAAD) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (fn6auvGjohVot8_pAAAD) at: { x: 0, y: 0, z: 0 }
+User disconnected: fn6auvGjohVot8_pAAAD
+[2026-04-22T16:10:44.008Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY4NzM0NjMsImV4cCI6MTc3Njk1OTg2M30.m22k-Tbgw8KJJt5vxx-Aoy7x6AK14cXarheY2mtITbM&courseId=1
+[2026-04-22T16:10:44.028Z] GET /styles.css
+[2026-04-22T16:10:44.105Z] GET /main.js?v=1.3.1
+[2026-04-22T16:10:44.144Z] GET /course-world.js?v=1
+[2026-04-22T16:10:45.031Z] GET /api/catalog
+[2026-04-22T16:10:45.031Z] GET /api/config
+[2026-04-22T16:10:45.320Z] GET /favicon.ico
+[2026-04-22T16:10:45.695Z] GET /assets/character/player.glb?v=1776874245689
+User connected: y3pe5wBTO04bEfsIAAAF
+[2026-04-22T16:10:45.883Z] GET /favicon.ico
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (y3pe5wBTO04bEfsIAAAF) at: { x: 0, y: 0, z: 0 }
+[2026-04-22T16:13:32.923Z] GET /
+User disconnected: y3pe5wBTO04bEfsIAAAF
+[2026-04-22T16:13:32.950Z] GET /styles.css
+[2026-04-22T16:13:32.956Z] GET /main.js?v=1.3.1
+[2026-04-22T16:13:32.962Z] GET /course-world.js?v=1
+[2026-04-22T16:13:33.073Z] GET /api/catalog
+[2026-04-22T16:13:33.076Z] GET /api/config
+[2026-04-22T16:13:33.115Z] GET /assets/maps/map/map.glb
+[2026-04-22T16:13:33.182Z] GET /favicon.ico
+[2026-04-22T16:14:13.588Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY4NzM0NjMsImV4cCI6MTc3Njk1OTg2M30.m22k-Tbgw8KJJt5vxx-Aoy7x6AK14cXarheY2mtITbM&courseId=1
+[2026-04-22T16:14:13.610Z] GET /styles.css
+[2026-04-22T16:14:13.612Z] GET /main.js?v=1.3.1
+[2026-04-22T16:14:13.613Z] GET /course-world.js?v=1
+[2026-04-22T16:14:13.665Z] GET /api/catalog
+[2026-04-22T16:14:13.665Z] GET /api/config
+[2026-04-22T16:14:13.781Z] GET /favicon.ico
+[2026-04-22T16:14:14.037Z] GET /assets/character/player.glb?v=1776874454033
+User connected: I5jkJfAw6EkBaBDZAAAH
+[2026-04-22T16:14:14.111Z] GET /favicon.ico
+[Movement Sync] Player admin (I5jkJfAw6EkBaBDZAAAH) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (I5jkJfAw6EkBaBDZAAAH) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (I5jkJfAw6EkBaBDZAAAH) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (I5jkJfAw6EkBaBDZAAAH) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (I5jkJfAw6EkBaBDZAAAH) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (I5jkJfAw6EkBaBDZAAAH) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (I5jkJfAw6EkBaBDZAAAH) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (I5jkJfAw6EkBaBDZAAAH) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (I5jkJfAw6EkBaBDZAAAH) at: { x: 0, y: 0, z: 0 }
+User disconnected: I5jkJfAw6EkBaBDZAAAH
