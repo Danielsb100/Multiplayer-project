@@ -21,6 +21,7 @@ const passwordInput = document.getElementById('password-input');
 const loginError = document.getElementById('login-error');
 let AUTH_API = 'https://login-system-production-84c6.up.railway.app';
 const COURSE_ID_FROM_URL = Number(new URLSearchParams(window.location.search).get('courseId')) || null;
+document.body.classList.toggle('course-world-mode', Boolean(COURSE_ID_FROM_URL));
 window.__courseWorldContext = { courseId: COURSE_ID_FROM_URL, runtime: null };
 const courseRoomContextCard = document.getElementById('course-room-context');
 const courseRoomContextCourse = document.getElementById('course-room-context-course');
@@ -853,11 +854,11 @@ function renderCourseRoomShells(runtime) {
         return;
     }
 
-    const roomWidth = 10;
-    const roomDepth = 8;
+    const roomWidth = 14;
+    const roomDepth = 10;
     const wallHeight = 3;
     const wallThickness = 0.25;
-    const doorWidth = 2.4;
+    const doorWidth = 3.2;
     const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95, metalness: 0.05 });
     const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x1d4ed8, emissiveIntensity: 0.12 });
     const roomSpacing = roomWidth;
@@ -1434,7 +1435,16 @@ function loadPlayerModel(path, color, container, isLocal = false, remoteId = nul
 // --- Input Handling ---
 const keys = { w: false, a: false, s: false, d: false, ' ': false, e: false };
 const chatInput = document.getElementById('chat-input');
+const chatHistoryContainer = document.getElementById('chat-history-container');
 const chatHistory = document.getElementById('chat-history');
+
+function syncChatHistoryVisibility() {
+    if (!chatHistoryContainer || !chatHistory) return;
+    const shouldHide = !chatHistory.children.length;
+    chatHistoryContainer.classList.toggle('hidden', shouldHide);
+}
+
+syncChatHistoryVisibility();
 
 window.addEventListener('keydown', (e) => {
     if (document.activeElement === emailInput || document.activeElement === passwordInput) return;
@@ -2558,6 +2568,7 @@ function addMessageToChat(data) {
     while (chatHistory.children.length > 50) {
         chatHistory.removeChild(chatHistory.firstChild);
     }
+    syncChatHistoryVisibility();
 }
 
 // Old model loading functions removed.
@@ -2967,6 +2978,9 @@ const tabPanes = document.querySelectorAll('.tab-pane');
 
 let currentModuleId = null;
 let currentPlacementId = null;
+let currentCourseModuleId = null;
+let currentModulePayload = null;
+let currentModuleRuntimeState = null;
 
 btnCloseSidebar.onclick = () => moduleSidebar.classList.add('hidden');
 
@@ -3858,6 +3872,259 @@ function renderModuleReports(module) {
             </div>
         `;
     }
+}
+
+function getActiveCourseRuntimeModule(courseModuleId = currentCourseModuleId, moduleId = currentModuleId) {
+    const runtimeModules = window.__courseWorldContext?.runtime?.modules || [];
+    return runtimeModules.find((entry) => {
+        if (courseModuleId && entry.courseModuleId === courseModuleId) return true;
+        return entry.moduleId === moduleId;
+    }) || null;
+}
+
+function updateRuntimeModuleFromQuizSubmission(score) {
+    const runtimeModule = getActiveCourseRuntimeModule();
+    if (!runtimeModule) return null;
+    const bestQuizScore = runtimeModule.bestQuizScore === null || runtimeModule.bestQuizScore === undefined
+        ? score
+        : Math.max(runtimeModule.bestQuizScore, score);
+    runtimeModule.bestQuizScore = bestQuizScore;
+    runtimeModule.latestQuizScore = score;
+    runtimeModule.quizAttemptCount = Number(runtimeModule.quizAttemptCount || 0) + 1;
+    if (runtimeModule.quizRequirementActive) {
+        runtimeModule.quizPassed = bestQuizScore >= Number(runtimeModule.minimumQuizScore || 0);
+    }
+    currentModuleRuntimeState = runtimeModule;
+    return runtimeModule;
+}
+
+function refreshCourseWorldRuntime() {
+    if (!COURSE_ID_FROM_URL) {
+        currentModuleRuntimeState = getActiveCourseRuntimeModule();
+        return Promise.resolve(window.__courseWorldContext?.runtime || null);
+    }
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const handleRuntimeUpdated = (event) => {
+            settled = true;
+            currentModuleRuntimeState = getActiveCourseRuntimeModule();
+            resolve(event.detail || window.__courseWorldContext?.runtime || null);
+        };
+
+        window.addEventListener('course-world:runtime-updated', handleRuntimeUpdated, { once: true });
+        window.dispatchEvent(new CustomEvent('course-world:refresh-runtime'));
+
+        window.setTimeout(() => {
+            if (settled) return;
+            window.removeEventListener('course-world:runtime-updated', handleRuntimeUpdated);
+            currentModuleRuntimeState = getActiveCourseRuntimeModule();
+            resolve(window.__courseWorldContext?.runtime || null);
+        }, 3000);
+    });
+}
+
+async function openModuleSidebarLegacy(placementId, moduleId, courseModuleId = null) {
+    const isOwner = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
+
+    if (!moduleId) {
+        if (isOwner) {
+            alert('Este sinalizador ainda nÃ£o possui um mÃ³dulo vinculado. Clique com o botÃ£o direito para vincular.');
+        } else {
+            alert('Este mÃ³dulo ainda nÃ£o foi configurado pelo professor.');
+        }
+        return;
+    }
+
+    currentModuleId = moduleId;
+    currentPlacementId = placementId;
+    currentCourseModuleId = courseModuleId || null;
+    currentModulePayload = null;
+    currentModuleRuntimeState = getActiveCourseRuntimeModule(courseModuleId, moduleId);
+
+    moduleTitle.innerText = 'Carregando...';
+    moduleDescription.innerText = '';
+    if (moduleGeneralShortcuts) moduleGeneralShortcuts.innerHTML = '';
+    if (moduleGeneralAssets) moduleGeneralAssets.innerHTML = '';
+    document.getElementById('sidebar-preview-banner').classList.remove('active');
+    moduleSidebar.classList.remove('hidden');
+    activateModuleTab('general');
+
+    try {
+        const response = await fetch(`${AUTH_API}/runtime/modules/${moduleId}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const module = await response.json();
+
+        if (response.status === 403) {
+            const errorMsg = module.error || 'MÃ³dulo indisponÃ­vel ou em manutenÃ§Ã£o.';
+            alert(errorMsg);
+            moduleSidebar.classList.add('hidden');
+            return;
+        }
+
+        if (!response.ok) throw new Error(module.error || 'Erro ao carregar mÃ³dulo');
+
+        currentModulePayload = module;
+        currentModuleRuntimeState = getActiveCourseRuntimeModule(courseModuleId, moduleId);
+        moduleTitle.innerText = module.title;
+        moduleDescription.innerText = module.description || 'Sem descriÃ§Ã£o.';
+
+        if (module.isPreview) {
+            document.getElementById('sidebar-preview-banner').classList.add('active');
+        }
+
+        renderModuleGeneral(module);
+        renderModuleVideos(module.videos);
+        renderModuleDocs(module.documents);
+        renderModuleQuiz(module.quizzes);
+        renderModuleForum(moduleId);
+        renderModuleReports(module);
+
+        fetch(`${AUTH_API}/modules/${moduleId}/access`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                source: 'MULTIPLAYER_WORLD',
+                sceneId: COURSE_ID_FROM_URL ? `course-${COURSE_ID_FROM_URL}` : 'level1',
+                placementId
+            })
+        });
+    } catch (err) {
+        alert('Erro: ' + err.message);
+        moduleSidebar.classList.add('hidden');
+    }
+}
+
+function renderModuleQuizLegacy(quizzes) {
+    const container = document.querySelector('#module-tab-quiz .quiz-container');
+    const submitBtn = document.getElementById('btn-submit-quiz');
+    if (!container || !submitBtn) return;
+
+    currentModuleRuntimeState = getActiveCourseRuntimeModule();
+    const hasQuizzes = Boolean(quizzes && quizzes.length);
+    if (!hasQuizzes) {
+        container.innerHTML = '<p style="padding: 20px; color: #94a3b8;">Nenhum quiz disponÃ­vel.</p>';
+        submitBtn.classList.add('hidden');
+        submitBtn.onclick = null;
+        return;
+    }
+
+    const bestScore = currentModuleRuntimeState?.bestQuizScore;
+    const minimumScore = currentModuleRuntimeState?.minimumQuizScore;
+    const quizGateActive = Boolean(currentModuleRuntimeState?.quizRequirementActive);
+    const quizPassed = Boolean(currentModuleRuntimeState?.quizPassed);
+    const gateCopy = quizGateActive
+        ? `This room only unlocks after you mark it done and score at least ${Math.round(minimumScore || 0)}% on the quiz.`
+        : 'Complete the full module quiz to register your score.';
+    const scoreCopy = bestScore === null || bestScore === undefined
+        ? 'No graded attempt yet.'
+        : `Best attempt: ${bestScore.toFixed(1)}%${quizGateActive ? (quizPassed ? ' • Requirement met' : ' • Requirement not met yet') : ''}`;
+
+    container.innerHTML = `
+        <div style="margin-bottom: 18px; padding: 14px 16px; border-radius: 14px; border: 1px solid ${quizGateActive ? 'rgba(96,165,250,0.28)' : 'rgba(255,255,255,0.08)'}; background: ${quizGateActive ? 'rgba(37,99,235,0.12)' : 'rgba(255,255,255,0.04)'};">
+            <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:center;">
+                <strong style="color:#f8fafc;">${quizGateActive ? 'Quiz gate active' : 'Module quiz'}</strong>
+                ${quizGateActive ? `<span style="font-size:0.75rem; padding:0.25rem 0.55rem; border-radius:999px; color:${quizPassed ? '#d1fae5' : '#dbeafe'}; background:${quizPassed ? 'rgba(16,185,129,0.16)' : 'rgba(59,130,246,0.16)'}; border:1px solid ${quizPassed ? 'rgba(52,211,153,0.3)' : 'rgba(96,165,250,0.26)'};">${quizPassed ? 'Passed' : `Need ${Math.round(minimumScore || 0)}%`}</span>` : ''}
+            </div>
+            <p style="margin:10px 0 6px; color:#cbd5e1; font-size:0.88rem; line-height:1.5;">${gateCopy}</p>
+            <p style="margin:0; color:${bestScore === null || bestScore === undefined ? '#94a3b8' : (quizPassed ? '#86efac' : '#93c5fd')}; font-size:0.82rem;">${scoreCopy}</p>
+        </div>
+    `;
+
+    (quizzes || []).forEach((quiz, quizIndex) => {
+        const questionCount = quiz.questions?.length || 0;
+        const quizBox = document.createElement('div');
+        quizBox.className = 'quiz-box glassmorphism';
+        quizBox.style.marginBottom = '20px';
+        quizBox.style.padding = '15px';
+        quizBox.style.borderRadius = '12px';
+        quizBox.style.background = 'rgba(255,255,255,0.05)';
+        quizBox.innerHTML = `
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+                <h3 style="color: var(--accent-color); margin: 0;">${quiz.title}</h3>
+                <span style="font-size:0.76rem; color:#94a3b8;">${questionCount} question${questionCount === 1 ? '' : 's'}</span>
+            </div>
+        `;
+
+        quiz.questions.forEach((q, qIdx) => {
+            const qDiv = document.createElement('div');
+            qDiv.className = 'quiz-question';
+            qDiv.style.marginBottom = '15px';
+            qDiv.innerHTML = `<p style="margin-bottom: 8px;"><strong>${quizIndex + 1}.${qIdx + 1} ${q.text}</strong></p>`;
+
+            q.options.forEach((opt) => {
+                const optDiv = document.createElement('div');
+                optDiv.style.marginBottom = '4px';
+                optDiv.innerHTML = `
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="radio" name="quiz_${quiz.id}_question_${q.id}" value="${opt.id}">
+                        ${opt.text}
+                    </label>
+                `;
+                qDiv.appendChild(optDiv);
+            });
+            quizBox.appendChild(qDiv);
+        });
+
+        container.appendChild(quizBox);
+    });
+
+    submitBtn.classList.remove('hidden');
+    submitBtn.innerText = 'Submit Full Quiz';
+    submitBtn.disabled = false;
+    submitBtn.onclick = async () => {
+        const answers = [];
+        let totalQuestions = 0;
+
+        (quizzes || []).forEach((quiz) => {
+            quiz.questions.forEach((question) => {
+                totalQuestions += 1;
+                const selected = container.querySelector(`input[name="quiz_${quiz.id}_question_${question.id}"]:checked`);
+                if (selected) {
+                    answers.push({ questionId: question.id, optionId: parseInt(selected.value, 10) });
+                }
+            });
+        });
+
+        if (answers.length < totalQuestions) {
+            alert('Answer every question before submitting the full quiz.');
+            return;
+        }
+
+        try {
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Submitting...';
+            const res = await fetch(`${AUTH_API}/modules/${currentModuleId}/quiz/submit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    answers,
+                    source: 'MULTIPLAYER_WORLD',
+                    courseId: window.__courseWorldContext?.courseId || null
+                })
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Erro ao enviar');
+
+            updateRuntimeModuleFromQuizSubmission(result.score);
+            await refreshCourseWorldRuntime();
+            currentModuleRuntimeState = getActiveCourseRuntimeModule();
+            renderModuleQuiz(quizzes);
+            alert(`Quiz submitted. Score: ${result.score.toFixed(1)}%`);
+        } catch (err) {
+            alert('Erro ao enviar quiz: ' + err.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Submit Full Quiz';
+        }
+    };
 }
 
 async function fetchModulePlacements() {

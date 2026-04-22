@@ -522,6 +522,41 @@ input[type="file"] {
     border-radius: 10px;
 }
 
+body.course-world-mode #player-list-container {
+    top: 6.4rem;
+    left: 1rem;
+    width: min(320px, calc(100vw - 32px));
+    max-height: calc(100vh - 7.4rem);
+    z-index: 1100;
+}
+
+body.course-world-mode #chat-history-container {
+    top: 6.4rem;
+    right: 24rem;
+    width: min(300px, calc(100vw - 440px));
+    max-height: calc(100vh - 7.4rem);
+    z-index: 1090;
+}
+
+body.course-world-mode #course-room-context {
+    top: 1rem !important;
+    width: min(560px, calc(100vw - 32px)) !important;
+    padding: 0.8rem 1.15rem !important;
+}
+
+body.course-world-mode .world-operations-card {
+    top: 6.4rem;
+    right: 24rem;
+    z-index: 1080;
+}
+
+@media (max-width: 1280px) {
+    body.course-world-mode #chat-history-container,
+    body.course-world-mode .world-operations-card {
+        display: none !important;
+    }
+}
+
 /* Estilo de cada mensagem individual */
 .chat-msg {
     font-size: 0.85rem;
