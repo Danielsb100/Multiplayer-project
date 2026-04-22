@@ -67,6 +67,8 @@ console.log("GAME_LOADED: Version 1.3.1 - VIDEO_IDENTITY_FIXED");
 
 let lastStateChangeTime = 0;
 const STATE_CHANGE_DEBOUNCE = 300; // ms
+const PRIMARY_DRAG_PAN_THRESHOLD = 8;
+let primaryPointerState = null;
 
 // User Color Logic
 const LOGIN_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ffffff', '#94a3b8'];
@@ -776,6 +778,12 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.zoomSpeed = 0.8; // More gradual zoom for mouse side-buttons
 controls.minZoom = 0.001; // Guard against scene disappearance
+controls.enablePan = true;
+controls.screenSpacePanning = true;
+controls.panSpeed = 0.9;
+controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
 controls.target.set(0, 0, 0);
 controls.enableRotate = false; // Keep isometric view
 
@@ -850,21 +858,14 @@ function renderCourseRoomShells(runtime) {
     const wallHeight = 3;
     const wallThickness = 0.25;
     const doorWidth = 2.4;
-    const corridorWidth = 2.8;
     const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95, metalness: 0.05 });
     const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x1d4ed8, emissiveIntensity: 0.12 });
-    const corridorMaterial = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, emissive: 0x1d4ed8, emissiveIntensity: 0.08, roughness: 0.92, metalness: 0.04 });
-    const centers = runtime.modules.map((module, index) => module.placement?.position || { x: Math.floor(index / 2) * 18, y: 0, z: index % 2 === 0 ? 0 : 10 });
-
-    const getDirection = (from, to) => {
-        if (!from || !to) return null;
-        const dx = to.x - from.x;
-        const dz = to.z - from.z;
-        if (Math.abs(dx) >= Math.abs(dz)) {
-            return dx >= 0 ? 'east' : 'west';
-        }
-        return dz >= 0 ? 'south' : 'north';
-    };
+    const roomSpacing = roomWidth;
+    const centers = runtime.modules.map((module, index) => ({
+        x: index * roomSpacing,
+        y: module?.placement?.position?.y ?? 0,
+        z: 0
+    }));
 
     const registerCourseCollider = (mesh, relatedId) => {
         mesh.updateMatrixWorld(true);
@@ -874,80 +875,38 @@ function renderCourseRoomShells(runtime) {
         courseRoomColliderIds.push(relatedId);
     };
 
-    const buildWallWithDoor = (group, center, orientation, hasDoor, colliderBaseId) => {
+    const addWallSegment = (group, width, depth, x, z, colliderId) => {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(width, wallHeight, depth), wallMaterial.clone());
+        wall.position.set(x, wallHeight / 2, z);
+        group.add(wall);
+        registerCourseCollider(wall, colliderId);
+    };
+
+    const buildNorthSouthWall = (group, center, orientation, colliderBaseId) => {
+        const z = center.z + (orientation === 'south' ? roomDepth / 2 : -roomDepth / 2);
+        addWallSegment(group, roomWidth, wallThickness, center.x, z, `${colliderBaseId}_${orientation}`);
+    };
+
+    const buildSharedWall = (group, x, centerZ, hasDoor, colliderBaseId) => {
         let segmentCounter = 0;
-        const addSegment = (width, depth, x, z) => {
-            const wall = new THREE.Mesh(new THREE.BoxGeometry(width, wallHeight, depth), wallMaterial.clone());
-            wall.position.set(x, wallHeight / 2, z);
-            group.add(wall);
-            registerCourseCollider(wall, `${colliderBaseId}_${orientation}_${segmentCounter++}`);
+        const addSegment = (depth, z) => {
+            addWallSegment(group, wallThickness, depth, x, z, `${colliderBaseId}_${segmentCounter++}`);
         };
 
-        if (orientation === 'north' || orientation === 'south') {
-            const z = center.z + (orientation === 'south' ? roomDepth / 2 : -roomDepth / 2);
-            if (!hasDoor) {
-                addSegment(roomWidth, wallThickness, center.x, z);
-                return;
-            }
-            const segmentWidth = (roomWidth - doorWidth) / 2;
-            const offset = doorWidth / 2 + segmentWidth / 2;
-            addSegment(segmentWidth, wallThickness, center.x - offset, z);
-            addSegment(segmentWidth, wallThickness, center.x + offset, z);
-            return;
-        }
-
-        const x = center.x + (orientation === 'east' ? roomWidth / 2 : -roomWidth / 2);
         if (!hasDoor) {
-            addSegment(wallThickness, roomDepth, x, center.z);
+            addSegment(roomDepth, centerZ);
             return;
         }
         const segmentDepth = (roomDepth - doorWidth) / 2;
         const offset = doorWidth / 2 + segmentDepth / 2;
-        addSegment(wallThickness, segmentDepth, x, center.z - offset);
-        addSegment(wallThickness, segmentDepth, x, center.z + offset);
-    };
-
-    const buildCorridor = (from, to, direction, colliderBaseId) => {
-        if (!from || !to || !direction) return;
-        const corridor = new THREE.Mesh(
-            new THREE.BoxGeometry(
-                direction === 'east' || direction === 'west' ? Math.abs(to.x - from.x) - roomWidth : corridorWidth,
-                0.05,
-                direction === 'north' || direction === 'south' ? Math.abs(to.z - from.z) - roomDepth : corridorWidth
-            ),
-            corridorMaterial.clone()
-        );
-        corridor.receiveShadow = true;
-        corridor.position.set((from.x + to.x) / 2, 0.03, (from.z + to.z) / 2);
-        scene.add(corridor);
-
-        const isHorizontal = direction === 'east' || direction === 'west';
-        const railLength = isHorizontal ? corridor.geometry.parameters.width : corridor.geometry.parameters.depth;
-        const railOffset = corridorWidth / 2;
-        for (const side of [-1, 1]) {
-            const rail = new THREE.Mesh(
-                new THREE.BoxGeometry(isHorizontal ? railLength : wallThickness, 1.2, isHorizontal ? wallThickness : railLength),
-                wallMaterial.clone()
-            );
-            rail.position.set(
-                corridor.position.x + (isHorizontal ? 0 : side * railOffset),
-                0.6,
-                corridor.position.z + (isHorizontal ? side * railOffset : 0)
-            );
-            scene.add(rail);
-            registerCourseCollider(rail, `${colliderBaseId}_rail_${side === -1 ? 'left' : 'right'}`);
-        }
+        addSegment(segmentDepth, centerZ - offset);
+        addSegment(segmentDepth, centerZ + offset);
     };
 
     runtime.modules.forEach((module, index) => {
         const center = centers[index];
-        const previousCenter = centers[index - 1] || null;
         const nextCenter = centers[index + 1] || null;
-        const hasOpenPreviousConnection = Boolean(module.unlocked && previousCenter);
-        const hasOpenNextConnection = Boolean(runtime.modules[index + 1]?.unlocked && nextCenter);
-        const openPrev = hasOpenPreviousConnection ? getDirection(center, previousCenter) : null;
-        const openNext = hasOpenNextConnection ? getDirection(center, nextCenter) : null;
-        const openings = new Set([openPrev, openNext].filter(Boolean));
+        const nextModule = runtime.modules[index + 1] || null;
         const roomGroup = new THREE.Group();
         roomGroup.userData.courseRoom = true;
         roomGroup.userData.moduleId = module.moduleId;
@@ -958,10 +917,23 @@ function renderCourseRoomShells(runtime) {
         floor.receiveShadow = true;
         roomGroup.add(floor);
 
-        buildWallWithDoor(roomGroup, center, 'north', openings.has('north'), colliderBaseId);
-        buildWallWithDoor(roomGroup, center, 'south', openings.has('south'), colliderBaseId);
-        buildWallWithDoor(roomGroup, center, 'east', openings.has('east'), colliderBaseId);
-        buildWallWithDoor(roomGroup, center, 'west', openings.has('west'), colliderBaseId);
+        buildNorthSouthWall(roomGroup, center, 'north', colliderBaseId);
+        buildNorthSouthWall(roomGroup, center, 'south', colliderBaseId);
+
+        if (index === 0) {
+            buildSharedWall(roomGroup, center.x - roomWidth / 2, center.z, false, `${colliderBaseId}_west_outer`);
+        }
+        if (!nextCenter) {
+            buildSharedWall(roomGroup, center.x + roomWidth / 2, center.z, false, `${colliderBaseId}_east_outer`);
+        } else {
+            buildSharedWall(
+                roomGroup,
+                center.x + roomSpacing / 2,
+                center.z,
+                Boolean(nextModule?.unlocked),
+                `${colliderBaseId}_to_${nextModule.moduleId}`
+            );
+        }
 
         scene.add(roomGroup);
         courseRoomShells.push({
@@ -973,10 +945,6 @@ function renderCourseRoomShells(runtime) {
             halfWidth: roomWidth / 2,
             halfDepth: roomDepth / 2
         });
-
-        if (hasOpenNextConnection) {
-            buildCorridor(center, nextCenter, getDirection(center, nextCenter), `${colliderBaseId}_to_${runtime.modules[index + 1].moduleId}`);
-        }
     });
 
     updateCourseRoomContext();
@@ -1928,12 +1896,139 @@ document.querySelectorAll('.color-option').forEach(opt => {
     });
 });
 
+function beginPrimaryPointer(event) {
+    primaryPointerState = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        dragged: false
+    };
+}
+
+function consumePrimaryPointerState() {
+    const state = primaryPointerState;
+    primaryPointerState = null;
+    return state;
+}
+
+function panCameraFromPointerDelta(deltaX, deltaY) {
+    const viewportWidth = renderer.domElement.clientWidth || window.innerWidth;
+    const viewportHeight = renderer.domElement.clientHeight || window.innerHeight;
+    if (!viewportWidth || !viewportHeight) return;
+
+    const worldUnitsPerPixelX = ((camera.right - camera.left) / camera.zoom) / viewportWidth;
+    const worldUnitsPerPixelY = ((camera.top - camera.bottom) / camera.zoom) / viewportHeight;
+    const panOffset = new THREE.Vector3();
+    const cameraRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+    const cameraUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+
+    panOffset.addScaledVector(cameraRight, -deltaX * worldUnitsPerPixelX);
+    panOffset.addScaledVector(cameraUp, deltaY * worldUnitsPerPixelY);
+
+    camera.position.add(panOffset);
+    controls.target.add(panOffset);
+    controls.update();
+}
+
+function updatePrimaryPointerState(event) {
+    if (!primaryPointerState || currentPlacementState !== PlacementState.NONE || (event.buttons & 1) !== 1) return;
+    const deltaX = event.clientX - primaryPointerState.clientX;
+    const deltaY = event.clientY - primaryPointerState.clientY;
+
+    if (!primaryPointerState.dragged && Math.hypot(deltaX, deltaY) >= PRIMARY_DRAG_PAN_THRESHOLD) {
+        primaryPointerState.dragged = true;
+        cursorMarker.visible = false;
+    }
+
+    if (!primaryPointerState.dragged) return;
+
+    panCameraFromPointerDelta(deltaX, deltaY);
+    primaryPointerState.clientX = event.clientX;
+    primaryPointerState.clientY = event.clientY;
+}
+
+function handlePrimaryWorldClick(event) {
+    const rect = container.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(scene.children, true);
+
+    for (const hit of intersects) {
+        let root = hit.object;
+        while (root && root !== scene) {
+            if (root.userData && root.userData.isPlacement) {
+                if (root.userData.isLocked) {
+                    alert('This module is still locked by the course path.');
+                    return;
+                }
+                openModuleSidebar(root.userData.id, root.userData.moduleId, root.userData.courseModuleId);
+
+                const mixerInfo = placementMixers[root.userData.id];
+                if (mixerInfo && mixerInfo.actions.interacted) {
+                    const action = mixerInfo.actions.interacted;
+                    action.reset().setLoop(THREE.LoopOnce).play();
+                    action.clampWhenFinished = false;
+                }
+
+                return;
+            }
+            root = root.parent;
+        }
+    }
+
+    if (!intersects.length) return;
+
+    let hitPoint = null;
+    for (const hit of intersects) {
+        let isPlayerOrGhost = false;
+        let root = hit.object;
+        while (root && root !== scene) {
+            if (root === playerGroup || (root.userData && root.userData.isOptimistic)) isPlayerOrGhost = true;
+            root = root.parent;
+        }
+        if (!isPlayerOrGhost) {
+            hitPoint = hit.point;
+            break;
+        }
+    }
+
+    if (!hitPoint) return;
+
+    const startPos = playerGroup.position.clone();
+    try {
+        const zoneData = _pathfinding.zones[_navmeshZone];
+        let groupID = 0;
+        if (zoneData && zoneData.groups) {
+            let minDist = Infinity;
+            for (let g = 0; g < zoneData.groups.length; g++) {
+                const node = _pathfinding.getClosestNode(startPos, _navmeshZone, g);
+                if (node) {
+                    const dist = node.centroid.distanceToSquared(startPos);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        groupID = g;
+                    }
+                }
+            }
+        } else {
+            groupID = _pathfinding.getGroup(_navmeshZone, startPos) || 0;
+        }
+
+        const path = _pathfinding.findPath(startPos, hitPoint, _navmeshZone, groupID);
+        localPlayerPath = (path && path.length > 0) ? path : [hitPoint];
+    } catch (e) {
+        console.error("Pathfinding error:", e);
+        localPlayerPath = [hitPoint];
+    }
+}
+
 window.addEventListener('mousedown', (event) => {
     if (localUsername === '' || document.activeElement === chatInput || isMenuOpen || isOverUI(event)) return;
 
     // Feature: Cancel with RIGHT click immediately
     if (event.button === 2 && currentPlacementState !== PlacementState.NONE) {
         cancelPlacement();
+        primaryPointerState = null;
         event.preventDefault();
         event.stopImmediatePropagation();
         return;
@@ -1941,85 +2036,14 @@ window.addEventListener('mousedown', (event) => {
 
     if (event.button !== 0) return; // Only left-click
 
+    if (currentPlacementState === PlacementState.NONE) {
+        beginPrimaryPointer(event);
+        return;
+    }
+
     try {
         console.log("Mousedown - Button:", event.button, "State:", currentPlacementState);
-        if (currentPlacementState === PlacementState.NONE) {
-            // --- Module Placement Interaction ---
-            const rect = container.getBoundingClientRect();
-            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(scene.children, true);
-            
-            for (const hit of intersects) {
-                let root = hit.object;
-                while (root && root !== scene) {
-                    if (root.userData && root.userData.isPlacement) {
-                        if (root.userData.isLocked) {
-                            alert('This module is still locked by the course path.');
-                            return;
-                        }
-                        openModuleSidebar(root.userData.id, root.userData.moduleId, root.userData.courseModuleId);
-                        
-                        // Trigger interacted animation if present
-                        const mixerInfo = placementMixers[root.userData.id];
-                        if (mixerInfo && mixerInfo.actions['interacted']) {
-                            const action = mixerInfo.actions['interacted'];
-                            action.reset().setLoop(THREE.LoopOnce).play();
-                            action.clampWhenFinished = false;
-                        }
-
-                        return; // Prevent pathfinding if clicked on placement
-                    }
-                    root = root.parent;
-                }
-            }
-
-            // --- Pathfinding Interaction ---
-            if (intersects.length > 0) {
-                let hitPoint = null;
-                for (const hit of intersects) {
-                    let isPlayerOrGhost = false;
-                    let root = hit.object;
-                    while (root && root !== scene) {
-                        if (root === playerGroup || (root.userData && root.userData.isOptimistic)) isPlayerOrGhost = true;
-                        root = root.parent;
-                    }
-                    if (!isPlayerOrGhost) {
-                        hitPoint = hit.point;
-                        break;
-                    }
-                }
-                if (hitPoint) {
-                    const startPos = playerGroup.position.clone();
-                    try {
-                        const zoneData = _pathfinding.zones[_navmeshZone];
-                        let groupID = 0;
-                        if (zoneData && zoneData.groups) {
-                            let minDist = Infinity;
-                            for (let g = 0; g < zoneData.groups.length; g++) {
-                                const node = _pathfinding.getClosestNode(startPos, _navmeshZone, g);
-                                if (node) {
-                                    const dist = node.centroid.distanceToSquared(startPos);
-                                    if (dist < minDist) {
-                                        minDist = dist;
-                                        groupID = g;
-                                    }
-                                }
-                            }
-                        } else {
-                            groupID = _pathfinding.getGroup(_navmeshZone, startPos) || 0;
-                        }
-
-                        const path = _pathfinding.findPath(startPos, hitPoint, _navmeshZone, groupID);
-                        localPlayerPath = (path && path.length > 0) ? path : [hitPoint];
-                    } catch (e) {
-                        console.error("Pathfinding error:", e);
-                        localPlayerPath = [hitPoint];
-                    }
-                }
-            }
-        } else if (currentPlacementState === PlacementState.HEIGHT) {
+        if (currentPlacementState === PlacementState.HEIGHT) {
             // Phase 3: Finalize
             console.log("Finalizing placement...");
             const previewBox = new THREE.Box3().setFromObject(previewCube);
@@ -2055,8 +2079,20 @@ window.addEventListener('mousedown', (event) => {
 
 window.addEventListener('mouseup', (event) => {
     if (event.button !== 0) return; // ONLY LEFT CLICK
+    const pointerState = consumePrimaryPointerState();
     if (isOverUI(event)) return;
     if (Date.now() - lastStateChangeTime < STATE_CHANGE_DEBOUNCE) return;
+
+    if (currentPlacementState === PlacementState.NONE) {
+        if (!pointerState?.dragged && localUsername !== '' && document.activeElement !== chatInput && !isMenuOpen) {
+            try {
+                handlePrimaryWorldClick(event);
+            } catch (err) {
+                console.error("Error in primary click:", err);
+            }
+        }
+        return;
+    }
 
     if (currentPlacementState === PlacementState.BASE) {
         // Phase 2: Start Height Definition
@@ -2078,8 +2114,11 @@ window.addEventListener('mousemove', (event) => {
         customCursor.classList.remove('ui-hover');
     }
 
+    updatePrimaryPointerState(event);
+    const isPrimaryPanning = Boolean(primaryPointerState?.dragged && (event.buttons & 1) === 1);
+
     // --- 3D Cursor Projection ---
-    if (currentPlacementState === PlacementState.NONE) {
+    if (currentPlacementState === PlacementState.NONE && !isPrimaryPanning) {
         const rect = container.getBoundingClientRect();
         mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;

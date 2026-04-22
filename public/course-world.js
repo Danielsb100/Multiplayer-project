@@ -7,6 +7,24 @@
     let latestRuntime = null;
     let lastRenderedActiveModuleId = null;
 
+    // Course Landing Modal
+    const btnLanding = document.getElementById('btn-show-course-landing');
+    const modalLanding = document.getElementById('course-landing-modal');
+    const closeLandingBtn = document.getElementById('close-course-landing');
+    const landingCssEl = document.getElementById('course-landing-custom-css');
+    const landingContentEl = document.getElementById('course-landing-content');
+
+    if (closeLandingBtn && modalLanding) {
+        closeLandingBtn.addEventListener('click', () => {
+            modalLanding.classList.add('hidden');
+        });
+        modalLanding.addEventListener('click', (e) => {
+            if (e.target === modalLanding) {
+                modalLanding.classList.add('hidden');
+            }
+        });
+    }
+
     function escapeHtml(value) {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -27,14 +45,11 @@
     }
 
     function normalizePlacement(module, index) {
-        if (module.placement) {
-            return module.placement;
-        }
         return {
-            id: `course-${window.__courseWorldContext.courseId}-module-${module.moduleId}`,
-            label: module.roomLabel || `Module Room ${index + 1}`,
-            position: { x: Math.floor(index / 2) * 18, y: 0, z: index % 2 === 0 ? 0 : 10 },
-            rotation: { x: 0, y: 0, z: 0 }
+            id: module.placement?.id || `course-${window.__courseWorldContext.courseId}-module-${module.moduleId}`,
+            label: module.roomLabel || module.placement?.label || `Module Room ${index + 1}`,
+            position: { x: index * 10, y: module.placement?.position?.y ?? 0, z: 0 },
+            rotation: module.placement?.rotation || { x: 0, y: 0, z: 0 }
         };
     }
 
@@ -155,6 +170,29 @@
             throw new Error(runtime.error || 'Failed to load course runtime.');
         }
         window.__courseWorldContext.runtime = runtime;
+
+        if (runtime.landingPage && runtime.landingPage.compiledHtml && btnLanding) {
+            btnLanding.classList.remove('hidden');
+            btnLanding.onclick = () => {
+                if (runtime.landingPage.compiledCss && landingCssEl) {
+                    landingCssEl.innerHTML = runtime.landingPage.compiledCss;
+                } else if (bridge.getAuthApi) {
+                    let link = document.getElementById('dynamic-landing-css');
+                    if (!link) {
+                        const cssUrl = bridge.getAuthApi() + '/css/modular-style.css';
+                        link = document.createElement('link');
+                        link.id = 'dynamic-landing-css';
+                        link.rel = 'stylesheet';
+                        link.href = cssUrl;
+                        document.head.appendChild(link);
+                    }
+                }
+                if (landingContentEl) {
+                    landingContentEl.innerHTML = `<div id="landing-page-builder-section" class="view-mode" style="min-height: 100%;">${runtime.landingPage.compiledHtml}</div>`;
+                }
+                modalLanding.classList.remove('hidden');
+            };
+        }
 
         (runtime.modules || []).forEach((module, index) => {
             const placement = normalizePlacement(module, index);
