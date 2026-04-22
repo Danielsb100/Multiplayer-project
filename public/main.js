@@ -2960,6 +2960,8 @@ const moduleSidebar = document.getElementById('module-sidebar');
 const btnCloseSidebar = document.getElementById('close-module-sidebar');
 const moduleTitle = document.getElementById('module-sidebar-title');
 const moduleDescription = document.getElementById('module-description');
+const moduleGeneralShortcuts = document.getElementById('module-general-shortcuts');
+const moduleGeneralAssets = document.getElementById('module-general-assets');
 const moduleTabBtns = document.querySelectorAll('.module-tab-btn');
 const tabPanes = document.querySelectorAll('.tab-pane');
 
@@ -2968,14 +2970,13 @@ let currentPlacementId = null;
 
 btnCloseSidebar.onclick = () => moduleSidebar.classList.add('hidden');
 
+function activateModuleTab(tab) {
+    moduleTabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+    tabPanes.forEach(pane => pane.classList.toggle('active', pane.id === `module-tab-${tab}`));
+}
+
 moduleTabBtns.forEach(btn => {
-    btn.onclick = () => {
-        const tab = btn.dataset.tab;
-        moduleTabBtns.forEach(b => b.classList.remove('active'));
-        tabPanes.forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(`module-tab-${tab}`).classList.add('active');
-    };
+    btn.onclick = () => activateModuleTab(btn.dataset.tab);
 });
 
 async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
@@ -2996,10 +2997,12 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
     // Reset UI
     moduleTitle.innerText = 'Carregando...';
     moduleDescription.innerText = '';
+    if (moduleGeneralShortcuts) moduleGeneralShortcuts.innerHTML = '';
+    if (moduleGeneralAssets) moduleGeneralAssets.innerHTML = '';
     document.getElementById('sidebar-preview-banner').classList.remove('active');
     moduleSidebar.classList.remove('hidden');
     // Set default tab
-    moduleTabBtns[0].click();
+    activateModuleTab('general');
 
     try {
         const response = await fetch(`${AUTH_API}/runtime/modules/${moduleId}`, {
@@ -3023,6 +3026,7 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
             document.getElementById('sidebar-preview-banner').classList.add('active');
         }
 
+        renderModuleGeneral(module);
         renderModuleVideos(module.videos);
         renderModuleDocs(module.documents);
         renderModuleQuiz(module.quizzes);
@@ -3122,6 +3126,312 @@ function roundRect(ctx, x, y, width, height, radius, fill) {
     ctx.quadraticCurveTo(x, y, x + radius, y);
     ctx.closePath();
     if (fill) ctx.fill();
+}
+
+function getModuleDocumentUrl(doc) {
+    return `${AUTH_API}/api/documents/download/${doc.documentId || doc.id}`;
+}
+
+function classifyModuleDocument(doc) {
+    const ext = doc.title ? doc.title.split('.').pop().toLowerCase() : '';
+    const tType = (doc.type || '').toLowerCase();
+
+    if (tType === 'application/pdf' || ext === 'pdf') {
+        return { kind: 'pdf', label: 'PDF', accent: '#f87171' };
+    }
+
+    if (tType.includes('word') || tType.includes('officedocument.wordprocessingml') || ['doc', 'docx'].includes(ext)) {
+        return { kind: 'word', label: 'Word', accent: '#60a5fa' };
+    }
+
+    if (tType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+        return { kind: 'img', label: 'Imagem', accent: '#34d399' };
+    }
+
+    return { kind: 'file', label: 'Arquivo', accent: '#94a3b8' };
+}
+
+function trackModuleVideoProgress(videoId) {
+    fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${videoId}/progress`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
+    }).catch(() => {});
+}
+
+function trackModuleDocumentDownload(doc) {
+    fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${doc.id}/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
+    }).catch(() => {});
+}
+
+function previewModuleImageDocument(doc) {
+    previewContent.innerHTML = '';
+
+    const fullImg = document.createElement('img');
+    fullImg.src = getModuleDocumentUrl(doc);
+    fullImg.style.maxWidth = '100%';
+    fullImg.style.maxHeight = '70vh';
+    fullImg.style.objectFit = 'contain';
+    previewContent.appendChild(fullImg);
+
+    btnDownloadPreview.style.display = 'inline-block';
+    btnDownloadPreview.onclick = () => {
+        window.downloadSharedAsset(doc.documentId || doc.id, doc.title);
+    };
+
+    previewModal.classList.remove('hidden');
+}
+
+function openModuleDocumentAsset(doc) {
+    const docMeta = classifyModuleDocument(doc);
+    if (docMeta.kind === 'img') {
+        previewModuleImageDocument(doc);
+        return;
+    }
+
+    window.open(getModuleDocumentUrl(doc), '_blank', 'noopener');
+    trackModuleDocumentDownload(doc);
+}
+
+function downloadModuleDocumentAsset(doc) {
+    window.downloadSharedAsset(doc.documentId || doc.id, doc.title);
+    trackModuleDocumentDownload(doc);
+}
+
+function openModuleVideoAsset(video) {
+    playModuleVideo(video);
+    trackModuleVideoProgress(video.id);
+}
+
+function openModuleForumFromSidebar() {
+    window.open(`${AUTH_API.replace('api', '')}`, '_blank');
+}
+
+function openModuleReportsFromSidebar() {
+    if (localUserRole === 'MASTER' || localUserRole === 'ADMIN') {
+        window.open(`${AUTH_API.replace('api', '')}/dashboard`, '_blank');
+        return;
+    }
+
+    activateModuleTab('reports');
+}
+
+function buildModuleGeneralShortcut(label, count, onClick) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'module-general-shortcut';
+    button.innerHTML = `<span>${label}</span><strong>${count}</strong>`;
+    button.onclick = onClick;
+    return button;
+}
+
+function buildModuleGeneralItem({ label, accent, title, caption, actionLabel, onClick }) {
+    const item = document.createElement('div');
+    item.className = 'module-general-item';
+
+    const meta = document.createElement('div');
+    meta.className = 'module-general-item-meta';
+
+    const pill = document.createElement('span');
+    pill.className = 'module-general-pill';
+    pill.innerText = label;
+    pill.style.color = accent;
+    pill.style.borderColor = `${accent}33`;
+    pill.style.background = `${accent}1a`;
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'module-general-item-title';
+    titleEl.innerText = title;
+
+    meta.appendChild(pill);
+    meta.appendChild(titleEl);
+
+    if (caption) {
+        const captionEl = document.createElement('div');
+        captionEl.className = 'module-general-item-caption';
+        captionEl.innerText = caption;
+        meta.appendChild(captionEl);
+    }
+
+    const action = document.createElement('button');
+    action.type = 'button';
+    action.className = 'btn-open';
+    action.innerText = actionLabel || 'Open';
+    action.onclick = onClick;
+
+    item.appendChild(meta);
+    item.appendChild(action);
+    return item;
+}
+
+function buildModuleGeneralSection(title, helperText, items, actionLabel, onAction) {
+    const section = document.createElement('section');
+    section.className = 'module-general-section';
+
+    const head = document.createElement('div');
+    head.className = 'module-general-section-head';
+
+    const copy = document.createElement('div');
+    const titleEl = document.createElement('h3');
+    titleEl.innerText = title;
+    copy.appendChild(titleEl);
+
+    if (helperText) {
+        const helper = document.createElement('span');
+        helper.innerText = helperText;
+        copy.appendChild(helper);
+    }
+
+    head.appendChild(copy);
+
+    if (actionLabel && typeof onAction === 'function') {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'module-general-link';
+        link.innerText = actionLabel;
+        link.onclick = onAction;
+        head.appendChild(link);
+    }
+
+    const list = document.createElement('div');
+    list.className = 'module-general-list';
+    items.forEach(item => list.appendChild(buildModuleGeneralItem(item)));
+
+    section.appendChild(head);
+    section.appendChild(list);
+    return section;
+}
+
+function renderModuleGeneral(module) {
+    if (!moduleGeneralShortcuts || !moduleGeneralAssets) return;
+
+    const videos = Array.isArray(module.videos) ? module.videos : [];
+    const documents = Array.isArray(module.documents) ? module.documents : [];
+    const quizzes = Array.isArray(module.quizzes) ? module.quizzes : [];
+
+    moduleGeneralShortcuts.innerHTML = '';
+    moduleGeneralAssets.innerHTML = '';
+
+    const shortcuts = [
+        { label: 'Videos', count: videos.length, onClick: () => activateModuleTab('videos') },
+        { label: 'Docs', count: documents.length, onClick: () => activateModuleTab('docs') },
+        { label: 'Quiz', count: quizzes.length, onClick: () => activateModuleTab('quiz') },
+        { label: 'Forum', count: 1, onClick: () => activateModuleTab('forum') },
+        { label: 'Reports', count: 1, onClick: () => activateModuleTab('reports') }
+    ];
+
+    shortcuts
+        .filter(shortcut => shortcut.count > 0)
+        .forEach(shortcut => {
+            moduleGeneralShortcuts.appendChild(
+                buildModuleGeneralShortcut(shortcut.label, shortcut.count, shortcut.onClick)
+            );
+        });
+
+    const sections = [];
+
+    if (videos.length) {
+        sections.push(buildModuleGeneralSection(
+            'Videos',
+            `${videos.length} item${videos.length === 1 ? '' : 's'}`,
+            videos.map(video => ({
+                label: 'Video',
+                accent: '#f59e0b',
+                title: video.title || 'Untitled video',
+                caption: 'Play directly from General.',
+                actionLabel: 'Open',
+                onClick: () => openModuleVideoAsset(video)
+            })),
+            'Open tab',
+            () => activateModuleTab('videos')
+        ));
+    }
+
+    if (documents.length) {
+        sections.push(buildModuleGeneralSection(
+            'Documents',
+            `${documents.length} file${documents.length === 1 ? '' : 's'}`,
+            documents.map(doc => {
+                const docMeta = classifyModuleDocument(doc);
+                return {
+                    label: docMeta.label,
+                    accent: docMeta.accent,
+                    title: doc.title || 'Untitled document',
+                    caption: docMeta.kind === 'img' ? 'Preview image from General.' : 'Open the file directly.',
+                    actionLabel: 'Open',
+                    onClick: () => openModuleDocumentAsset(doc)
+                };
+            }),
+            'Open tab',
+            () => activateModuleTab('docs')
+        ));
+    }
+
+    if (quizzes.length) {
+        sections.push(buildModuleGeneralSection(
+            'Quiz',
+            `${quizzes.length} available`,
+            quizzes.map(quiz => ({
+                label: 'Quiz',
+                accent: '#a78bfa',
+                title: quiz.title || 'Module quiz',
+                caption: 'Jump to the quiz tab and submit answers there.',
+                actionLabel: 'Go to quiz',
+                onClick: () => activateModuleTab('quiz')
+            })),
+            'Open tab',
+            () => activateModuleTab('quiz')
+        ));
+    }
+
+    sections.push(buildModuleGeneralSection(
+        'Forum',
+        'Discuss the module with the team.',
+        [{
+            label: 'Forum',
+            accent: '#38bdf8',
+            title: 'Module discussion',
+            caption: 'Open the forum directly from General.',
+            actionLabel: 'Open',
+            onClick: () => openModuleForumFromSidebar()
+        }],
+        'Open tab',
+        () => activateModuleTab('forum')
+    ));
+
+    sections.push(buildModuleGeneralSection(
+        'Reports',
+        localUserRole === 'MASTER' || localUserRole === 'ADMIN'
+            ? 'Open the reports dashboard for this module.'
+            : 'Check your progress summary.',
+        [{
+            label: 'Reports',
+            accent: '#34d399',
+            title: localUserRole === 'MASTER' || localUserRole === 'ADMIN'
+                ? 'Module analytics dashboard'
+                : 'Progress summary',
+            caption: localUserRole === 'MASTER' || localUserRole === 'ADMIN'
+                ? 'Open the dashboard in a new tab.'
+                : 'View your current module progress.',
+            actionLabel: 'Open',
+            onClick: () => openModuleReportsFromSidebar()
+        }],
+        'Open tab',
+        () => activateModuleTab('reports')
+    ));
+
+    if (!sections.length) {
+        moduleGeneralAssets.innerHTML = '<p class="module-general-empty">No extra content available in this module yet.</p>';
+        return;
+    }
+
+    sections.forEach(section => moduleGeneralAssets.appendChild(section));
 }
 
 function renderModuleVideos(videos) {
