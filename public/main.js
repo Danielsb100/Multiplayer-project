@@ -776,8 +776,8 @@ function openCatalog(type, onSelect) {
 // --- 1. Scene Setup ---
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#0f172a');
-scene.fog = new THREE.FogExp2('#0f172a', 0.005); // Relaxed fog for production visibility
+scene.background = new THREE.Color('#f8f9fa');
+scene.fog = new THREE.FogExp2('#f8f9fa', 0.005); // Relaxed fog for production visibility
 
 const clock = new THREE.Clock(); // For animations
 
@@ -793,7 +793,7 @@ camera.lookAt(0, 0, 0);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -816,16 +816,16 @@ controls.enableRotate = false; // Keep isometric view
 function createCourseModeBaseEnvironment() {
     const floor = new THREE.Mesh(
         new THREE.PlaneGeometry(220, 220),
-        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95, metalness: 0.05 })
+        new THREE.MeshStandardMaterial({ color: 0xf8f9fa, roughness: 0.95, metalness: 0.05 })
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
+    floor.receiveShadow = false;
     floor.userData.id = 'course_floor';
     scene.add(floor);
 
-    const grid = new THREE.GridHelper(220, 22, 0x334155, 0x1e293b);
-    grid.position.y = 0.01;
-    scene.add(grid);
+    // const grid = new THREE.GridHelper(220, 22, 0x334155, 0x1e293b);
+    // grid.position.y = 0.01;
+    // scene.add(grid);
 }
 
 function prepareCourseRoomModelTemplate(root) {
@@ -1078,7 +1078,7 @@ function renderCourseRoomShells(runtime) {
     const wallHeight = 3;
     const wallThickness = 0.25;
     const doorWidth = 3.2;
-    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95, metalness: 0.05 });
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.95, metalness: 0.05 });
     const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x1d4ed8, emissiveIntensity: 0.12 });
     const doorBlockerMaterial = new THREE.MeshStandardMaterial({
         color: 0x1d4ed8,
