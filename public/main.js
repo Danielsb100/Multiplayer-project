@@ -1216,6 +1216,14 @@ function renderCourseRoomShells(runtime) {
                 }
             });
 
+            // CRITICAL FIX: The procedural walls were hidden but their collision boxes remained in memory!
+            // We must purge their mathematical boxes from the physics array so the GLB colliders take over cleanly.
+            for (let i = wallBoxes.length - 1; i >= 0; i--) {
+                if (wallBoxes[i].relatedId && wallBoxes[i].relatedId.startsWith(colliderBaseId)) {
+                    wallBoxes.splice(i, 1);
+                }
+            }
+
             shellModel.updateMatrixWorld(true);
             shellModel.traverse((child) => {
                 if (child.isMesh) {
