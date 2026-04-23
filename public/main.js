@@ -1258,14 +1258,6 @@ function renderCourseRoomShells(runtime) {
                 }
             });
 
-            // CRITICAL FIX: The procedural walls were hidden but their collision boxes remained in memory!
-            // We must purge their mathematical boxes from the physics array so the GLB colliders take over cleanly.
-            for (let i = wallBoxes.length - 1; i >= 0; i--) {
-                if (wallBoxes[i].relatedId && wallBoxes[i].relatedId.startsWith(colliderBaseId)) {
-                    wallBoxes.splice(i, 1);
-                }
-            }
-
             if (nextCenter && !nextModule?.unlocked) {
                 addDoorBlocker(roomGroup, center.x + roomSpacing / 2, center.z);
             }
@@ -1281,10 +1273,10 @@ function renderCourseRoomShells(runtime) {
         try {
             const mergedGeometry = BufferGeometryUtils.mergeGeometries(window.__navmeshGeometries, false);
             if (mergedGeometry) {
-                // Stitch vertices that are within 0.15 units of each other to close the modeling gaps
-                const stitchedGeometry = BufferGeometryUtils.mergeVertices(mergedGeometry, 0.15);
+                // Stitch vertices that are within 0.50 units of each other to close modeling gaps
+                const stitchedGeometry = BufferGeometryUtils.mergeVertices(mergedGeometry, 0.50);
                 _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(stitchedGeometry));
-                console.log("Procedural NavMesh merged and stitched successfully (15cm tolerance)!");
+                console.log("Procedural NavMesh merged and stitched successfully (50cm tolerance)!");
             }
         } catch (err) {
             console.error("Error merging Procedural NavMeshes:", err);
