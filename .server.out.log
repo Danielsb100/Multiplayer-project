@@ -341,3 +341,17 @@ User connected: b3w-VFaedMATp_21AAAZ
 [Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 0.5259097484447833, y: 0, z: -9.966791593913985 }
 [Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 0.5259097484447833, y: 0, z: -9.966791593913985 }
 [Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 0.5259097484447833, y: 0, z: -9.966791593913985 }
+User disconnected: b3w-VFaedMATp_21AAAZ
+User disconnected: lwDM8zoPiRqmtHqRAAAT
+User connected: rrlb0BBEeUiuCZ2CAAAb
+User connected: ak2Zl7HcOnLX9ovaAAAd
+[2026-04-23T02:29:05.229Z] GET /assets/character/player.glb?v=1776911345149
+[2026-04-23T02:29:05.278Z] GET /assets/character/player.glb?v=1776911345153
+User disconnected: ak2Zl7HcOnLX9ovaAAAd
+User disconnected: rrlb0BBEeUiuCZ2CAAAb
+User connected: 4giY0wStHTUQQ-c7AAAf
+User connected: DpzcE2Dwrn4PvPn7AAAh
+[2026-04-23T03:54:07.032Z] GET /assets/character/player.glb?v=1776916446733
+[2026-04-23T03:54:07.988Z] GET /assets/character/player.glb?v=1776916447774
+User disconnected: 4giY0wStHTUQQ-c7AAAf
+User disconnected: DpzcE2Dwrn4PvPn7AAAh
