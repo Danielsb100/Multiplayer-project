@@ -96,8 +96,8 @@
         <div class="menu-header">
             <span id="action-menu-name">Username</span>
         </div>
-        <div class="menu-item" id="btn-call-player">📞 Ligar</div>
-        <div class="menu-item" id="btn-view-assets">📁 Ver Assets</div>
+        <div class="menu-item" id="btn-call-player">Call</div>
+        <div class="menu-item" id="btn-view-assets">View Assets</div>
     </div>
 
     <!-- Assets Modal (Download shared documents) -->
@@ -292,12 +292,21 @@
 
     <!-- Estrutura do Chat Global - Histórico (Canto Superior Direito) -->
     <div id="chat-history-container" class="ui-layer">
+        <div class="chat-panel-header">
+            <div>
+                <span class="chat-panel-eyebrow">Room chat</span>
+                <strong>Conversation</strong>
+            </div>
+            <span class="chat-panel-hint">Enter to focus</span>
+        </div>
+        <div id="chat-history-empty">No messages yet. Press <kbd>Enter</kbd> or use the field below to start chatting.</div>
         <div id="chat-history"></div>
     </div>
 
     <!-- Estrutura do Chat Global - Entrada de Texto (Canto Inferior Direito) -->
     <div id="chat-input-container" class="ui-layer">
-        <input type="text" id="chat-input" placeholder="Type your message..." autocomplete="off">
+        <input type="text" id="chat-input" placeholder="Type your message and press Enter" autocomplete="off">
+        <button type="button" id="chat-send-btn">Send</button>
     </div>
 
     <!-- Menu de Contexto (Botão Direito) -->
