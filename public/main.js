@@ -1706,24 +1706,45 @@ const keys = { w: false, a: false, s: false, d: false, ' ': false, e: false };
 const chatInput = document.getElementById('chat-input');
 const chatHistoryContainer = document.getElementById('chat-history-container');
 const chatHistory = document.getElementById('chat-history');
+const chatHistoryEmpty = document.getElementById('chat-history-empty');
+const chatSendBtn = document.getElementById('chat-send-btn');
+
+function sendChatMessage() {
+    const msg = chatInput?.value?.trim();
+    if (!msg || !socket) return;
+    socket.emit('chatMessage', msg);
+    chatInput.value = '';
+    chatInput.focus();
+}
 
 function syncChatHistoryVisibility() {
     if (!chatHistoryContainer || !chatHistory) return;
-    const shouldHide = !chatHistory.children.length;
-    chatHistoryContainer.classList.toggle('hidden', shouldHide);
+    const hasMessages = chatHistory.children.length > 0;
+    if (chatHistoryEmpty) {
+        chatHistoryEmpty.classList.toggle('hidden', hasMessages);
+    }
+
+    if (document.body.classList.contains('course-world-mode')) {
+        chatHistoryContainer.classList.remove('hidden');
+        return;
+    }
+
+    chatHistoryContainer.classList.toggle('hidden', !hasMessages);
 }
 
 syncChatHistoryVisibility();
+
+if (chatSendBtn) {
+    chatSendBtn.addEventListener('click', () => sendChatMessage());
+}
 
 window.addEventListener('keydown', (e) => {
     if (document.activeElement === emailInput || document.activeElement === passwordInput) return;
     if (document.activeElement === chatInput) {
         if (e.key === 'Enter') {
-            const msg = chatInput.value.trim();
-            if (msg) {
-                socket.emit('chatMessage', msg);
-                chatInput.value = '';
-            }
+            e.preventDefault();
+            sendChatMessage();
+        } else if (e.key === 'Escape') {
             chatInput.blur();
         }
         return;
