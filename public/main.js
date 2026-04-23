@@ -3257,7 +3257,7 @@ menuPlaceModule.addEventListener('click', async () => {
                 'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify({
-                sceneId: 'level1',
+                sceneId: COURSE_ID_FROM_URL ? `course-${COURSE_ID_FROM_URL}` : 'level1',
                 objectType: 'TEACHING_MODULE_BEACON',
                 position: contextMenuPoint,
                 rotation: { x: 0, y: 0, z: 0 },
@@ -3371,6 +3371,26 @@ let currentPlacementId = null;
 let currentCourseModuleId = null;
 let currentModulePayload = null;
 let currentModuleRuntimeState = null;
+const moduleForumState = {
+    moduleId: null,
+    threads: [],
+    activeThreadId: null,
+    activeThread: null,
+    loadingList: false,
+    loadingThread: false,
+    creatingThread: false,
+    replying: false,
+    threadDraftTitle: '',
+    threadDraftContent: '',
+    replyDraftContent: '',
+    listError: '',
+    threadError: ''
+};
+let moduleForumRequestToken = 0;
+const moduleForumDateFormatter = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+});
 
 btnCloseSidebar.onclick = () => moduleSidebar.classList.add('hidden');
 
@@ -3397,6 +3417,9 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
 
     currentModuleId = moduleId;
     currentPlacementId = placementId;
+    currentCourseModuleId = courseModuleId || null;
+    currentModulePayload = null;
+    currentModuleRuntimeState = getActiveCourseRuntimeModule(courseModuleId, moduleId);
 
     // Reset UI
     moduleTitle.innerText = 'Carregando...';
@@ -3423,6 +3446,8 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
 
         if (!response.ok) throw new Error(module.error || 'Erro ao carregar módulo');
 
+        currentModulePayload = module;
+        currentModuleRuntimeState = getActiveCourseRuntimeModule(courseModuleId, moduleId);
         moduleTitle.innerText = module.title;
         moduleDescription.innerText = module.description || 'Sem descrição.';
 
@@ -3446,7 +3471,7 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
             },
             body: JSON.stringify({
                 source: 'MULTIPLAYER_WORLD',
-                sceneId: 'level1',
+                sceneId: COURSE_ID_FROM_URL ? `course-${COURSE_ID_FROM_URL}` : 'level1',
                 placementId: placementId
             })
         });
@@ -3614,7 +3639,530 @@ function openModuleVideoAsset(video) {
 }
 
 function openModuleForumFromSidebar() {
-    window.open(`${AUTH_API.replace('api', '')}`, '_blank');
+    activateModuleTab('forum');
+    const threadTitleInput = document.getElementById('module-forum-thread-title');
+    threadTitleInput?.focus();
+}
+
+function isModuleForumRequestCurrent(requestToken, moduleId = currentModuleId) {
+    return requestToken === moduleForumRequestToken
+        && moduleForumState.moduleId === moduleId
+        && currentModuleId === moduleId;
+}
+
+function resetModuleForumState(moduleId) {
+    moduleForumRequestToken += 1;
+    moduleForumState.moduleId = moduleId;
+    moduleForumState.threads = [];
+    moduleForumState.activeThreadId = null;
+    moduleForumState.activeThread = null;
+    moduleForumState.loadingList = true;
+    moduleForumState.loadingThread = false;
+    moduleForumState.creatingThread = false;
+    moduleForumState.replying = false;
+    moduleForumState.threadDraftTitle = '';
+    moduleForumState.threadDraftContent = '';
+    moduleForumState.replyDraftContent = '';
+    moduleForumState.listError = '';
+    moduleForumState.threadError = '';
+    return moduleForumRequestToken;
+}
+
+function formatModuleForumDate(value) {
+    if (!value) return 'Just now';
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return 'Just now';
+    }
+
+    return moduleForumDateFormatter.format(parsed);
+}
+
+function renderModuleForumText(content) {
+    return escapeWorldHtml(content || '').replace(/\n/g, '<br>');
+}
+
+function summarizeModuleForumText(content, maxLength = 140) {
+    const normalized = String(content || '').replace(/\s+/g, ' ').trim();
+    if (!normalized) return 'No description provided yet.';
+    if (normalized.length <= maxLength) return normalized;
+    return `${normalized.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function getModuleForumReplyCount(thread) {
+    return Number(thread?._count?.replies ?? thread?.replies?.length ?? 0);
+}
+
+function renderModuleForumThreadList() {
+    if (moduleForumState.loadingList) {
+        return `
+            <div class="module-forum-loading">
+                Loading module discussions...
+            </div>
+        `;
+    }
+
+    if (moduleForumState.listError) {
+        return `
+            <div class="module-forum-error">
+                <p>${escapeWorldHtml(moduleForumState.listError)}</p>
+                <button type="button" class="module-forum-ghost" data-forum-action="refresh">Try again</button>
+            </div>
+        `;
+    }
+
+    if (!moduleForumState.threads.length) {
+        return `
+            <div class="module-forum-empty">
+                <strong>No discussions yet.</strong>
+                <span>Start the first thread to capture questions, blockers, and insights from this room.</span>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="module-forum-thread-items">
+            ${moduleForumState.threads.map((thread) => {
+                const replyCount = getModuleForumReplyCount(thread);
+                const isActive = thread.id === moduleForumState.activeThreadId;
+                return `
+                    <button
+                        type="button"
+                        class="module-forum-thread-card ${isActive ? 'active' : ''}"
+                        data-forum-thread-id="${thread.id}"
+                    >
+                        <div class="module-forum-thread-card-head">
+                            <span class="module-forum-thread-card-title">${escapeWorldHtml(thread.title || 'Untitled thread')}</span>
+                            <span class="module-forum-thread-card-date">${escapeWorldHtml(formatModuleForumDate(thread.createdAt))}</span>
+                        </div>
+                        <p class="module-forum-thread-card-preview">${escapeWorldHtml(summarizeModuleForumText(thread.content))}</p>
+                        <div class="module-forum-thread-card-meta">
+                            <span>${escapeWorldHtml(thread.user?.username || 'Unknown author')}</span>
+                            <span>${replyCount} repl${replyCount === 1 ? 'y' : 'ies'}</span>
+                        </div>
+                    </button>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+function renderModuleForumThreadDetail() {
+    if (!moduleForumState.threads.length && !moduleForumState.loadingList) {
+        return `
+            <div class="module-forum-empty">
+                <strong>Your team can use this forum for each module.</strong>
+                <span>Create a thread above and replies will stay attached to this room.</span>
+            </div>
+        `;
+    }
+
+    if (!moduleForumState.activeThreadId) {
+        return `
+            <div class="module-forum-empty">
+                <strong>Select a discussion.</strong>
+                <span>Pick a thread from the list to read the full context and reply.</span>
+            </div>
+        `;
+    }
+
+    if (moduleForumState.loadingThread) {
+        return `
+            <div class="module-forum-loading">
+                Loading thread details...
+            </div>
+        `;
+    }
+
+    if (moduleForumState.threadError) {
+        return `
+            <div class="module-forum-error">
+                <p>${escapeWorldHtml(moduleForumState.threadError)}</p>
+                <button type="button" class="module-forum-ghost" data-forum-action="reload-thread">Reload thread</button>
+            </div>
+        `;
+    }
+
+    const thread = moduleForumState.activeThread;
+    if (!thread) {
+        return `
+            <div class="module-forum-empty">
+                <strong>Thread unavailable.</strong>
+                <span>Refresh the forum list and try again.</span>
+            </div>
+        `;
+    }
+
+    const replies = Array.isArray(thread.replies) ? thread.replies : [];
+    return `
+        <div class="module-forum-post module-forum-post-root">
+            <div class="module-forum-post-head">
+                <div>
+                    <span class="module-forum-post-author">${escapeWorldHtml(thread.user?.username || 'Unknown author')}</span>
+                    <span class="module-forum-post-date">${escapeWorldHtml(formatModuleForumDate(thread.createdAt))}</span>
+                </div>
+                <span class="module-forum-stat">${replies.length} repl${replies.length === 1 ? 'y' : 'ies'}</span>
+            </div>
+            <h4 class="module-forum-post-title">${escapeWorldHtml(thread.title || 'Untitled thread')}</h4>
+            <p class="module-forum-post-content">${renderModuleForumText(thread.content)}</p>
+        </div>
+        <div class="module-forum-replies">
+            <div class="module-forum-replies-header">
+                <strong>Replies</strong>
+                <span>${replies.length ? 'Newest messages stay attached to this room.' : 'Be the first to reply.'}</span>
+            </div>
+            ${replies.length ? replies.map((reply) => `
+                <article class="module-forum-post module-forum-post-reply">
+                    <div class="module-forum-post-head">
+                        <div>
+                            <span class="module-forum-post-author">${escapeWorldHtml(reply.user?.username || 'Unknown author')}</span>
+                            <span class="module-forum-post-date">${escapeWorldHtml(formatModuleForumDate(reply.createdAt))}</span>
+                        </div>
+                    </div>
+                    <p class="module-forum-post-content">${renderModuleForumText(reply.content)}</p>
+                </article>
+            `).join('') : `
+                <div class="module-forum-empty compact">
+                    <strong>No replies yet.</strong>
+                    <span>Use the form below to continue the discussion.</span>
+                </div>
+            `}
+        </div>
+        <form id="module-forum-reply-form" class="module-forum-form module-forum-reply-form">
+            <div class="module-forum-field">
+                <label for="module-forum-reply-content">Reply to this discussion</label>
+                <textarea
+                    id="module-forum-reply-content"
+                    class="module-forum-textarea"
+                    rows="4"
+                    maxlength="4000"
+                    placeholder="Share an answer, ask for clarification, or leave the next step for the team."
+                >${escapeWorldHtml(moduleForumState.replyDraftContent)}</textarea>
+            </div>
+            <div class="module-forum-form-footer">
+                <span class="module-forum-helper">Replies are visible to everyone who can access this module.</span>
+                <button type="submit" class="btn-open" ${moduleForumState.replying ? 'disabled' : ''}>
+                    ${moduleForumState.replying ? 'Sending...' : 'Post reply'}
+                </button>
+            </div>
+        </form>
+    `;
+}
+
+function bindModuleForumEvents() {
+    const container = document.getElementById('module-forum-container');
+    if (!container) return;
+
+    container.querySelectorAll('[data-forum-action="refresh"]').forEach((button) => {
+        button.addEventListener('click', () => {
+            refreshModuleForumThreads(moduleForumState.activeThreadId);
+        });
+    });
+
+    const reloadThreadButton = container.querySelector('[data-forum-action="reload-thread"]');
+    if (reloadThreadButton) {
+        reloadThreadButton.addEventListener('click', () => {
+            if (moduleForumState.activeThreadId) {
+                loadModuleForumThread(moduleForumState.activeThreadId);
+            }
+        });
+    }
+
+    container.querySelectorAll('[data-forum-thread-id]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const threadId = Number(button.dataset.forumThreadId);
+            if (!threadId || threadId === moduleForumState.activeThreadId) return;
+            loadModuleForumThread(threadId);
+        });
+    });
+
+    const threadForm = document.getElementById('module-forum-thread-form');
+    if (threadForm) {
+        threadForm.addEventListener('submit', submitModuleForumThread);
+    }
+
+    const threadTitleInput = document.getElementById('module-forum-thread-title');
+    if (threadTitleInput) {
+        threadTitleInput.addEventListener('input', (event) => {
+            moduleForumState.threadDraftTitle = event.target.value;
+        });
+    }
+
+    const threadContentInput = document.getElementById('module-forum-thread-content');
+    if (threadContentInput) {
+        threadContentInput.addEventListener('input', (event) => {
+            moduleForumState.threadDraftContent = event.target.value;
+        });
+    }
+
+    const replyForm = document.getElementById('module-forum-reply-form');
+    if (replyForm) {
+        replyForm.addEventListener('submit', submitModuleForumReply);
+    }
+
+    const replyInput = document.getElementById('module-forum-reply-content');
+    if (replyInput) {
+        replyInput.addEventListener('input', (event) => {
+            moduleForumState.replyDraftContent = event.target.value;
+        });
+    }
+}
+
+function renderModuleForumView() {
+    const container = document.getElementById('module-forum-container');
+    if (!container) return;
+
+    const totalReplies = moduleForumState.threads.reduce((total, thread) => total + getModuleForumReplyCount(thread), 0);
+
+    container.innerHTML = `
+        <div class="module-forum-shell">
+            <section class="module-forum-toolbar">
+                <div>
+                    <span class="module-forum-eyebrow">Module forum</span>
+                    <h3>Keep the room conversation attached to the content.</h3>
+                    <p>Questions, implementation notes, and follow-ups stay visible to everyone who can enter this module.</p>
+                </div>
+                <div class="module-forum-toolbar-actions">
+                    <span class="module-forum-stat">${moduleForumState.threads.length} thread${moduleForumState.threads.length === 1 ? '' : 's'}</span>
+                    <span class="module-forum-stat">${totalReplies} repl${totalReplies === 1 ? 'y' : 'ies'}</span>
+                    <button type="button" class="module-forum-ghost" data-forum-action="refresh">Refresh</button>
+                </div>
+            </section>
+
+            <section class="module-forum-composer">
+                <div class="module-forum-section-title">Start a new discussion</div>
+                <form id="module-forum-thread-form" class="module-forum-form">
+                    <div class="module-forum-field">
+                        <label for="module-forum-thread-title">Thread title</label>
+                        <input
+                            id="module-forum-thread-title"
+                            class="module-forum-input"
+                            type="text"
+                            maxlength="160"
+                            placeholder="What should the class discuss about this module?"
+                            value="${escapeWorldHtml(moduleForumState.threadDraftTitle)}"
+                        >
+                    </div>
+                    <div class="module-forum-field">
+                        <label for="module-forum-thread-content">Context</label>
+                        <textarea
+                            id="module-forum-thread-content"
+                            class="module-forum-textarea"
+                            rows="4"
+                            maxlength="4000"
+                            placeholder="Describe the question, the blocker, or the insight you want to capture."
+                        >${escapeWorldHtml(moduleForumState.threadDraftContent)}</textarea>
+                    </div>
+                    <div class="module-forum-form-footer">
+                        <span class="module-forum-helper">The thread stays attached to this module room.</span>
+                        <button type="submit" class="btn-open" ${moduleForumState.creatingThread ? 'disabled' : ''}>
+                            ${moduleForumState.creatingThread ? 'Posting...' : 'Post thread'}
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="module-forum-feed">
+                <div class="module-forum-thread-list">
+                    <div class="module-forum-section-title">Discussions</div>
+                    ${renderModuleForumThreadList()}
+                </div>
+                <div class="module-forum-thread-detail">
+                    <div class="module-forum-section-title">Thread detail</div>
+                    ${renderModuleForumThreadDetail()}
+                </div>
+            </section>
+        </div>
+    `;
+
+    bindModuleForumEvents();
+}
+
+async function refreshModuleForumThreads(preferredThreadId = moduleForumState.activeThreadId) {
+    if (!currentModuleId || moduleForumState.moduleId !== currentModuleId) return;
+    const requestToken = moduleForumRequestToken;
+    moduleForumState.loadingList = true;
+    moduleForumState.listError = '';
+    renderModuleForumView();
+    await loadModuleForumThreads(currentModuleId, preferredThreadId, requestToken);
+}
+
+function buildModuleForumRequestUrl(path) {
+    const url = new URL(path, AUTH_API.endsWith('/') ? AUTH_API : `${AUTH_API}/`);
+    const activeCourseId = window.__courseWorldContext?.courseId || null;
+    if (activeCourseId) {
+        url.searchParams.set('courseId', String(activeCourseId));
+    }
+    return url.toString();
+}
+
+async function loadModuleForumThreads(moduleId, preferredThreadId = null, requestToken = moduleForumRequestToken) {
+    try {
+        const response = await fetch(buildModuleForumRequestUrl(`modules/${moduleId}/forum/threads`), {
+            headers: {
+                Authorization: `Bearer ${authToken}`
+            }
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load forum threads.');
+        }
+
+        if (!isModuleForumRequestCurrent(requestToken, moduleId)) return;
+
+        moduleForumState.threads = Array.isArray(data) ? data : [];
+        moduleForumState.loadingList = false;
+        moduleForumState.listError = '';
+
+        const nextThreadId = preferredThreadId && moduleForumState.threads.some((thread) => thread.id === preferredThreadId)
+            ? preferredThreadId
+            : moduleForumState.threads[0]?.id || null;
+
+        moduleForumState.activeThreadId = nextThreadId;
+        if (!nextThreadId) {
+            moduleForumState.activeThread = null;
+            moduleForumState.loadingThread = false;
+            moduleForumState.threadError = '';
+            renderModuleForumView();
+            return;
+        }
+
+        renderModuleForumView();
+        await loadModuleForumThread(nextThreadId, requestToken);
+    } catch (error) {
+        if (!isModuleForumRequestCurrent(requestToken, moduleId)) return;
+        moduleForumState.loadingList = false;
+        moduleForumState.listError = error.message;
+        renderModuleForumView();
+    }
+}
+
+async function loadModuleForumThread(threadId, requestToken = moduleForumRequestToken) {
+    if (!threadId || !currentModuleId) return;
+
+    const isDifferentThread = moduleForumState.activeThreadId !== threadId;
+    moduleForumState.activeThreadId = threadId;
+    moduleForumState.loadingThread = true;
+    moduleForumState.threadError = '';
+    if (isDifferentThread) {
+        moduleForumState.replyDraftContent = '';
+    }
+    renderModuleForumView();
+
+    try {
+        const response = await fetch(buildModuleForumRequestUrl(`forum/threads/${threadId}`), {
+            headers: {
+                Authorization: `Bearer ${authToken}`
+            }
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load thread.');
+        }
+
+        if (!isModuleForumRequestCurrent(requestToken, currentModuleId)) return;
+
+        moduleForumState.activeThread = data;
+        moduleForumState.loadingThread = false;
+        moduleForumState.threadError = '';
+        renderModuleForumView();
+    } catch (error) {
+        if (!isModuleForumRequestCurrent(requestToken, currentModuleId)) return;
+        moduleForumState.loadingThread = false;
+        moduleForumState.threadError = error.message;
+        renderModuleForumView();
+    }
+}
+
+async function submitModuleForumThread(event) {
+    event.preventDefault();
+    if (!currentModuleId) return;
+
+    const titleInput = document.getElementById('module-forum-thread-title');
+    const contentInput = document.getElementById('module-forum-thread-content');
+    const title = titleInput?.value.trim();
+    const content = contentInput?.value.trim();
+
+    moduleForumState.threadDraftTitle = titleInput?.value || '';
+    moduleForumState.threadDraftContent = contentInput?.value || '';
+
+    if (!title || !content) {
+        alert('Provide both a thread title and a message before posting.');
+        return;
+    }
+
+    moduleForumState.creatingThread = true;
+    renderModuleForumView();
+
+    try {
+        const activeCourseId = window.__courseWorldContext?.courseId || null;
+        const response = await fetch(buildModuleForumRequestUrl(`modules/${currentModuleId}/forum/threads`), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ title, content, courseId: activeCourseId })
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to create thread.');
+        }
+
+        moduleForumState.threadDraftTitle = '';
+        moduleForumState.threadDraftContent = '';
+        moduleForumState.creatingThread = false;
+        await refreshModuleForumThreads(data.id);
+    } catch (error) {
+        moduleForumState.creatingThread = false;
+        renderModuleForumView();
+        alert(error.message);
+    }
+}
+
+async function submitModuleForumReply(event) {
+    event.preventDefault();
+    if (!moduleForumState.activeThreadId) return;
+
+    const replyInput = document.getElementById('module-forum-reply-content');
+    const content = replyInput?.value.trim();
+    moduleForumState.replyDraftContent = replyInput?.value || '';
+    if (!content) {
+        alert('Write a reply before posting it.');
+        return;
+    }
+
+    moduleForumState.replying = true;
+    renderModuleForumView();
+
+    try {
+        const activeCourseId = window.__courseWorldContext?.courseId || null;
+        const response = await fetch(buildModuleForumRequestUrl(`forum/threads/${moduleForumState.activeThreadId}/replies`), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ content, courseId: activeCourseId })
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to post reply.');
+        }
+
+        moduleForumState.replyDraftContent = '';
+        moduleForumState.replying = false;
+        await refreshModuleForumThreads(moduleForumState.activeThreadId);
+    } catch (error) {
+        moduleForumState.replying = false;
+        renderModuleForumView();
+        alert(error.message);
+    }
 }
 
 function openModuleReportsFromSidebar() {
@@ -4221,6 +4769,10 @@ function renderModuleQuiz(quizzes) {
 function renderModuleForum(moduleId) {
     const container = document.getElementById('module-forum-container');
     if (!container) return;
+    const requestToken = resetModuleForumState(moduleId);
+    renderModuleForumView();
+    loadModuleForumThreads(moduleId, null, requestToken);
+    return;
     container.innerHTML = `
         <div style="text-align: center; padding: 40px 20px;">
             <p style="color: #94a3b8; margin-bottom: 20px;">Participe das discussões deste módulo.</p>
