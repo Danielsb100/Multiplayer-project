@@ -943,8 +943,13 @@ function getCourseRoomLayoutMetrics() {
 }
 
 function getCourseRoomPlacement(index, y = 0) {
+    // FIX: Teleportation must use the same cumulative logic as the render loop
+    if (window.__courseRoomCenters && window.__courseRoomCenters[index]) {
+        return { ...window.__courseRoomCenters[index], y };
+    }
+    // Fallback if not yet rendered
     return {
-        x: index * courseRoomLayoutMetrics.roomSpacing,
+        x: index * (courseRoomLayoutMetrics?.roomWidth || 14),
         y,
         z: 0
     };
@@ -1109,8 +1114,6 @@ function renderCourseRoomShells(runtime) {
         return layout.roomWidth;
     });
 
-    console.log("Room Widths Detected:", roomWidths);
-
     let currentX = 0;
     const centers = roomWidths.map((w, index) => {
         const x = currentX + w / 2;
@@ -1185,10 +1188,13 @@ function renderCourseRoomShells(runtime) {
             console.log("--- Starting Procedural NavMesh Collection ---");
         }
 
+        // Procedural floor
         const floor = new THREE.Mesh(new THREE.BoxGeometry(thisRoomWidth, 0.08, thisRoomDepth), accentMaterial.clone());
         floor.position.set(center.x, 0.04, center.z);
         floor.receiveShadow = true;
         floor.userData.courseStructure = true;
+        // CRITICAL FIX: Name it so raycasters/logic can identify it as a floor to ignore or walk on correctly
+        floor.name = "procedural_floor_ignore"; 
         roomGroup.add(floor);
         proceduralMeshes.push(floor);
 
@@ -1231,9 +1237,9 @@ function renderCourseRoomShells(runtime) {
         if (roomModelTemplate) {
             const shellModel = roomModelTemplate.clone(true);
             shellModel.position.set(
-                center.x + COURSE_ROOM_MODEL_CONFIG.position.x,
+                COURSE_ROOM_MODEL_CONFIG.position.x,
                 COURSE_ROOM_MODEL_CONFIG.position.y,
-                center.z + COURSE_ROOM_MODEL_CONFIG.position.z
+                COURSE_ROOM_MODEL_CONFIG.position.z
             );
             shellModel.scale.set(
                 COURSE_ROOM_MODEL_CONFIG.scale.x,
@@ -1243,21 +1249,9 @@ function renderCourseRoomShells(runtime) {
             shellModel.rotation.y = COURSE_ROOM_MODEL_CONFIG.rotationY;
             roomGroup.add(shellModel);
 
-            proceduralMeshes.forEach((mesh) => {
-                if (mesh) {
-                    mesh.visible = false;
-                }
-            });
-
-            // CRITICAL FIX: The procedural walls were hidden but their collision boxes remained in memory!
-            // We must purge their mathematical boxes from the physics array so the GLB colliders take over cleanly.
-            for (let i = wallBoxes.length - 1; i >= 0; i--) {
-                if (wallBoxes[i].relatedId && wallBoxes[i].relatedId.startsWith(colliderBaseId)) {
-                    wallBoxes.splice(i, 1);
-                }
-            }
-
             shellModel.updateMatrixWorld(true);
+            let hasGlbCollisions = false;
+
             shellModel.traverse((child) => {
                 if (child.isMesh) {
                     const name = child.name ? child.name.toLowerCase() : '';
@@ -1269,13 +1263,39 @@ function renderCourseRoomShells(runtime) {
                             window.__navmeshGeometries.push(geo);
                             console.log(`Collected NavMesh from room ${index}: ${child.name}`);
                         }
-                    } else if (name.includes('collision')) {
-                        child.visible = false;
+                    } else {
+                        // User wants to use the real model as collision!
+                        // If it has 'collision' in name, we treat it as specific collider.
+                        // Otherwise, we add it as precise collider anyway to prevent falling through walls.
+                        if (name.includes('collision')) {
+                            hasGlbCollisions = true;
+                            child.visible = false;
+                        }
                         child.userData.id = 'course_coll_' + child.uuid;
                         preciseColliders.push(child);
+                        console.log(`Added GLB mesh to precise colliders: ${child.name}`);
                     }
                 }
             });
+
+            // ONLY hide procedural meshes if we are sure the GLB provides enough coverage?
+            // Actually, let's keep them hidden but ONLY purge hitboxes if GLB has its own.
+            proceduralMeshes.forEach((mesh) => {
+                if (mesh) mesh.visible = false;
+            });
+
+            if (hasGlbCollisions) {
+                // If the GLB specifically has collision meshes, purge all procedural ones
+                const proceduralWallSuffixes = ['_north', '_south', '_west_outer', '_east_outer', '_to_'];
+                for (let i = wallBoxes.length - 1; i >= 0; i--) {
+                    const rid = wallBoxes[i].relatedId;
+                    if (rid && rid.startsWith(colliderBaseId)) {
+                        if (proceduralWallSuffixes.some(suffix => rid.includes(suffix))) {
+                            wallBoxes.splice(i, 1);
+                        }
+                    }
+                }
+            }
 
             if (nextCenter && !nextModule?.unlocked) {
                 const thisRightEdge = center.x + thisRoomWidth / 2;
