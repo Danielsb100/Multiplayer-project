@@ -943,13 +943,8 @@ function getCourseRoomLayoutMetrics() {
 }
 
 function getCourseRoomPlacement(index, y = 0) {
-    // FIX: Teleportation must use the same cumulative logic as the render loop
-    if (window.__courseRoomCenters && window.__courseRoomCenters[index]) {
-        return { ...window.__courseRoomCenters[index], y };
-    }
-    // Fallback if not yet rendered
     return {
-        x: index * (courseRoomLayoutMetrics?.roomWidth || 14),
+        x: index * (courseRoomLayoutMetrics?.roomSpacing || 14),
         y,
         z: 0
     };
@@ -1107,20 +1102,10 @@ function renderCourseRoomShells(runtime) {
         transparent: true,
         opacity: 0.94
     });
-    const roomWidths = runtime.modules.map((module, index) => {
-        const template = getCourseRoomModelTemplateForIndex(index, runtime.modules.length, roomTemplates);
-        if (!template) return layoutMetrics.roomWidth;
-        const layout = calculateCourseRoomLayoutFromTemplate(template);
-        return layout.roomWidth;
-    });
-
-    let currentX = 0;
-    const centers = roomWidths.map((w, index) => {
-        const x = currentX + w / 2;
-        console.log(`Room ${index} Position: ${x.toFixed(2)} (Width: ${w.toFixed(2)})`);
-        currentX += w;
-        return { x, y: runtime.modules[index]?.placement?.position?.y ?? 0, z: 0 };
-    });
+    const roomSpacing = layoutMetrics.roomSpacing;
+    const centers = runtime.modules.map((module, index) => ({
+        ...getCourseRoomPlacement(index, module?.placement?.position?.y ?? 0)
+    }));
 
     const registerCourseCollider = (mesh, relatedId) => {
         mesh.updateMatrixWorld(true);
@@ -1177,8 +1162,6 @@ function renderCourseRoomShells(runtime) {
         const roomGroup = new THREE.Group();
         roomGroup.userData.courseRoom = true;
         roomGroup.userData.moduleId = module.moduleId;
-        const thisRoomWidth = roomWidths[index];
-        const thisRoomDepth = layoutMetrics.roomDepth;
         const colliderBaseId = `course_room_${module.moduleId}`;
         const proceduralMeshes = [];
         
@@ -1189,7 +1172,7 @@ function renderCourseRoomShells(runtime) {
         }
 
         // Procedural floor
-        const floor = new THREE.Mesh(new THREE.BoxGeometry(thisRoomWidth, 0.08, thisRoomDepth), accentMaterial.clone());
+        const floor = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, 0.08, roomDepth), accentMaterial.clone());
         floor.position.set(center.x, 0.04, center.z);
         floor.receiveShadow = true;
         floor.userData.courseStructure = true;
@@ -1199,23 +1182,22 @@ function renderCourseRoomShells(runtime) {
         proceduralMeshes.push(floor);
 
         const buildNorthSouthWall = (group, center, orientation, colliderBaseId) => {
-            const z = center.z + (orientation === 'south' ? thisRoomDepth / 2 : -thisRoomDepth / 2);
-            return addWallSegment(group, thisRoomWidth, wallThickness, center.x, z, `${colliderBaseId}_${orientation}`);
+            const z = center.z + (orientation === 'south' ? roomDepth / 2 : -roomDepth / 2);
+            return addWallSegment(group, roomWidth, wallThickness, center.x, z, `${colliderBaseId}_${orientation}`);
         };
 
         proceduralMeshes.push(buildNorthSouthWall(roomGroup, center, 'north', colliderBaseId));
         proceduralMeshes.push(buildNorthSouthWall(roomGroup, center, 'south', colliderBaseId));
 
         if (index === 0) {
-            proceduralMeshes.push(...buildSharedWall(roomGroup, center.x - thisRoomWidth / 2, center.z, false, `${colliderBaseId}_west_outer`));
+            proceduralMeshes.push(...buildSharedWall(roomGroup, center.x - roomWidth / 2, center.z, false, `${colliderBaseId}_west_outer`));
         }
         if (!nextCenter) {
-            proceduralMeshes.push(...buildSharedWall(roomGroup, center.x + thisRoomWidth / 2, center.z, false, `${colliderBaseId}_east_outer`));
+            proceduralMeshes.push(...buildSharedWall(roomGroup, center.x + roomWidth / 2, center.z, false, `${colliderBaseId}_east_outer`));
         } else {
-            const thisRightEdge = center.x + thisRoomWidth / 2;
             proceduralMeshes.push(...buildSharedWall(
                 roomGroup,
-                thisRightEdge,
+                center.x + roomSpacing / 2,
                 center.z,
                 Boolean(nextModule?.unlocked),
                 `${colliderBaseId}_to_${nextModule.moduleId}`
@@ -1229,8 +1211,8 @@ function renderCourseRoomShells(runtime) {
             title: module.title,
             index,
             center,
-            halfWidth: thisRoomWidth / 2,
-            halfDepth: thisRoomDepth / 2
+            halfWidth: roomWidth / 2,
+            halfDepth: roomDepth / 2
         });
 
         const roomModelTemplate = getCourseRoomModelTemplateForIndex(index, runtime.modules.length, roomTemplates);
@@ -1285,8 +1267,7 @@ function renderCourseRoomShells(runtime) {
             }
 
             if (nextCenter && !nextModule?.unlocked) {
-                const thisRightEdge = center.x + thisRoomWidth / 2;
-                addDoorBlocker(roomGroup, thisRightEdge, center.z);
+                addDoorBlocker(roomGroup, center.x + roomSpacing / 2, center.z);
             }
         }
     });
