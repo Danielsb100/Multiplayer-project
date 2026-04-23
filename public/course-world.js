@@ -45,10 +45,14 @@
     }
 
     function normalizePlacement(module, index) {
+        const dynamicPosition = window.__worldBridge?.getCourseRoomPlacement?.(
+            index,
+            module.placement?.position?.y ?? 0
+        );
         return {
             id: module.placement?.id || `course-${window.__courseWorldContext.courseId}-module-${module.moduleId}`,
             label: module.roomLabel || module.placement?.label || `Module Room ${index + 1}`,
-            position: { x: index * 14, y: module.placement?.position?.y ?? 0, z: 0 },
+            position: dynamicPosition || { x: index * 14, y: module.placement?.position?.y ?? 0, z: 0 },
             rotation: module.placement?.rotation || { x: 0, y: 0, z: 0 }
         };
     }

@@ -29,6 +29,31 @@ const courseRoomContextRoom = document.getElementById('course-room-context-room'
 let courseRoomShells = [];
 let courseRoomColliderIds = [];
 let activeCourseRoomModuleId = null;
+const COURSE_ROOM_MODEL_CONFIG = Object.freeze({
+    paths: Object.freeze({
+        first: 'assets/course-room/room-first.glb',
+        middle: 'assets/course-room/room-middle.glb',
+        last: 'assets/course-room/room-last.glb'
+    }),
+    fallbackPath: 'assets/course-room/room-shell.glb',
+    position: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+    rotationY: 0,
+    minimumWidth: 14,
+    minimumDepth: 10,
+    spacingPadding: 0
+});
+const DEFAULT_COURSE_ROOM_LAYOUT = Object.freeze({
+    roomWidth: COURSE_ROOM_MODEL_CONFIG.minimumWidth,
+    roomDepth: COURSE_ROOM_MODEL_CONFIG.minimumDepth,
+    roomSpacing: COURSE_ROOM_MODEL_CONFIG.minimumWidth,
+    source: 'procedural'
+});
+let courseRoomModelTemplatesPromise = null;
+let courseRoomModelTemplates = null;
+let courseRoomModelLoadFailed = false;
+let courseRoomRenderVersion = 0;
+let courseRoomLayoutMetrics = { ...DEFAULT_COURSE_ROOM_LAYOUT };
 
 // Auth Elements
 const authTabs = document.querySelector('.auth-tabs');
@@ -803,6 +828,186 @@ function createCourseModeBaseEnvironment() {
     scene.add(grid);
 }
 
+function prepareCourseRoomModelTemplate(root) {
+    root.updateMatrixWorld(true);
+    root.traverse((child) => {
+        const name = child.name ? child.name.toLowerCase() : '';
+        if (name.includes('navmesh') || name.includes('collision')) {
+            child.visible = false;
+            return;
+        }
+
+        if (!child.isMesh) return;
+        child.castShadow = true;
+        child.receiveShadow = true;
+        child.frustumCulled = false;
+    });
+    return root;
+}
+
+function loadSingleCourseRoomModelTemplate(path, label) {
+    const loader = new GLTFLoader();
+    return new Promise((resolve) => {
+        loader.load(
+            path,
+            (gltf) => resolve(prepareCourseRoomModelTemplate(gltf.scene)),
+            undefined,
+            (error) => {
+                console.warn(`Course room model "${label}" not loaded from ${path}.`, error);
+                resolve(null);
+            }
+        );
+    });
+}
+
+function calculateCourseRoomLayoutFromTemplate(template) {
+    if (!template) {
+        return { ...DEFAULT_COURSE_ROOM_LAYOUT };
+    }
+
+    const probe = template.clone(true);
+    probe.position.set(
+        COURSE_ROOM_MODEL_CONFIG.position.x,
+        COURSE_ROOM_MODEL_CONFIG.position.y,
+        COURSE_ROOM_MODEL_CONFIG.position.z
+    );
+    probe.scale.set(
+        COURSE_ROOM_MODEL_CONFIG.scale.x,
+        COURSE_ROOM_MODEL_CONFIG.scale.y,
+        COURSE_ROOM_MODEL_CONFIG.scale.z
+    );
+    probe.rotation.y = COURSE_ROOM_MODEL_CONFIG.rotationY;
+    probe.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(probe);
+    const size = box.getSize(new THREE.Vector3());
+    const roomWidth = Math.max(COURSE_ROOM_MODEL_CONFIG.minimumWidth, Number.isFinite(size.x) ? size.x : COURSE_ROOM_MODEL_CONFIG.minimumWidth);
+    const roomDepth = Math.max(COURSE_ROOM_MODEL_CONFIG.minimumDepth, Number.isFinite(size.z) ? size.z : COURSE_ROOM_MODEL_CONFIG.minimumDepth);
+
+    return {
+        roomWidth,
+        roomDepth,
+        roomSpacing: roomWidth + COURSE_ROOM_MODEL_CONFIG.spacingPadding,
+        source: 'model'
+    };
+}
+
+function calculateCourseRoomLayoutFromTemplates(templates) {
+    const availableTemplates = Object.values(templates || {}).filter(Boolean);
+    if (!availableTemplates.length) {
+        return { ...DEFAULT_COURSE_ROOM_LAYOUT };
+    }
+
+    const templateLayouts = availableTemplates.map((template) => calculateCourseRoomLayoutFromTemplate(template));
+    const roomWidth = Math.max(...templateLayouts.map((layout) => layout.roomWidth));
+    const roomDepth = Math.max(...templateLayouts.map((layout) => layout.roomDepth));
+
+    return {
+        roomWidth,
+        roomDepth,
+        roomSpacing: roomWidth + COURSE_ROOM_MODEL_CONFIG.spacingPadding,
+        source: 'model'
+    };
+}
+
+function setCourseRoomLayoutMetrics(nextMetrics) {
+    const prev = courseRoomLayoutMetrics;
+    const changed = !prev
+        || Math.abs(prev.roomWidth - nextMetrics.roomWidth) > 0.01
+        || Math.abs(prev.roomDepth - nextMetrics.roomDepth) > 0.01
+        || Math.abs(prev.roomSpacing - nextMetrics.roomSpacing) > 0.01
+        || prev.source !== nextMetrics.source;
+
+    if (changed) {
+        courseRoomLayoutMetrics = { ...nextMetrics };
+    }
+
+    return changed;
+}
+
+function getCourseRoomLayoutMetrics() {
+    return { ...courseRoomLayoutMetrics };
+}
+
+function getCourseRoomPlacement(index, y = 0) {
+    return {
+        x: index * courseRoomLayoutMetrics.roomSpacing,
+        y,
+        z: 0
+    };
+}
+
+function getCourseRoomModelRole(index, totalModules) {
+    if (totalModules <= 1 || index === 0) {
+        return 'first';
+    }
+    if (index === totalModules - 1) {
+        return 'last';
+    }
+    return 'middle';
+}
+
+function getCourseRoomModelTemplateForIndex(index, totalModules, templates = courseRoomModelTemplates) {
+    if (!templates) return null;
+
+    const role = getCourseRoomModelRole(index, totalModules);
+    return templates[role] || templates.middle || templates.first || templates.last || null;
+}
+
+function getCourseRuntimePlacementId(module, index) {
+    return module?.placement?.id || `course-${COURSE_ID_FROM_URL}-module-${module?.moduleId ?? index}`;
+}
+
+function syncCoursePlacementObjects(runtime, centers) {
+    if (!runtime?.modules?.length || !centers?.length) return;
+
+    runtime.modules.forEach((module, index) => {
+        const placementId = getCourseRuntimePlacementId(module, index);
+        const placementObject = scene.getObjectByProperty('uuid', idToUuid[placementId]);
+        if (!placementObject) return;
+
+        const center = centers[index];
+        placementObject.position.set(center.x, center.y, center.z);
+    });
+}
+
+function loadCourseRoomModelTemplates() {
+    if (courseRoomModelLoadFailed) {
+        return Promise.resolve(null);
+    }
+    if (courseRoomModelTemplates) {
+        return Promise.resolve(courseRoomModelTemplates);
+    }
+    if (courseRoomModelTemplatesPromise) {
+        return courseRoomModelTemplatesPromise;
+    }
+
+    courseRoomModelTemplatesPromise = Promise.all([
+        loadSingleCourseRoomModelTemplate(COURSE_ROOM_MODEL_CONFIG.paths.first, 'first'),
+        loadSingleCourseRoomModelTemplate(COURSE_ROOM_MODEL_CONFIG.paths.middle, 'middle'),
+        loadSingleCourseRoomModelTemplate(COURSE_ROOM_MODEL_CONFIG.paths.last, 'last'),
+        loadSingleCourseRoomModelTemplate(COURSE_ROOM_MODEL_CONFIG.fallbackPath, 'fallback')
+    ]).then(([firstTemplate, middleTemplate, lastTemplate, fallbackTemplate]) => {
+        const templates = {
+            first: firstTemplate || fallbackTemplate || middleTemplate || lastTemplate || null,
+            middle: middleTemplate || fallbackTemplate || firstTemplate || lastTemplate || null,
+            last: lastTemplate || fallbackTemplate || middleTemplate || firstTemplate || null
+        };
+
+        if (!templates.first && !templates.middle && !templates.last) {
+            courseRoomModelLoadFailed = true;
+            setCourseRoomLayoutMetrics({ ...DEFAULT_COURSE_ROOM_LAYOUT });
+            return null;
+        }
+
+        courseRoomModelTemplates = templates;
+        setCourseRoomLayoutMetrics(calculateCourseRoomLayoutFromTemplates(courseRoomModelTemplates));
+        return courseRoomModelTemplates;
+    });
+
+    return courseRoomModelTemplatesPromise;
+}
+
 function clearCourseRoomShells() {
     courseRoomShells.forEach((room) => {
         if (room.group?.parent) {
@@ -854,18 +1059,39 @@ function renderCourseRoomShells(runtime) {
         return;
     }
 
-    const roomWidth = 14;
-    const roomDepth = 10;
+    const renderVersion = ++courseRoomRenderVersion;
+    if (!courseRoomModelTemplates && !courseRoomModelLoadFailed) {
+        loadCourseRoomModelTemplates().then((templates) => {
+            if (!templates || courseRoomRenderVersion !== renderVersion) return;
+            renderCourseRoomShells(runtime);
+        });
+    }
+
+    const roomTemplates = courseRoomModelTemplates;
+    const layoutMetrics = roomTemplates
+        ? calculateCourseRoomLayoutFromTemplates(roomTemplates)
+        : getCourseRoomLayoutMetrics();
+    setCourseRoomLayoutMetrics(layoutMetrics);
+
+    const roomWidth = layoutMetrics.roomWidth;
+    const roomDepth = layoutMetrics.roomDepth;
     const wallHeight = 3;
     const wallThickness = 0.25;
     const doorWidth = 3.2;
     const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95, metalness: 0.05 });
     const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x1d4ed8, emissiveIntensity: 0.12 });
-    const roomSpacing = roomWidth;
+    const doorBlockerMaterial = new THREE.MeshStandardMaterial({
+        color: 0x1d4ed8,
+        emissive: 0x60a5fa,
+        emissiveIntensity: 0.22,
+        metalness: 0.08,
+        roughness: 0.45,
+        transparent: true,
+        opacity: 0.94
+    });
+    const roomSpacing = layoutMetrics.roomSpacing;
     const centers = runtime.modules.map((module, index) => ({
-        x: index * roomSpacing,
-        y: module?.placement?.position?.y ?? 0,
-        z: 0
+        ...getCourseRoomPlacement(index, module?.placement?.position?.y ?? 0)
     }));
 
     const registerCourseCollider = (mesh, relatedId) => {
@@ -879,29 +1105,41 @@ function renderCourseRoomShells(runtime) {
     const addWallSegment = (group, width, depth, x, z, colliderId) => {
         const wall = new THREE.Mesh(new THREE.BoxGeometry(width, wallHeight, depth), wallMaterial.clone());
         wall.position.set(x, wallHeight / 2, z);
+        wall.userData.courseStructure = true;
         group.add(wall);
         registerCourseCollider(wall, colliderId);
+        return wall;
     };
 
     const buildNorthSouthWall = (group, center, orientation, colliderBaseId) => {
         const z = center.z + (orientation === 'south' ? roomDepth / 2 : -roomDepth / 2);
-        addWallSegment(group, roomWidth, wallThickness, center.x, z, `${colliderBaseId}_${orientation}`);
+        return addWallSegment(group, roomWidth, wallThickness, center.x, z, `${colliderBaseId}_${orientation}`);
     };
 
     const buildSharedWall = (group, x, centerZ, hasDoor, colliderBaseId) => {
+        const segments = [];
         let segmentCounter = 0;
         const addSegment = (depth, z) => {
-            addWallSegment(group, wallThickness, depth, x, z, `${colliderBaseId}_${segmentCounter++}`);
+            segments.push(addWallSegment(group, wallThickness, depth, x, z, `${colliderBaseId}_${segmentCounter++}`));
         };
 
         if (!hasDoor) {
             addSegment(roomDepth, centerZ);
-            return;
+            return segments;
         }
         const segmentDepth = (roomDepth - doorWidth) / 2;
         const offset = doorWidth / 2 + segmentDepth / 2;
         addSegment(segmentDepth, centerZ - offset);
         addSegment(segmentDepth, centerZ + offset);
+        return segments;
+    };
+
+    const addDoorBlocker = (group, x, z) => {
+        const blocker = new THREE.Mesh(new THREE.BoxGeometry(0.34, wallHeight * 0.82, doorWidth * 0.92), doorBlockerMaterial.clone());
+        blocker.position.set(x, (wallHeight * 0.82) / 2, z);
+        blocker.userData.courseDoorBlocker = true;
+        group.add(blocker);
+        return blocker;
     };
 
     runtime.modules.forEach((module, index) => {
@@ -912,28 +1150,31 @@ function renderCourseRoomShells(runtime) {
         roomGroup.userData.courseRoom = true;
         roomGroup.userData.moduleId = module.moduleId;
         const colliderBaseId = `course_room_${module.moduleId}`;
+        const proceduralMeshes = [];
 
         const floor = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, 0.08, roomDepth), accentMaterial.clone());
         floor.position.set(center.x, 0.04, center.z);
         floor.receiveShadow = true;
+        floor.userData.courseStructure = true;
         roomGroup.add(floor);
+        proceduralMeshes.push(floor);
 
-        buildNorthSouthWall(roomGroup, center, 'north', colliderBaseId);
-        buildNorthSouthWall(roomGroup, center, 'south', colliderBaseId);
+        proceduralMeshes.push(buildNorthSouthWall(roomGroup, center, 'north', colliderBaseId));
+        proceduralMeshes.push(buildNorthSouthWall(roomGroup, center, 'south', colliderBaseId));
 
         if (index === 0) {
-            buildSharedWall(roomGroup, center.x - roomWidth / 2, center.z, false, `${colliderBaseId}_west_outer`);
+            proceduralMeshes.push(...buildSharedWall(roomGroup, center.x - roomWidth / 2, center.z, false, `${colliderBaseId}_west_outer`));
         }
         if (!nextCenter) {
-            buildSharedWall(roomGroup, center.x + roomWidth / 2, center.z, false, `${colliderBaseId}_east_outer`);
+            proceduralMeshes.push(...buildSharedWall(roomGroup, center.x + roomWidth / 2, center.z, false, `${colliderBaseId}_east_outer`));
         } else {
-            buildSharedWall(
+            proceduralMeshes.push(...buildSharedWall(
                 roomGroup,
                 center.x + roomSpacing / 2,
                 center.z,
                 Boolean(nextModule?.unlocked),
                 `${colliderBaseId}_to_${nextModule.moduleId}`
-            );
+            ));
         }
 
         scene.add(roomGroup);
@@ -946,8 +1187,36 @@ function renderCourseRoomShells(runtime) {
             halfWidth: roomWidth / 2,
             halfDepth: roomDepth / 2
         });
+
+        const roomModelTemplate = getCourseRoomModelTemplateForIndex(index, runtime.modules.length, roomTemplates);
+        if (roomModelTemplate) {
+            const shellModel = roomModelTemplate.clone(true);
+            shellModel.position.set(
+                center.x + COURSE_ROOM_MODEL_CONFIG.position.x,
+                COURSE_ROOM_MODEL_CONFIG.position.y,
+                center.z + COURSE_ROOM_MODEL_CONFIG.position.z
+            );
+            shellModel.scale.set(
+                COURSE_ROOM_MODEL_CONFIG.scale.x,
+                COURSE_ROOM_MODEL_CONFIG.scale.y,
+                COURSE_ROOM_MODEL_CONFIG.scale.z
+            );
+            shellModel.rotation.y = COURSE_ROOM_MODEL_CONFIG.rotationY;
+            roomGroup.add(shellModel);
+
+            proceduralMeshes.forEach((mesh) => {
+                if (mesh) {
+                    mesh.visible = false;
+                }
+            });
+
+            if (nextCenter && !nextModule?.unlocked) {
+                addDoorBlocker(roomGroup, center.x + roomSpacing / 2, center.z);
+            }
+        }
     });
 
+    syncCoursePlacementObjects(runtime, centers);
     updateCourseRoomContext();
 }
 
@@ -4833,6 +5102,8 @@ window.__worldBridge = {
     getAuthApi: () => AUTH_API,
     getCourseId: () => COURSE_ID_FROM_URL,
     getPlayerRole: () => localUserRole,
+    getCourseRoomLayoutMetrics,
+    getCourseRoomPlacement,
     createModulePlacement,
     openModuleSidebar,
     renderCourseRoomShells,
