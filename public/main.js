@@ -880,6 +880,18 @@ function calculateCourseRoomLayoutFromTemplate(template) {
     probe.rotation.y = COURSE_ROOM_MODEL_CONFIG.rotationY;
     probe.updateMatrixWorld(true);
 
+    // Filter out navmesh/nodes so they don't inflate the room width and cause gaps
+    probe.traverse((child) => {
+        if (child.isMesh) {
+            const name = child.name ? child.name.toLowerCase() : '';
+            if (name.includes('navmesh') || name.includes('node') || name.includes('door') || name.includes('tongue')) {
+                child.visible = false;
+                // Temporarily detach/move or just use a more surgical box calculation
+                // For setFromObject, we can just set visible to false and it will be ignored by default
+            }
+        }
+    });
+
     const box = new THREE.Box3().setFromObject(probe);
     const size = box.getSize(new THREE.Vector3());
     const roomWidth = Math.max(COURSE_ROOM_MODEL_CONFIG.minimumWidth, Number.isFinite(size.x) ? size.x : COURSE_ROOM_MODEL_CONFIG.minimumWidth);
@@ -1156,6 +1168,7 @@ function renderCourseRoomShells(runtime) {
         // Ensure navmesh array exists in local scope closure
         if (index === 0) {
             window.__navmeshGeometries = [];
+            console.log("--- Starting Procedural NavMesh Collection ---");
         }
 
         const floor = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, 0.08, roomDepth), accentMaterial.clone());
@@ -1232,7 +1245,10 @@ function renderCourseRoomShells(runtime) {
                         child.visible = false;
                         const geo = child.geometry.clone();
                         geo.applyMatrix4(child.matrixWorld);
-                        if (window.__navmeshGeometries) window.__navmeshGeometries.push(geo);
+                        if (window.__navmeshGeometries) {
+                            window.__navmeshGeometries.push(geo);
+                            console.log(`Collected NavMesh from room ${index}: ${child.name}`);
+                        }
                     } else if (name.includes('collision')) {
                         child.visible = false;
                         child.userData.id = 'course_coll_' + child.uuid;
@@ -1252,13 +1268,14 @@ function renderCourseRoomShells(runtime) {
     
     // Merge NavMeshes and stitch the gaps for the procedural rooms
     if (window.__navmeshGeometries && window.__navmeshGeometries.length > 0) {
+        console.log(`Total NavMesh pieces collected: ${window.__navmeshGeometries.length}`);
         try {
             const mergedGeometry = BufferGeometryUtils.mergeGeometries(window.__navmeshGeometries, false);
             if (mergedGeometry) {
-                // Stitch vertices that are within 0.1 units of each other to close the modeling gaps
-                const stitchedGeometry = BufferGeometryUtils.mergeVertices(mergedGeometry, 0.1);
+                // Stitch vertices that are within 0.15 units of each other to close the modeling gaps
+                const stitchedGeometry = BufferGeometryUtils.mergeVertices(mergedGeometry, 0.15);
                 _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(stitchedGeometry));
-                console.log("Procedural NavMesh merged and stitched successfully!");
+                console.log("Procedural NavMesh merged and stitched successfully (15cm tolerance)!");
             }
         } catch (err) {
             console.error("Error merging Procedural NavMeshes:", err);
@@ -2652,8 +2669,8 @@ const lastStoredPosition = new THREE.Vector3();
 let lastLogTime = 0;
 
 function checkCollision(targetPosition) {
-    // COMPACT COLLISION: Box increased requested by user to avoid tight clipping (0.6x1.8x0.6 units)
-    const playerBoxSize = new THREE.Vector3(0.6, 1.8, 0.6);
+    // COMPACT COLLISION: Width balanced (0.45 units) to avoid falling through walls but still fit through doors (approx 1m wide)
+    const playerBoxSize = new THREE.Vector3(0.45, 1.8, 0.45);
     const playerCenter = targetPosition.clone().add(new THREE.Vector3(0, 0.9, 0));
     const playerBox = new THREE.Box3().setFromCenterAndSize(playerCenter, playerBoxSize);
 
