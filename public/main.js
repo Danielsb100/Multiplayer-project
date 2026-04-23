@@ -1427,6 +1427,11 @@ function createGametag(id, name, color, isLocal, profilePictureUrl = null) {
     `;
 
     if (!isLocal) {
+        element.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPlayerActionMenuForId(id, e);
+        });
+
         const callBtn = document.createElement('button');
         callBtn.innerText = '📞';
         callBtn.className = 'gametag-call-btn';
@@ -1483,11 +1488,11 @@ function updatePlayerList() {
     // 2. Add Others
     for (const id in remotePlayers) {
         const player = remotePlayers[id];
-        let name = player.name || 'Desconhecido';
+        let name = player.name || 'Unknown';
 
-        // Final fallback: if state name is Guest or Desconhecido, check gametag
+        // Final fallback: if state name is Guest or Unknown, check gametag
         if ((!player.name || player.name.includes('Guest')) && gametags[id]) {
-            const tagText = gametags[id].element.innerText.replace('📞', '').replace('(sem voz)', '').trim();
+            const tagText = gametags[id].element.innerText.replace('📞', '').replace('(no voice)', '').trim();
             if (tagText && !tagText.includes('Guest') && tagText !== 'Carregando...') {
                 name = tagText;
                 player.name = name; // Update state silently
@@ -1503,13 +1508,12 @@ function updatePlayerList() {
         infoDiv.innerHTML = `
             <div class="player-status-dot" style="background: ${player.peerId ? '#10b981' : '#64748b'}"></div>
             <span class="player-name">${name}</span>
-            ${!player.peerId ? '<span style="font-size: 0.7rem; color: #94a3b8; margin-left: 5px;">(sem voz)</span>' : ''}
+            ${!player.peerId ? '<span style="font-size: 0.7rem; color: #94a3b8; margin-left: 5px;">(no voice)</span>' : ''}
         `;
 
         infoDiv.addEventListener('click', (e) => {
             e.stopPropagation();
-            selectedPlayerPeerId = player.peerId; // Track peerId for the menu
-            showPlayerActionMenu(name, e);
+            openPlayerActionMenuForId(id, e);
         });
 
         playerDiv.appendChild(infoDiv);
@@ -1620,10 +1624,12 @@ function addOtherPlayer(playerInfo) {
     const anchorGroup = new THREE.Group();
     anchorGroup.position.set(playerInfo.position.x, playerInfo.position.y, playerInfo.position.z);
     anchorGroup.rotation.set(playerInfo.rotation.x, playerInfo.rotation.y, playerInfo.rotation.z);
+    anchorGroup.userData.remotePlayerId = playerInfo.id;
     scene.add(anchorGroup);
 
     // Avatar container: child of anchor — all visual mesh loading/centering goes here
     const avatarContainer = new THREE.Group();
+    avatarContainer.userData.remotePlayerId = playerInfo.id;
     anchorGroup.add(avatarContainer);
 
     // Default avatar goes into avatarContainer
@@ -1715,6 +1721,27 @@ function sendChatMessage() {
     socket.emit('chatMessage', msg);
     chatInput.value = '';
     chatInput.focus();
+}
+
+function getRemotePlayerFromObject(object) {
+    let root = object;
+    while (root && root !== scene) {
+        const remotePlayerId = root.userData?.remotePlayerId;
+        if (remotePlayerId && remotePlayers[remotePlayerId]) {
+            return { id: remotePlayerId, player: remotePlayers[remotePlayerId] };
+        }
+        root = root.parent;
+    }
+    return null;
+}
+
+function openPlayerActionMenuForId(playerId, eventOrPosition) {
+    const player = remotePlayers[playerId];
+    if (!player) return;
+
+    const name = player.name || 'Unknown';
+    selectedPlayerPeerId = player.peerId || null;
+    showPlayerActionMenu(name, eventOrPosition);
 }
 
 function syncChatHistoryVisibility() {
@@ -2252,6 +2279,14 @@ function handlePrimaryWorldClick(event) {
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(scene.children, true);
+
+    for (const hit of intersects) {
+        const remotePlayerHit = getRemotePlayerFromObject(hit.object);
+        if (remotePlayerHit) {
+            openPlayerActionMenuForId(remotePlayerHit.id, event);
+            return;
+        }
+    }
 
     for (const hit of intersects) {
         let root = hit.object;
@@ -4498,7 +4533,7 @@ async function initPeer() {
             return;
         }
 
-        const callerName = peerIdToName[call.peer] || 'Desconhecido';
+        const callerName = peerIdToName[call.peer] || 'Unknown';
         incomingCaller.innerText = callerName;
         incomingModal.classList.remove('hidden');
 
@@ -4520,7 +4555,7 @@ async function initPeer() {
 }
 
 function makeCall(targetPeerId, name) {
-    if (!localStream) return alert('Microfone não detectado.');
+    if (!localStream) return alert('Microphone not detected.');
     callingName.innerText = name;
     audioCallLayer.classList.remove('hidden');
 
@@ -4530,7 +4565,7 @@ function makeCall(targetPeerId, name) {
 
 function answerCall(call) {
     currentCall = call;
-    const callerName = peerIdToName[call.peer] || 'Conectado';
+    const callerName = peerIdToName[call.peer] || 'Connected';
     callingName.innerText = callerName;
     audioCallLayer.classList.remove('hidden');
     
@@ -4693,8 +4728,13 @@ function showPlayerActionMenu(username, event) {
     selectedPlayerForAction = username;
     actionMenuName.innerText = username;
 
-    playerActionMenu.style.left = event.clientX + 'px';
-    playerActionMenu.style.top = event.clientY + 'px';
+    const point = {
+        x: event?.clientX ?? event?.x ?? window.innerWidth / 2,
+        y: event?.clientY ?? event?.y ?? window.innerHeight / 2
+    };
+
+    playerActionMenu.style.left = point.x + 'px';
+    playerActionMenu.style.top = point.y + 'px';
     playerActionMenu.classList.remove('hidden');
 
     // Auto-close when clicking elsewhere
@@ -4709,7 +4749,7 @@ btnCallPlayer.addEventListener('click', () => {
     if (selectedPlayerPeerId) {
         makeCall(selectedPlayerPeerId, selectedPlayerForAction);
     } else {
-        alert('Este jogador ainda não configurou o canal de voz.');
+        alert('This player has not configured a voice channel yet.');
     }
 });
 
@@ -4725,7 +4765,7 @@ async function showAssetModal(username) {
 
     // UI Setup
     updateTabUI();
-    assetListBody.innerHTML = '<tr><td colspan="2">Carregando assets...</td></tr>';
+    assetListBody.innerHTML = '<tr><td colspan="2">Loading assets...</td></tr>';
     assetGridContainer.innerHTML = 'Carregando...';
     assetModalOverlay.classList.remove('hidden');
     if (btnUploadAsset) {
@@ -4735,13 +4775,13 @@ async function showAssetModal(username) {
 
     try {
         const response = await fetch(`${AUTH_API}/api/documents/user/${encodeURIComponent(username)}`);
-        if (!response.ok) throw new Error('Não foi possível carregar os arquivos.');
+        if (!response.ok) throw new Error('Could not load the files.');
 
         const data = await response.json();
         currentLoadedAssets = data.documents || []; // Use currentLoadedAssets
 
         if (currentLoadedAssets.length === 0) {
-            assetListBody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px;">Nenhum arquivo compartilhado.</td></tr>';
+            assetListBody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px;">No shared files.</td></tr>';
             assetGridContainer.innerHTML = '<div style="text-align: center; width: 100%; padding: 3rem; color: var(--text-secondary);">Nenhum arquivo nesta categoria.</div>';
         } else {
             renderCurrentTab();
@@ -4805,7 +4845,7 @@ tabBtns.forEach(btn => {
 });
 
 async function showSelfAssetModal() {
-    modalUsernameSpan.innerText = `${localUsername} (Meu Perfil)`;
+    modalUsernameSpan.innerText = `${localUsername} (My Profile)`;
     isSelfModal = true;
     currentAssetTab = 'image';
 
