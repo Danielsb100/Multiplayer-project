@@ -1237,9 +1237,9 @@ function renderCourseRoomShells(runtime) {
         if (roomModelTemplate) {
             const shellModel = roomModelTemplate.clone(true);
             shellModel.position.set(
-                COURSE_ROOM_MODEL_CONFIG.position.x,
+                center.x + COURSE_ROOM_MODEL_CONFIG.position.x,
                 COURSE_ROOM_MODEL_CONFIG.position.y,
-                COURSE_ROOM_MODEL_CONFIG.position.z
+                center.z + COURSE_ROOM_MODEL_CONFIG.position.z
             );
             shellModel.scale.set(
                 COURSE_ROOM_MODEL_CONFIG.scale.x,
@@ -1250,7 +1250,6 @@ function renderCourseRoomShells(runtime) {
             roomGroup.add(shellModel);
 
             shellModel.updateMatrixWorld(true);
-            let hasGlbCollisions = false;
 
             shellModel.traverse((child) => {
                 if (child.isMesh) {
@@ -1263,37 +1262,25 @@ function renderCourseRoomShells(runtime) {
                             window.__navmeshGeometries.push(geo);
                             console.log(`Collected NavMesh from room ${index}: ${child.name}`);
                         }
-                    } else {
-                        // User wants to use the real model as collision!
-                        // If it has 'collision' in name, we treat it as specific collider.
-                        // Otherwise, we add it as precise collider anyway to prevent falling through walls.
-                        if (name.includes('collision')) {
-                            hasGlbCollisions = true;
-                            child.visible = false;
-                        }
+                    } else if (name.includes('collision')) {
+                        child.visible = false;
                         child.userData.id = 'course_coll_' + child.uuid;
                         preciseColliders.push(child);
-                        console.log(`Added GLB mesh to precise colliders: ${child.name}`);
                     }
                 }
             });
 
-            // ONLY hide procedural meshes if we are sure the GLB provides enough coverage?
-            // Actually, let's keep them hidden but ONLY purge hitboxes if GLB has its own.
             proceduralMeshes.forEach((mesh) => {
-                if (mesh) mesh.visible = false;
+                if (mesh) {
+                    mesh.visible = false;
+                }
             });
 
-            if (hasGlbCollisions) {
-                // If the GLB specifically has collision meshes, purge all procedural ones
-                const proceduralWallSuffixes = ['_north', '_south', '_west_outer', '_east_outer', '_to_'];
-                for (let i = wallBoxes.length - 1; i >= 0; i--) {
-                    const rid = wallBoxes[i].relatedId;
-                    if (rid && rid.startsWith(colliderBaseId)) {
-                        if (proceduralWallSuffixes.some(suffix => rid.includes(suffix))) {
-                            wallBoxes.splice(i, 1);
-                        }
-                    }
+            // CRITICAL FIX: The procedural walls were hidden but their collision boxes remained in memory!
+            // We must purge their mathematical boxes from the physics array so the GLB colliders take over cleanly.
+            for (let i = wallBoxes.length - 1; i >= 0; i--) {
+                if (wallBoxes[i].relatedId && wallBoxes[i].relatedId.startsWith(colliderBaseId)) {
+                    wallBoxes.splice(i, 1);
                 }
             }
 
