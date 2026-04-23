@@ -1,0 +1,343 @@
+========================================
+SERVER STARTING UP
+Time: 2026-04-22T18:46:21.379Z
+Port: 3001
+Binding: 0.0.0.0
+========================================
+[2026-04-22T20:23:00.255Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY4ODkzNjksImV4cCI6MTc3Njk3NTc2OX0.M4PHcTLugiqepC8ljwELOMfPxKQuEOoMlNkj0JGArpk&courseId=1
+[2026-04-22T20:23:00.309Z] GET /styles.css
+[2026-04-22T20:23:00.335Z] GET /main.js?v=1.3.1
+[2026-04-22T20:23:00.350Z] GET /course-world.js?v=1
+[2026-04-22T20:23:00.826Z] GET /api/catalog
+[2026-04-22T20:23:00.855Z] GET /api/config
+[2026-04-22T20:23:00.984Z] GET /favicon.ico
+[2026-04-22T20:23:01.120Z] GET /assets/character/player.glb?v=1776889381100
+[2026-04-22T20:23:01.324Z] GET /favicon.ico
+User connected: tmrzNMFuPr0eKoqzAAAB
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: -3.345373363262296, y: 0, z: -0.39509432718432186 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 20.08434910798782, y: 0, z: 0.9298600188463046 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 15.049415880494372, y: 0, z: -1.264260770129625 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 15.049415880494372, y: 0, z: -1.264260770129625 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 7.347419887308337, y: 0, z: -1.8599811079950965 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 0.07944702778430553, y: 0, z: -3.024711483673445 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 0.07944702778430553, y: 0, z: -3.024711483673445 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 0.07944702778430553, y: 0, z: -3.024711483673445 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 9.17006566317664, y: 0, z: 0.5038330167163145 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 20.609560332875507, y: 0, z: -0.28847744821251964 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 21.398157958566532, y: 0, z: 1.7887803862834712 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: 10.997969891038872, y: 0, z: -0.04716116393170654 }
+[Movement Sync] Player admin (tmrzNMFuPr0eKoqzAAAB) at: { x: -4.287393731206112, y: 0, z: 0.004585534294781889 }
+User disconnected: tmrzNMFuPr0eKoqzAAAB
+[2026-04-22T20:24:27.227Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY4ODkzNjksImV4cCI6MTc3Njk3NTc2OX0.M4PHcTLugiqepC8ljwELOMfPxKQuEOoMlNkj0JGArpk&courseId=1
+[2026-04-22T20:24:27.254Z] GET /styles.css
+[2026-04-22T20:24:27.258Z] GET /main.js?v=1.3.1
+[2026-04-22T20:24:27.259Z] GET /course-world.js?v=1
+[2026-04-22T20:24:27.328Z] GET /api/catalog
+[2026-04-22T20:24:27.329Z] GET /api/config
+[2026-04-22T20:24:27.428Z] GET /favicon.ico
+[2026-04-22T20:24:27.486Z] GET /assets/character/player.glb?v=1776889467483
+User connected: GhELI3r7dBNNXjQZAAAD
+[2026-04-22T20:24:27.531Z] GET /favicon.ico
+[Movement Sync] Player admin (GhELI3r7dBNNXjQZAAAD) at: { x: 7.318664378147235, y: 0, z: 0.6637884771785628 }
+[Movement Sync] Player admin (GhELI3r7dBNNXjQZAAAD) at: { x: 17.821166820539776, y: 0, z: 4.607037799129332 }
+[2026-04-22T20:53:05.828Z] GET /
+User disconnected: GhELI3r7dBNNXjQZAAAD
+[2026-04-22T20:53:05.895Z] GET /styles.css
+[2026-04-22T20:53:05.897Z] GET /course-world.js?v=1
+[2026-04-22T20:53:05.902Z] GET /main.js?v=1.3.1
+[2026-04-22T20:53:05.969Z] GET /api/catalog
+[2026-04-22T20:53:05.970Z] GET /api/config
+[2026-04-22T20:53:05.999Z] GET /assets/maps/map/map.glb
+[2026-04-22T20:53:06.115Z] GET /favicon.ico
+[2026-04-22T20:53:10.128Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY4ODkzNjksImV4cCI6MTc3Njk3NTc2OX0.M4PHcTLugiqepC8ljwELOMfPxKQuEOoMlNkj0JGArpk&courseId=1
+[2026-04-22T20:53:10.149Z] GET /styles.css
+[2026-04-22T20:53:10.150Z] GET /main.js?v=1.3.1
+[2026-04-22T20:53:10.151Z] GET /course-world.js?v=1
+[2026-04-22T20:53:10.212Z] GET /api/catalog
+[2026-04-22T20:53:10.213Z] GET /api/config
+[2026-04-22T20:53:10.300Z] GET /favicon.ico
+[2026-04-22T20:53:10.416Z] GET /assets/character/player.glb?v=1776891190413
+[2026-04-22T20:53:10.470Z] GET /favicon.ico
+User connected: aqV6pkg_SiAQEExNAAAF
+[2026-04-22T20:53:10.829Z] GET /assets/course-room/room-shell.glb
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: 3.7176292205455943, y: 0, z: 0.06305731744301961 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: 16.603429965379, y: 0, z: 0.5658025667421506 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: -6.6271945380129464, y: 0, z: -3.551744025827322 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: -6.672861073403602, y: 0, z: -3.0290338012986697 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: -6.672861073403602, y: 0, z: -3.0290338012986697 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: -6.672861073403602, y: 0, z: -3.0290338012986697 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: -6.672861073403602, y: 0, z: -3.0290338012986697 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: -6.672861073403602, y: 0, z: -3.0290338012986697 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: -6.672861073403602, y: 0, z: -3.0290338012986697 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: 6.674738460124327, y: 0, z: -1.5138299413528824 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: -2.0233261460062426, y: 0, z: -1.6500533041146188 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: 15.601188342613124, y: 0, z: 1.3739384610078875 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: 31.199702462810446, y: 0, z: -0.287849204019225 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: 34.626973787922694, y: 0, z: 1.0385882291315536 }
+[Movement Sync] Player admin (aqV6pkg_SiAQEExNAAAF) at: { x: 34.626973787922694, y: 0, z: 1.0385882291315536 }
+User disconnected: aqV6pkg_SiAQEExNAAAF
+[2026-04-22T21:02:43.247Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY4ODkzNjksImV4cCI6MTc3Njk3NTc2OX0.M4PHcTLugiqepC8ljwELOMfPxKQuEOoMlNkj0JGArpk&courseId=1
+[2026-04-22T21:02:43.267Z] GET /styles.css
+[2026-04-22T21:02:43.270Z] GET /main.js?v=1.3.1
+[2026-04-22T21:02:43.271Z] GET /course-world.js?v=1
+[2026-04-22T21:02:43.348Z] GET /api/catalog
+[2026-04-22T21:02:43.349Z] GET /api/config
+[2026-04-22T21:02:43.458Z] GET /favicon.ico
+[2026-04-22T21:02:43.589Z] GET /assets/character/player.glb?v=1776891763586
+User connected: GiABMeD8K7YVG1DsAAAH
+[2026-04-22T21:02:43.657Z] GET /favicon.ico
+[2026-04-22T21:02:43.989Z] GET /assets/course-room/room-shell.glb
+[Movement Sync] Player admin (GiABMeD8K7YVG1DsAAAH) at: { x: 7.178770556239329, y: 0, z: 1.0044954000826691 }
+[Movement Sync] Player admin (GiABMeD8K7YVG1DsAAAH) at: { x: 30.29077638105624, y: 0, z: 0.9283115332245997 }
+[Movement Sync] Player admin (GiABMeD8K7YVG1DsAAAH) at: { x: 24.881547852707943, y: 0, z: -0.7420405324818025 }
+[Movement Sync] Player admin (GiABMeD8K7YVG1DsAAAH) at: { x: 15.618588688089073, y: 0, z: -1.571219153674934 }
+[Movement Sync] Player admin (GiABMeD8K7YVG1DsAAAH) at: { x: 15.618588688089073, y: 0, z: -1.571219153674934 }
+[Movement Sync] Player admin (GiABMeD8K7YVG1DsAAAH) at: { x: 15.618588688089073, y: 0, z: -1.571219153674934 }
+[2026-04-22T21:23:21.763Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY4ODkzNjksImV4cCI6MTc3Njk3NTc2OX0.M4PHcTLugiqepC8ljwELOMfPxKQuEOoMlNkj0JGArpk&courseId=1
+[2026-04-22T21:23:21.790Z] GET /styles.css
+[2026-04-22T21:23:21.799Z] GET /main.js?v=1.3.1
+[2026-04-22T21:23:21.800Z] GET /course-world.js?v=1
+[2026-04-22T21:23:21.872Z] GET /api/catalog
+[2026-04-22T21:23:21.874Z] GET /api/config
+[2026-04-22T21:23:22.003Z] GET /favicon.ico
+[2026-04-22T21:23:22.269Z] GET /assets/character/player.glb?v=1776893002213
+[2026-04-22T21:23:22.289Z] GET /favicon.ico
+User connected: wUB72MtoMCg7RFv6AAAJ
+[2026-04-22T21:23:22.336Z] GET /assets/character/player.glb?v=1776893002335
+[2026-04-22T21:23:22.352Z] GET /assets/character/player.glb?v=1776891763586?v=1776893002348
+[2026-04-22T21:23:22.366Z] GET /assets/character/player.glb?v=1776893002213?v=1776893002361
+[2026-04-22T21:23:22.521Z] GET /assets/course-room/room-shell.glb
+[Movement Sync] Player admin (GiABMeD8K7YVG1DsAAAH) at: { x: 18.01893962543844, y: 0, z: -1.178519776304277 }
+User disconnected: GiABMeD8K7YVG1DsAAAH
+[Movement Sync] Player admin (wUB72MtoMCg7RFv6AAAJ) at: { x: 8.327716994553807, y: 0, z: 1.0073071894049044 }
+[Movement Sync] Player admin (wUB72MtoMCg7RFv6AAAJ) at: { x: 31.880377648899774, y: 0, z: -0.20527138597282496 }
+[Movement Sync] Player admin (wUB72MtoMCg7RFv6AAAJ) at: { x: 55.0301166335601, y: 0, z: 0.9598949908292258 }
+[Movement Sync] Player admin (wUB72MtoMCg7RFv6AAAJ) at: { x: 34.641908289692914, y: 0, z: 1.7972492425540258 }
+[Movement Sync] Player admin (wUB72MtoMCg7RFv6AAAJ) at: { x: 10.433064251730903, y: 0, z: -0.9219081658461844 }
+[Movement Sync] Player admin (wUB72MtoMCg7RFv6AAAJ) at: { x: 5.084876372019954, y: 0, z: -1.6681563841441174 }
+[Movement Sync] Player admin (wUB72MtoMCg7RFv6AAAJ) at: { x: 5.084876372019954, y: 0, z: -1.6681563841441174 }
+[Movement Sync] Player admin (wUB72MtoMCg7RFv6AAAJ) at: { x: 5.084876372019954, y: 0, z: -1.6681563841441174 }
+User disconnected: wUB72MtoMCg7RFv6AAAJ
+[2026-04-22T21:27:55.184Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY4ODkzNjksImV4cCI6MTc3Njk3NTc2OX0.M4PHcTLugiqepC8ljwELOMfPxKQuEOoMlNkj0JGArpk&courseId=1
+[2026-04-22T21:27:55.210Z] GET /styles.css
+[2026-04-22T21:27:55.214Z] GET /main.js?v=1.3.1
+[2026-04-22T21:27:55.218Z] GET /course-world.js?v=1
+[2026-04-22T21:27:55.288Z] GET /api/catalog
+[2026-04-22T21:27:55.290Z] GET /api/config
+[2026-04-22T21:27:55.380Z] GET /favicon.ico
+[2026-04-22T21:27:55.481Z] GET /assets/character/player.glb?v=1776893275478
+User connected: DV93ho05tlCXvIh0AAAL
+[2026-04-22T21:27:55.538Z] GET /favicon.ico
+[2026-04-22T21:27:55.909Z] GET /assets/course-room/room-shell.glb
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 4.605814992845358, y: 0, z: -3.7943151614539357 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 27.538112916472503, y: 0, z: -0.779173297391096 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 51.19413958234213, y: 0, z: -0.3197447616960031 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 66.16353197714683, y: 0, z: 1.8461373632181182 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 65.14215906575227, y: 0, z: 2.476055910229916 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 41.61341574355009, y: 0, z: -0.7660308420973619 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 25.950297212387078, y: 0, z: 0.9446218430891464 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 25.950297212387078, y: 0, z: 0.9446218430891464 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 25.950297212387078, y: 0, z: 0.9446218430891464 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 25.950297212387078, y: 0, z: 0.9446218430891464 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 8.712332411799624, y: 0, z: -1.065655213725745 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 17.88276128173615, y: 0, z: -0.8383833728633705 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 28.950426849330977, y: 0, z: 0.5939354993465901 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 28.950426849330977, y: 0, z: 0.5939354993465901 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 28.950426849330977, y: 0, z: 0.5939354993465901 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 28.950426849330977, y: 0, z: 0.5939354993465901 }
+[Movement Sync] Player admin (DV93ho05tlCXvIh0AAAL) at: { x: 28.950426849330977, y: 0, z: 0.5939354993465901 }
+User disconnected: DV93ho05tlCXvIh0AAAL
+User connected: A6KGtaXddDOllwcqAAAN
+[Movement Sync] Player Guest_933 (A6KGtaXddDOllwcqAAAN) at: { x: 28.950426849330977, y: 0, z: 0.5939354993465901 }
+User disconnected: A6KGtaXddDOllwcqAAAN
+[2026-04-23T01:07:56.077Z] GET /health
+[2026-04-23T01:10:15.711Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY5MDY2MDEsImV4cCI6MTc3Njk5MzAwMX0.TNKctOtasLi4Qfmq27kGUJ_gaqMu5Vm9fo--6ay8g14&courseId=1
+[2026-04-23T01:10:15.737Z] GET /styles.css
+[2026-04-23T01:10:15.745Z] GET /main.js?v=1.3.1
+[2026-04-23T01:10:15.763Z] GET /course-world.js?v=1
+[2026-04-23T01:10:15.855Z] GET /api/catalog
+[2026-04-23T01:10:15.858Z] GET /api/config
+[2026-04-23T01:10:15.974Z] GET /favicon.ico
+[2026-04-23T01:10:16.087Z] GET /assets/character/player.glb?v=1776906616083
+[2026-04-23T01:10:16.149Z] GET /favicon.ico
+User connected: BQEln9Y1PoPNbOriAAAP
+[2026-04-23T01:10:16.513Z] GET /assets/course-room/room-first.glb
+[2026-04-23T01:10:16.514Z] GET /assets/course-room/room-middle.glb
+[2026-04-23T01:10:16.514Z] GET /assets/course-room/room-last.glb
+[2026-04-23T01:10:16.525Z] GET /assets/course-room/room-shell.glb
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: 14.895760420218911, y: 0, z: -1.683047221195325 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: 4.131715918870043, y: 0, z: -2.5629798323682387 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: 23.34129358353235, y: 0, z: 1.2481478802187294 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: 46.14623976913349, y: 0, z: 0.16755815132095908 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: 63.84089037432207, y: 0, z: 0.003635121644311852 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: 38.5982872077468, y: 0, z: 0.20915370175397593 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: 13.899534701713188, y: 0, z: -1.069580669497203 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: 3.0312185535505565, y: 0, z: -1.4508012140468296 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -1.5413570090749573, y: 0, z: -1.7406445847948122 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -10.808071147760401, y: 0, z: -4.226051295180425 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -6.018881266620567, y: 0, z: 0.4236030234101239 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -6.018881266620567, y: 0, z: 0.4236030234101239 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -6.018881266620567, y: 0, z: 0.4236030234101239 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -5.158311869737141, y: 0, z: -0.616550961895751 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[Movement Sync] Player admin (BQEln9Y1PoPNbOriAAAP) at: { x: -3.245935432218415, y: 0, z: -2.9280042625754703 }
+[2026-04-23T01:17:30.868Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTcsInVzZXJuYW1lIjoidGVzdGUxMjNAdGVzdGUxMjMuY29tIiwiZW1haWwiOiJ0ZXN0ZTEyM0B0ZXN0ZTEyMy5jb20iLCJyb2xlIjoiVVNFUiIsImxlZ2FjeVJvbGUiOiJVU0VSIiwicm9sZXMiOlsiU1RVREVOVCJdLCJwcmltYXJ5Um9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzY5MDY4NTIsImV4cCI6MTc3Njk5MzI1Mn0.ievsLNWcu_SVToYdrKr0JMFr5pizf5_M--s_rNfJA6o&courseId=1
+[2026-04-23T01:17:30.895Z] GET /styles.css
+[2026-04-23T01:17:30.913Z] GET /main.js?v=1.3.1
+[2026-04-23T01:17:30.916Z] GET /course-world.js?v=1
+[2026-04-23T01:17:31.312Z] GET /api/catalog
+[2026-04-23T01:17:31.316Z] GET /api/config
+[2026-04-23T01:17:31.413Z] GET /favicon.ico
+[2026-04-23T01:17:31.466Z] GET /assets/character/player.glb?v=1776907051469
+[2026-04-23T01:17:31.524Z] GET /favicon.ico
+User connected: mLwidcIwBAm_7aSmAAAR
+[2026-04-23T01:17:31.564Z] GET /assets/character/player.glb?v=1776906616083?v=1776907051566
+[2026-04-23T01:17:31.909Z] GET /assets/character/player.glb?v=1776907051606
+[2026-04-23T01:17:31.914Z] GET /assets/character/player.glb?v=1776907051469?v=1776907051617
+[2026-04-23T01:17:31.933Z] GET /assets/course-room/room-first.glb
+[2026-04-23T01:17:31.934Z] GET /assets/course-room/room-middle.glb
+[2026-04-23T01:17:31.934Z] GET /assets/course-room/room-last.glb
+[2026-04-23T01:17:31.935Z] GET /assets/course-room/room-shell.glb
+[Movement Sync] Player teste123@teste123.com (mLwidcIwBAm_7aSmAAAR) at: { x: -4.44063166307173, y: 0, z: -2.527204437343885 }
+[Movement Sync] Player teste123@teste123.com (mLwidcIwBAm_7aSmAAAR) at: { x: -5.966670933178297, y: 0, z: -6.0346007859324695 }
+[Movement Sync] Player teste123@teste123.com (mLwidcIwBAm_7aSmAAAR) at: { x: -6.335730286659329, y: 0, z: 3.933528530024799 }
+[Movement Sync] Player teste123@teste123.com (mLwidcIwBAm_7aSmAAAR) at: { x: -6.965827727631635, y: 0, z: -1.9578721705624726 }
+[2026-04-23T01:26:36.186Z] GET /
+User disconnected: mLwidcIwBAm_7aSmAAAR
+[2026-04-23T01:26:36.229Z] GET /styles.css
+[2026-04-23T01:26:36.239Z] GET /main.js?v=1.3.1
+[2026-04-23T01:26:36.247Z] GET /course-world.js?v=1
+[2026-04-23T01:26:36.324Z] GET /api/catalog
+[2026-04-23T01:26:36.327Z] GET /api/config
+[2026-04-23T01:26:36.354Z] GET /assets/maps/map/map.glb
+[2026-04-23T01:26:36.409Z] GET /favicon.ico
+[2026-04-23T01:26:39.672Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTcsInVzZXJuYW1lIjoidGVzdGUxMjNAdGVzdGUxMjMuY29tIiwiZW1haWwiOiJ0ZXN0ZTEyM0B0ZXN0ZTEyMy5jb20iLCJyb2xlIjoiVVNFUiIsImxlZ2FjeVJvbGUiOiJVU0VSIiwicm9sZXMiOlsiU1RVREVOVCJdLCJwcmltYXJ5Um9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzY5MDY4NTIsImV4cCI6MTc3Njk5MzI1Mn0.ievsLNWcu_SVToYdrKr0JMFr5pizf5_M--s_rNfJA6o&courseId=1
+[2026-04-23T01:26:39.690Z] GET /styles.css
+[2026-04-23T01:26:39.693Z] GET /main.js?v=1.3.1
+[2026-04-23T01:26:39.694Z] GET /course-world.js?v=1
+[2026-04-23T01:26:39.755Z] GET /api/catalog
+[2026-04-23T01:26:39.756Z] GET /api/config
+[2026-04-23T01:26:39.842Z] GET /favicon.ico
+[2026-04-23T01:26:39.922Z] GET /assets/character/player.glb?v=1776907599929
+User connected: lwDM8zoPiRqmtHqRAAAT
+[2026-04-23T01:26:39.955Z] GET /assets/character/player.glb?v=1776906616083?v=1776907599961
+[2026-04-23T01:26:39.991Z] GET /favicon.ico
+[2026-04-23T01:26:40.316Z] GET /assets/character/player.glb?v=1776907600007
+[2026-04-23T01:26:40.322Z] GET /assets/character/player.glb?v=1776907599929?v=1776907600043
+[2026-04-23T01:26:40.360Z] GET /assets/course-room/room-first.glb
+[2026-04-23T01:26:40.362Z] GET /assets/course-room/room-middle.glb
+[2026-04-23T01:26:40.364Z] GET /assets/course-room/room-last.glb
+[2026-04-23T01:26:40.368Z] GET /assets/course-room/room-shell.glb
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 0, y: 0, z: 0 }
+[2026-04-23T01:26:59.148Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY5MDY2MDEsImV4cCI6MTc3Njk5MzAwMX0.TNKctOtasLi4Qfmq27kGUJ_gaqMu5Vm9fo--6ay8g14&courseId=1
+[2026-04-23T01:26:59.173Z] GET /styles.css
+[2026-04-23T01:26:59.177Z] GET /main.js?v=1.3.1
+[2026-04-23T01:26:59.178Z] GET /course-world.js?v=1
+[2026-04-23T01:26:59.299Z] GET /api/catalog
+[2026-04-23T01:26:59.302Z] GET /api/config
+[2026-04-23T01:26:59.472Z] GET /favicon.ico
+[2026-04-23T01:26:59.787Z] GET /assets/character/player.glb?v=1776907619781
+[2026-04-23T01:26:59.873Z] GET /favicon.ico
+User connected: g662isCQFPujeGXTAAAV
+[2026-04-23T01:26:59.991Z] GET /assets/character/player.glb?v=1776907619974
+[2026-04-23T01:27:00.004Z] GET /assets/character/player.glb?v=1776907619781?v=1776907619997
+[2026-04-23T01:27:00.048Z] GET /assets/character/player.glb?v=1776906616083?v=1776907620008
+[2026-04-23T01:27:00.058Z] GET /assets/character/player.glb?v=1776907599929?v=1776907620010
+[2026-04-23T01:27:00.188Z] GET /assets/course-room/room-first.glb
+[2026-04-23T01:27:00.189Z] GET /assets/course-room/room-middle.glb
+[2026-04-23T01:27:00.190Z] GET /assets/course-room/room-last.glb
+[2026-04-23T01:27:00.192Z] GET /assets/course-room/room-shell.glb
+[2026-04-23T01:27:00.394Z] GET /assets/character/player.glb?v=1776907620382
+[2026-04-23T01:27:00.427Z] GET /assets/character/player.glb?v=1776907619781?v=1776907620418
+User disconnected: BQEln9Y1PoPNbOriAAAP
+[Movement Sync] Player admin (g662isCQFPujeGXTAAAV) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 4.929062125534408, y: 0, z: 3.551052176837495 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: -3.068285573420905, y: 0, z: -3.04028047013491 }
+[Movement Sync] Player admin (g662isCQFPujeGXTAAAV) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (g662isCQFPujeGXTAAAV) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (g662isCQFPujeGXTAAAV) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (g662isCQFPujeGXTAAAV) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (g662isCQFPujeGXTAAAV) at: { x: 0, y: 0, z: 0 }
+[Movement Sync] Player admin (g662isCQFPujeGXTAAAV) at: { x: 0, y: 0, z: 0 }
+User disconnected: g662isCQFPujeGXTAAAV
+[2026-04-23T01:48:28.787Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY5MDY2MDEsImV4cCI6MTc3Njk5MzAwMX0.TNKctOtasLi4Qfmq27kGUJ_gaqMu5Vm9fo--6ay8g14&courseId=1
+[2026-04-23T01:48:28.816Z] GET /styles.css
+[2026-04-23T01:48:28.817Z] GET /main.js?v=1.3.1
+[2026-04-23T01:48:28.821Z] GET /course-world.js?v=1
+[2026-04-23T01:48:28.899Z] GET /api/catalog
+[2026-04-23T01:48:28.899Z] GET /api/config
+[2026-04-23T01:48:29.017Z] GET /favicon.ico
+[2026-04-23T01:48:29.148Z] GET /assets/character/player.glb?v=1776908909145
+[2026-04-23T01:48:29.215Z] GET /favicon.ico
+User connected: wQ09YNEbvTqBVh_SAAAX
+[2026-04-23T01:48:29.246Z] GET /assets/character/player.glb?v=1776907599929?v=1776908909246
+[2026-04-23T01:48:29.550Z] GET /assets/course-room/room-first.glb
+[2026-04-23T01:48:29.553Z] GET /assets/course-room/room-middle.glb
+[2026-04-23T01:48:29.555Z] GET /assets/course-room/room-last.glb
+[2026-04-23T01:48:29.561Z] GET /assets/character/player.glb?v=1776908909247
+[2026-04-23T01:48:29.563Z] GET /assets/course-room/room-shell.glb
+[2026-04-23T01:48:29.566Z] GET /assets/character/player.glb?v=1776908909145?v=1776908909265
+[Movement Sync] Player admin (wQ09YNEbvTqBVh_SAAAX) at: { x: -8.220508946727735, y: 0, z: -3.5313208701079533 }
+[Movement Sync] Player admin (wQ09YNEbvTqBVh_SAAAX) at: { x: -8.98203428169957, y: 0, z: -7.203184043511353 }
+[Movement Sync] Player admin (wQ09YNEbvTqBVh_SAAAX) at: { x: -2.5923701955277947, y: 0, z: -3.0316839896952636 }
+[Movement Sync] Player admin (wQ09YNEbvTqBVh_SAAAX) at: { x: -9.453987996782791, y: 0, z: -6.971533263747196 }
+[Movement Sync] Player admin (wQ09YNEbvTqBVh_SAAAX) at: { x: -5.023052145845197, y: 0, z: 2.5477528168827908 }
+[Movement Sync] Player admin (wQ09YNEbvTqBVh_SAAAX) at: { x: -5.023052145845197, y: 0, z: 2.5477528168827908 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: -3.6483604510746366, y: 0, z: -1.835292980267111 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 14.930803229654735, y: 0, z: -0.8928264151726005 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 6.734656918854091, y: 0, z: -4.702032942806568 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 8.491288579127692, y: 0, z: 1.9270870789490964 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 10.461790459638397, y: 0, z: 0.059860934772968846 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 14.934980780202434, y: 0, z: 0.4280995488443372 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 14.934980780202434, y: 0, z: 0.4280995488443372 }
+[Movement Sync] Player admin (wQ09YNEbvTqBVh_SAAAX) at: { x: -5.023052145845197, y: 0, z: 2.5477528168827908 }
+[Movement Sync] Player admin (wQ09YNEbvTqBVh_SAAAX) at: { x: -1.9937535436738356, y: 0, z: -3.0082024390153075 }
+[Movement Sync] Player admin (wQ09YNEbvTqBVh_SAAAX) at: { x: 14.886466265036756, y: 0, z: 1.6326451467891414 }
+User disconnected: wQ09YNEbvTqBVh_SAAAX
+[2026-04-23T01:54:59.685Z] GET /?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AbWFzdGVyLmNvbSIsInJvbGUiOiJNQVNURVIiLCJsZWdhY3lSb2xlIjoiTUFTVEVSIiwicm9sZXMiOlsiVEVBQ0hFUiJdLCJwcmltYXJ5Um9sZSI6IlRFQUNIRVIiLCJpYXQiOjE3NzY5MDY2MDEsImV4cCI6MTc3Njk5MzAwMX0.TNKctOtasLi4Qfmq27kGUJ_gaqMu5Vm9fo--6ay8g14&courseId=1
+[2026-04-23T01:54:59.710Z] GET /styles.css
+[2026-04-23T01:54:59.716Z] GET /main.js?v=1.3.1
+[2026-04-23T01:54:59.719Z] GET /course-world.js?v=1
+[2026-04-23T01:54:59.795Z] GET /api/catalog
+[2026-04-23T01:54:59.796Z] GET /api/config
+[2026-04-23T01:54:59.890Z] GET /favicon.ico
+[2026-04-23T01:55:00.071Z] GET /assets/character/player.glb?v=1776909300068
+User connected: b3w-VFaedMATp_21AAAZ
+[2026-04-23T01:55:00.115Z] GET /assets/character/player.glb?v=1776907599929?v=1776909300111
+[2026-04-23T01:55:00.176Z] GET /favicon.ico
+[2026-04-23T01:55:00.417Z] GET /assets/character/player.glb?v=1776909300105
+[2026-04-23T01:55:00.419Z] GET /assets/course-room/room-first.glb
+[2026-04-23T01:55:00.420Z] GET /assets/course-room/room-middle.glb
+[2026-04-23T01:55:00.421Z] GET /assets/course-room/room-last.glb
+[2026-04-23T01:55:00.422Z] GET /assets/character/player.glb?v=1776909300068?v=1776909300189
+[2026-04-23T01:55:00.424Z] GET /assets/course-room/room-shell.glb
+[Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 9.776844113578706, y: 0, z: -2.0863103893658703 }
+[Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 16.29981354226442, y: 0, z: 0.7801324990294787 }
+[Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 5.773106438013742, y: 0, z: -3.9060814223452582 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 5.730610787107053, y: 0, z: 4.382788091461798 }
+[Movement Sync] Player teste123@teste123.com (lwDM8zoPiRqmtHqRAAAT) at: { x: 3.0063530958684255, y: 0, z: -7.796530788369435 }
+[Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 7.799575092679253, y: 0, z: -2.5933759692671403 }
+[Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 0.5259097484447833, y: 0, z: -9.966791593913985 }
+[Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 0.5259097484447833, y: 0, z: -9.966791593913985 }
+[Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 0.5259097484447833, y: 0, z: -9.966791593913985 }
+[Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 0.5259097484447833, y: 0, z: -9.966791593913985 }
+[Movement Sync] Player admin (b3w-VFaedMATp_21AAAZ) at: { x: 0.5259097484447833, y: 0, z: -9.966791593913985 }

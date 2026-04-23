@@ -145,3 +145,14 @@ User connected: I5jkJfAw6EkBaBDZAAAH
 [Movement Sync] Player admin (I5jkJfAw6EkBaBDZAAAH) at: { x: 0, y: 0, z: 0 }
 [Movement Sync] Player admin (I5jkJfAw6EkBaBDZAAAH) at: { x: 0, y: 0, z: 0 }
 User disconnected: I5jkJfAw6EkBaBDZAAAH
+[2026-04-22T16:37:16.015Z] GET /
+[2026-04-22T16:48:44.842Z] GET /?courseId=1
+[2026-04-22T16:48:44.851Z] GET /styles.css
+[2026-04-22T16:48:44.884Z] GET /main.js?v=1.3.1
+[2026-04-22T16:48:44.888Z] GET /course-world.js?v=1
+[2026-04-22T16:48:46.479Z] GET /api/catalog
+[2026-04-22T16:48:46.479Z] GET /api/config
+[2026-04-22T16:48:46.693Z] GET /favicon.ico
+[2026-04-22T16:48:47.254Z] GET /assets/character/player.glb?v=1776876527251
+User connected: W_lKGufNP8-vw3TmAAAJ
+User disconnected: W_lKGufNP8-vw3TmAAAJ

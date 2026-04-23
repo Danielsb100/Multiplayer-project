@@ -6,8 +6,8 @@
     const listEl = document.getElementById('course-trail-list');
     let latestRuntime = null;
     let lastRenderedActiveModuleId = null;
+    let refreshBridge = null;
 
-    // Course Landing Modal
     const btnLanding = document.getElementById('btn-show-course-landing');
     const modalLanding = document.getElementById('course-landing-modal');
     const closeLandingBtn = document.getElementById('close-course-landing');
@@ -45,10 +45,14 @@
     }
 
     function normalizePlacement(module, index) {
+        const dynamicPosition = window.__worldBridge?.getCourseRoomPlacement?.(
+            index,
+            module.placement?.position?.y ?? 0
+        );
         return {
             id: module.placement?.id || `course-${window.__courseWorldContext.courseId}-module-${module.moduleId}`,
             label: module.roomLabel || module.placement?.label || `Module Room ${index + 1}`,
-            position: { x: index * 10, y: module.placement?.position?.y ?? 0, z: 0 },
+            position: dynamicPosition || { x: index * 14, y: module.placement?.position?.y ?? 0, z: 0 },
             rotation: module.placement?.rotation || { x: 0, y: 0, z: 0 }
         };
     }
@@ -64,11 +68,26 @@
         const activeModuleId = bridge.getActiveCourseRoomModuleId?.() || null;
         lastRenderedActiveModuleId = activeModuleId;
         const actionButtonStyle = 'padding:0.58rem 0.9rem; border:none; border-radius:12px; cursor:pointer; font-weight:700; letter-spacing:0.01em; transition:transform 120ms ease, opacity 120ms ease;';
+
         listEl.innerHTML = (runtime.modules || []).map((module, index) => {
             const statusLabel = module.completed ? 'Done' : (module.unlocked ? 'Ready' : 'Locked');
             const statusColor = module.completed ? '#10b981' : (module.unlocked ? '#60a5fa' : '#ef4444');
             const stepIcon = module.completed ? '✓' : (module.unlocked ? '•' : '⨯');
             const isCurrentRoom = activeModuleId === module.moduleId;
+            const quizRuleText = module.quizRequirementActive
+                ? `Quiz gate ${Math.round(module.minimumQuizScore || 0)}%`
+                : (module.hasQuiz ? 'Quiz available' : null);
+            const quizProgressText = module.hasQuiz
+                ? (module.bestQuizScore === null || module.bestQuizScore === undefined
+                    ? 'No graded attempt yet.'
+                    : `Best score ${module.bestQuizScore.toFixed(1)}%${module.quizRequirementActive ? (module.quizPassed ? ' • Requirement met' : ' • Requirement not met yet') : ''}`)
+                : null;
+            const showCompleteButton = module.unlocked && !module.completed;
+            const completeButtonLabel = module.canMarkComplete ? 'Mark done' : 'Pass quiz first';
+            const completeButtonStyle = module.canMarkComplete
+                ? `${actionButtonStyle} background:rgba(16,185,129,0.16); color:#d1fae5; border:1px solid rgba(52,211,153,0.25);`
+                : `${actionButtonStyle} background:rgba(37,99,235,0.12); color:#dbeafe; border:1px solid rgba(96,165,250,0.22); opacity:0.72; cursor:not-allowed;`;
+
             return `
                 <article data-course-trail-module="${module.moduleId}" style="padding:1rem; border-radius:18px; background:${isCurrentRoom ? 'linear-gradient(135deg, rgba(37,99,235,0.34), rgba(14,165,233,0.22))' : 'rgba(30,41,59,0.78)'}; border:2px solid ${isCurrentRoom ? 'rgba(125,211,252,0.95)' : 'rgba(255,255,255,0.06)'}; display:flex; flex-direction:column; gap:0.7rem; box-shadow:${isCurrentRoom ? '0 0 0 2px rgba(56,189,248,0.18), 0 18px 38px rgba(2,132,199,0.18)' : 'none'}; transform:${isCurrentRoom ? 'translateX(-4px) scale(1.01)' : 'none'}; transition:all 160ms ease;">
                     <div style="display:flex; justify-content:space-between; gap:0.75rem; align-items:flex-start;">
@@ -88,12 +107,14 @@
                         <span>${module.isRequired ? 'Required' : 'Optional'}</span>
                         <span>•</span>
                         <span>${escapeHtml(module.moduleStatus || 'DRAFT')}</span>
+                        ${quizRuleText ? `<span>•</span><span>${escapeHtml(quizRuleText)}</span>` : ''}
                         ${isCurrentRoom ? '<span>•</span><strong style="color:#e0f2fe;">Current room</strong>' : ''}
                     </div>
+                    ${quizProgressText ? `<div style="font-size:0.78rem; color:${module.quizPassed ? '#86efac' : '#93c5fd'};">${escapeHtml(quizProgressText)}</div>` : ''}
                     <div style="display:flex; gap:0.55rem; flex-wrap:wrap;">
                         ${!isCurrentRoom ? `<button type="button" data-course-trail-action="teleport" data-module-id="${module.moduleId}" style="${actionButtonStyle} background:linear-gradient(135deg, #2563eb, #38bdf8); color:white; box-shadow:0 10px 24px rgba(37,99,235,0.28);">Go to room</button>` : ''}
                         ${module.unlocked ? `<button type="button" data-course-trail-action="open" data-module-id="${module.moduleId}" style="${actionButtonStyle} background:rgba(255,255,255,0.1); color:#f8fafc; border:1px solid rgba(255,255,255,0.14);">Open module</button>` : ''}
-                        ${module.unlocked && !module.completed ? `<button type="button" data-course-trail-action="complete" data-module-id="${module.moduleId}" style="${actionButtonStyle} background:rgba(16,185,129,0.16); color:#d1fae5; border:1px solid rgba(52,211,153,0.25);">Mark done</button>` : ''}
+                        ${showCompleteButton ? `<button type="button" data-course-trail-action="complete" data-module-id="${module.moduleId}" style="${completeButtonStyle}" ${module.canMarkComplete ? '' : 'data-completion-blocked="true"'}>${completeButtonLabel}</button>` : ''}
                     </div>
                 </article>
             `;
@@ -125,6 +146,11 @@
                 }
 
                 if (button.dataset.courseTrailAction === 'complete') {
+                    if (button.dataset.completionBlocked === 'true') {
+                        alert(module.completionBlockedReason || 'Pass the quiz requirement before marking this room as done.');
+                        return;
+                    }
+
                     try {
                         button.disabled = true;
                         const response = await fetch(`${bridge.getAuthApi()}/courses/${window.__courseWorldContext.courseId}/modules/${module.moduleId}/complete`, {
@@ -170,6 +196,7 @@
             throw new Error(runtime.error || 'Failed to load course runtime.');
         }
         window.__courseWorldContext.runtime = runtime;
+        window.dispatchEvent(new CustomEvent('course-world:runtime-updated', { detail: runtime }));
 
         if (runtime.landingPage && runtime.landingPage.compiledHtml && btnLanding) {
             btnLanding.classList.remove('hidden');
@@ -222,6 +249,12 @@
             console.warn('Course world bridge not ready.');
             return;
         }
+
+        refreshBridge = bridge;
+        window.addEventListener('course-world:refresh-runtime', () => {
+            if (!refreshBridge) return;
+            loadRuntime(refreshBridge).catch((error) => console.error('Failed to refresh course runtime:', error));
+        });
 
         try {
             await loadRuntime(bridge);

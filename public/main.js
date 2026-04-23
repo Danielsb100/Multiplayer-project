@@ -21,6 +21,7 @@ const passwordInput = document.getElementById('password-input');
 const loginError = document.getElementById('login-error');
 let AUTH_API = 'https://login-system-production-84c6.up.railway.app';
 const COURSE_ID_FROM_URL = Number(new URLSearchParams(window.location.search).get('courseId')) || null;
+document.body.classList.toggle('course-world-mode', Boolean(COURSE_ID_FROM_URL));
 window.__courseWorldContext = { courseId: COURSE_ID_FROM_URL, runtime: null };
 const courseRoomContextCard = document.getElementById('course-room-context');
 const courseRoomContextCourse = document.getElementById('course-room-context-course');
@@ -28,6 +29,31 @@ const courseRoomContextRoom = document.getElementById('course-room-context-room'
 let courseRoomShells = [];
 let courseRoomColliderIds = [];
 let activeCourseRoomModuleId = null;
+const COURSE_ROOM_MODEL_CONFIG = Object.freeze({
+    paths: Object.freeze({
+        first: 'assets/course-room/room-first.glb',
+        middle: 'assets/course-room/room-middle.glb',
+        last: 'assets/course-room/room-last.glb'
+    }),
+    fallbackPath: 'assets/course-room/room-shell.glb',
+    position: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+    rotationY: 0,
+    minimumWidth: 14,
+    minimumDepth: 10,
+    spacingPadding: 0
+});
+const DEFAULT_COURSE_ROOM_LAYOUT = Object.freeze({
+    roomWidth: COURSE_ROOM_MODEL_CONFIG.minimumWidth,
+    roomDepth: COURSE_ROOM_MODEL_CONFIG.minimumDepth,
+    roomSpacing: COURSE_ROOM_MODEL_CONFIG.minimumWidth,
+    source: 'procedural'
+});
+let courseRoomModelTemplatesPromise = null;
+let courseRoomModelTemplates = null;
+let courseRoomModelLoadFailed = false;
+let courseRoomRenderVersion = 0;
+let courseRoomLayoutMetrics = { ...DEFAULT_COURSE_ROOM_LAYOUT };
 
 // Auth Elements
 const authTabs = document.querySelector('.auth-tabs');
@@ -802,6 +828,186 @@ function createCourseModeBaseEnvironment() {
     scene.add(grid);
 }
 
+function prepareCourseRoomModelTemplate(root) {
+    root.updateMatrixWorld(true);
+    root.traverse((child) => {
+        const name = child.name ? child.name.toLowerCase() : '';
+        if (name.includes('navmesh') || name.includes('collision')) {
+            child.visible = false;
+            return;
+        }
+
+        if (!child.isMesh) return;
+        child.castShadow = true;
+        child.receiveShadow = true;
+        child.frustumCulled = false;
+    });
+    return root;
+}
+
+function loadSingleCourseRoomModelTemplate(path, label) {
+    const loader = new GLTFLoader();
+    return new Promise((resolve) => {
+        loader.load(
+            path,
+            (gltf) => resolve(prepareCourseRoomModelTemplate(gltf.scene)),
+            undefined,
+            (error) => {
+                console.warn(`Course room model "${label}" not loaded from ${path}.`, error);
+                resolve(null);
+            }
+        );
+    });
+}
+
+function calculateCourseRoomLayoutFromTemplate(template) {
+    if (!template) {
+        return { ...DEFAULT_COURSE_ROOM_LAYOUT };
+    }
+
+    const probe = template.clone(true);
+    probe.position.set(
+        COURSE_ROOM_MODEL_CONFIG.position.x,
+        COURSE_ROOM_MODEL_CONFIG.position.y,
+        COURSE_ROOM_MODEL_CONFIG.position.z
+    );
+    probe.scale.set(
+        COURSE_ROOM_MODEL_CONFIG.scale.x,
+        COURSE_ROOM_MODEL_CONFIG.scale.y,
+        COURSE_ROOM_MODEL_CONFIG.scale.z
+    );
+    probe.rotation.y = COURSE_ROOM_MODEL_CONFIG.rotationY;
+    probe.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(probe);
+    const size = box.getSize(new THREE.Vector3());
+    const roomWidth = Math.max(COURSE_ROOM_MODEL_CONFIG.minimumWidth, Number.isFinite(size.x) ? size.x : COURSE_ROOM_MODEL_CONFIG.minimumWidth);
+    const roomDepth = Math.max(COURSE_ROOM_MODEL_CONFIG.minimumDepth, Number.isFinite(size.z) ? size.z : COURSE_ROOM_MODEL_CONFIG.minimumDepth);
+
+    return {
+        roomWidth,
+        roomDepth,
+        roomSpacing: roomWidth + COURSE_ROOM_MODEL_CONFIG.spacingPadding,
+        source: 'model'
+    };
+}
+
+function calculateCourseRoomLayoutFromTemplates(templates) {
+    const availableTemplates = Object.values(templates || {}).filter(Boolean);
+    if (!availableTemplates.length) {
+        return { ...DEFAULT_COURSE_ROOM_LAYOUT };
+    }
+
+    const templateLayouts = availableTemplates.map((template) => calculateCourseRoomLayoutFromTemplate(template));
+    const roomWidth = Math.max(...templateLayouts.map((layout) => layout.roomWidth));
+    const roomDepth = Math.max(...templateLayouts.map((layout) => layout.roomDepth));
+
+    return {
+        roomWidth,
+        roomDepth,
+        roomSpacing: roomWidth + COURSE_ROOM_MODEL_CONFIG.spacingPadding,
+        source: 'model'
+    };
+}
+
+function setCourseRoomLayoutMetrics(nextMetrics) {
+    const prev = courseRoomLayoutMetrics;
+    const changed = !prev
+        || Math.abs(prev.roomWidth - nextMetrics.roomWidth) > 0.01
+        || Math.abs(prev.roomDepth - nextMetrics.roomDepth) > 0.01
+        || Math.abs(prev.roomSpacing - nextMetrics.roomSpacing) > 0.01
+        || prev.source !== nextMetrics.source;
+
+    if (changed) {
+        courseRoomLayoutMetrics = { ...nextMetrics };
+    }
+
+    return changed;
+}
+
+function getCourseRoomLayoutMetrics() {
+    return { ...courseRoomLayoutMetrics };
+}
+
+function getCourseRoomPlacement(index, y = 0) {
+    return {
+        x: index * courseRoomLayoutMetrics.roomSpacing,
+        y,
+        z: 0
+    };
+}
+
+function getCourseRoomModelRole(index, totalModules) {
+    if (totalModules <= 1 || index === 0) {
+        return 'first';
+    }
+    if (index === totalModules - 1) {
+        return 'last';
+    }
+    return 'middle';
+}
+
+function getCourseRoomModelTemplateForIndex(index, totalModules, templates = courseRoomModelTemplates) {
+    if (!templates) return null;
+
+    const role = getCourseRoomModelRole(index, totalModules);
+    return templates[role] || templates.middle || templates.first || templates.last || null;
+}
+
+function getCourseRuntimePlacementId(module, index) {
+    return module?.placement?.id || `course-${COURSE_ID_FROM_URL}-module-${module?.moduleId ?? index}`;
+}
+
+function syncCoursePlacementObjects(runtime, centers) {
+    if (!runtime?.modules?.length || !centers?.length) return;
+
+    runtime.modules.forEach((module, index) => {
+        const placementId = getCourseRuntimePlacementId(module, index);
+        const placementObject = scene.getObjectByProperty('uuid', idToUuid[placementId]);
+        if (!placementObject) return;
+
+        const center = centers[index];
+        placementObject.position.set(center.x, center.y, center.z);
+    });
+}
+
+function loadCourseRoomModelTemplates() {
+    if (courseRoomModelLoadFailed) {
+        return Promise.resolve(null);
+    }
+    if (courseRoomModelTemplates) {
+        return Promise.resolve(courseRoomModelTemplates);
+    }
+    if (courseRoomModelTemplatesPromise) {
+        return courseRoomModelTemplatesPromise;
+    }
+
+    courseRoomModelTemplatesPromise = Promise.all([
+        loadSingleCourseRoomModelTemplate(COURSE_ROOM_MODEL_CONFIG.paths.first, 'first'),
+        loadSingleCourseRoomModelTemplate(COURSE_ROOM_MODEL_CONFIG.paths.middle, 'middle'),
+        loadSingleCourseRoomModelTemplate(COURSE_ROOM_MODEL_CONFIG.paths.last, 'last'),
+        loadSingleCourseRoomModelTemplate(COURSE_ROOM_MODEL_CONFIG.fallbackPath, 'fallback')
+    ]).then(([firstTemplate, middleTemplate, lastTemplate, fallbackTemplate]) => {
+        const templates = {
+            first: firstTemplate || fallbackTemplate || middleTemplate || lastTemplate || null,
+            middle: middleTemplate || fallbackTemplate || firstTemplate || lastTemplate || null,
+            last: lastTemplate || fallbackTemplate || middleTemplate || firstTemplate || null
+        };
+
+        if (!templates.first && !templates.middle && !templates.last) {
+            courseRoomModelLoadFailed = true;
+            setCourseRoomLayoutMetrics({ ...DEFAULT_COURSE_ROOM_LAYOUT });
+            return null;
+        }
+
+        courseRoomModelTemplates = templates;
+        setCourseRoomLayoutMetrics(calculateCourseRoomLayoutFromTemplates(courseRoomModelTemplates));
+        return courseRoomModelTemplates;
+    });
+
+    return courseRoomModelTemplatesPromise;
+}
+
 function clearCourseRoomShells() {
     courseRoomShells.forEach((room) => {
         if (room.group?.parent) {
@@ -853,18 +1059,39 @@ function renderCourseRoomShells(runtime) {
         return;
     }
 
-    const roomWidth = 10;
-    const roomDepth = 8;
+    const renderVersion = ++courseRoomRenderVersion;
+    if (!courseRoomModelTemplates && !courseRoomModelLoadFailed) {
+        loadCourseRoomModelTemplates().then((templates) => {
+            if (!templates || courseRoomRenderVersion !== renderVersion) return;
+            renderCourseRoomShells(runtime);
+        });
+    }
+
+    const roomTemplates = courseRoomModelTemplates;
+    const layoutMetrics = roomTemplates
+        ? calculateCourseRoomLayoutFromTemplates(roomTemplates)
+        : getCourseRoomLayoutMetrics();
+    setCourseRoomLayoutMetrics(layoutMetrics);
+
+    const roomWidth = layoutMetrics.roomWidth;
+    const roomDepth = layoutMetrics.roomDepth;
     const wallHeight = 3;
     const wallThickness = 0.25;
-    const doorWidth = 2.4;
+    const doorWidth = 3.2;
     const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95, metalness: 0.05 });
     const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x1d4ed8, emissiveIntensity: 0.12 });
-    const roomSpacing = roomWidth;
+    const doorBlockerMaterial = new THREE.MeshStandardMaterial({
+        color: 0x1d4ed8,
+        emissive: 0x60a5fa,
+        emissiveIntensity: 0.22,
+        metalness: 0.08,
+        roughness: 0.45,
+        transparent: true,
+        opacity: 0.94
+    });
+    const roomSpacing = layoutMetrics.roomSpacing;
     const centers = runtime.modules.map((module, index) => ({
-        x: index * roomSpacing,
-        y: module?.placement?.position?.y ?? 0,
-        z: 0
+        ...getCourseRoomPlacement(index, module?.placement?.position?.y ?? 0)
     }));
 
     const registerCourseCollider = (mesh, relatedId) => {
@@ -878,29 +1105,41 @@ function renderCourseRoomShells(runtime) {
     const addWallSegment = (group, width, depth, x, z, colliderId) => {
         const wall = new THREE.Mesh(new THREE.BoxGeometry(width, wallHeight, depth), wallMaterial.clone());
         wall.position.set(x, wallHeight / 2, z);
+        wall.userData.courseStructure = true;
         group.add(wall);
         registerCourseCollider(wall, colliderId);
+        return wall;
     };
 
     const buildNorthSouthWall = (group, center, orientation, colliderBaseId) => {
         const z = center.z + (orientation === 'south' ? roomDepth / 2 : -roomDepth / 2);
-        addWallSegment(group, roomWidth, wallThickness, center.x, z, `${colliderBaseId}_${orientation}`);
+        return addWallSegment(group, roomWidth, wallThickness, center.x, z, `${colliderBaseId}_${orientation}`);
     };
 
     const buildSharedWall = (group, x, centerZ, hasDoor, colliderBaseId) => {
+        const segments = [];
         let segmentCounter = 0;
         const addSegment = (depth, z) => {
-            addWallSegment(group, wallThickness, depth, x, z, `${colliderBaseId}_${segmentCounter++}`);
+            segments.push(addWallSegment(group, wallThickness, depth, x, z, `${colliderBaseId}_${segmentCounter++}`));
         };
 
         if (!hasDoor) {
             addSegment(roomDepth, centerZ);
-            return;
+            return segments;
         }
         const segmentDepth = (roomDepth - doorWidth) / 2;
         const offset = doorWidth / 2 + segmentDepth / 2;
         addSegment(segmentDepth, centerZ - offset);
         addSegment(segmentDepth, centerZ + offset);
+        return segments;
+    };
+
+    const addDoorBlocker = (group, x, z) => {
+        const blocker = new THREE.Mesh(new THREE.BoxGeometry(0.34, wallHeight * 0.82, doorWidth * 0.92), doorBlockerMaterial.clone());
+        blocker.position.set(x, (wallHeight * 0.82) / 2, z);
+        blocker.userData.courseDoorBlocker = true;
+        group.add(blocker);
+        return blocker;
     };
 
     runtime.modules.forEach((module, index) => {
@@ -911,28 +1150,31 @@ function renderCourseRoomShells(runtime) {
         roomGroup.userData.courseRoom = true;
         roomGroup.userData.moduleId = module.moduleId;
         const colliderBaseId = `course_room_${module.moduleId}`;
+        const proceduralMeshes = [];
 
         const floor = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, 0.08, roomDepth), accentMaterial.clone());
         floor.position.set(center.x, 0.04, center.z);
         floor.receiveShadow = true;
+        floor.userData.courseStructure = true;
         roomGroup.add(floor);
+        proceduralMeshes.push(floor);
 
-        buildNorthSouthWall(roomGroup, center, 'north', colliderBaseId);
-        buildNorthSouthWall(roomGroup, center, 'south', colliderBaseId);
+        proceduralMeshes.push(buildNorthSouthWall(roomGroup, center, 'north', colliderBaseId));
+        proceduralMeshes.push(buildNorthSouthWall(roomGroup, center, 'south', colliderBaseId));
 
         if (index === 0) {
-            buildSharedWall(roomGroup, center.x - roomWidth / 2, center.z, false, `${colliderBaseId}_west_outer`);
+            proceduralMeshes.push(...buildSharedWall(roomGroup, center.x - roomWidth / 2, center.z, false, `${colliderBaseId}_west_outer`));
         }
         if (!nextCenter) {
-            buildSharedWall(roomGroup, center.x + roomWidth / 2, center.z, false, `${colliderBaseId}_east_outer`);
+            proceduralMeshes.push(...buildSharedWall(roomGroup, center.x + roomWidth / 2, center.z, false, `${colliderBaseId}_east_outer`));
         } else {
-            buildSharedWall(
+            proceduralMeshes.push(...buildSharedWall(
                 roomGroup,
                 center.x + roomSpacing / 2,
                 center.z,
                 Boolean(nextModule?.unlocked),
                 `${colliderBaseId}_to_${nextModule.moduleId}`
-            );
+            ));
         }
 
         scene.add(roomGroup);
@@ -945,8 +1187,36 @@ function renderCourseRoomShells(runtime) {
             halfWidth: roomWidth / 2,
             halfDepth: roomDepth / 2
         });
+
+        const roomModelTemplate = getCourseRoomModelTemplateForIndex(index, runtime.modules.length, roomTemplates);
+        if (roomModelTemplate) {
+            const shellModel = roomModelTemplate.clone(true);
+            shellModel.position.set(
+                center.x + COURSE_ROOM_MODEL_CONFIG.position.x,
+                COURSE_ROOM_MODEL_CONFIG.position.y,
+                center.z + COURSE_ROOM_MODEL_CONFIG.position.z
+            );
+            shellModel.scale.set(
+                COURSE_ROOM_MODEL_CONFIG.scale.x,
+                COURSE_ROOM_MODEL_CONFIG.scale.y,
+                COURSE_ROOM_MODEL_CONFIG.scale.z
+            );
+            shellModel.rotation.y = COURSE_ROOM_MODEL_CONFIG.rotationY;
+            roomGroup.add(shellModel);
+
+            proceduralMeshes.forEach((mesh) => {
+                if (mesh) {
+                    mesh.visible = false;
+                }
+            });
+
+            if (nextCenter && !nextModule?.unlocked) {
+                addDoorBlocker(roomGroup, center.x + roomSpacing / 2, center.z);
+            }
+        }
     });
 
+    syncCoursePlacementObjects(runtime, centers);
     updateCourseRoomContext();
 }
 
@@ -1157,6 +1427,11 @@ function createGametag(id, name, color, isLocal, profilePictureUrl = null) {
     `;
 
     if (!isLocal) {
+        element.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPlayerActionMenuForId(id, e);
+        });
+
         const callBtn = document.createElement('button');
         callBtn.innerText = '📞';
         callBtn.className = 'gametag-call-btn';
@@ -1213,11 +1488,11 @@ function updatePlayerList() {
     // 2. Add Others
     for (const id in remotePlayers) {
         const player = remotePlayers[id];
-        let name = player.name || 'Desconhecido';
+        let name = player.name || 'Unknown';
 
-        // Final fallback: if state name is Guest or Desconhecido, check gametag
+        // Final fallback: if state name is Guest or Unknown, check gametag
         if ((!player.name || player.name.includes('Guest')) && gametags[id]) {
-            const tagText = gametags[id].element.innerText.replace('📞', '').replace('(sem voz)', '').trim();
+            const tagText = gametags[id].element.innerText.replace('📞', '').replace('(no voice)', '').trim();
             if (tagText && !tagText.includes('Guest') && tagText !== 'Carregando...') {
                 name = tagText;
                 player.name = name; // Update state silently
@@ -1233,13 +1508,12 @@ function updatePlayerList() {
         infoDiv.innerHTML = `
             <div class="player-status-dot" style="background: ${player.peerId ? '#10b981' : '#64748b'}"></div>
             <span class="player-name">${name}</span>
-            ${!player.peerId ? '<span style="font-size: 0.7rem; color: #94a3b8; margin-left: 5px;">(sem voz)</span>' : ''}
+            ${!player.peerId ? '<span style="font-size: 0.7rem; color: #94a3b8; margin-left: 5px;">(no voice)</span>' : ''}
         `;
 
         infoDiv.addEventListener('click', (e) => {
             e.stopPropagation();
-            selectedPlayerPeerId = player.peerId; // Track peerId for the menu
-            showPlayerActionMenu(name, e);
+            openPlayerActionMenuForId(id, e);
         });
 
         playerDiv.appendChild(infoDiv);
@@ -1350,10 +1624,12 @@ function addOtherPlayer(playerInfo) {
     const anchorGroup = new THREE.Group();
     anchorGroup.position.set(playerInfo.position.x, playerInfo.position.y, playerInfo.position.z);
     anchorGroup.rotation.set(playerInfo.rotation.x, playerInfo.rotation.y, playerInfo.rotation.z);
+    anchorGroup.userData.remotePlayerId = playerInfo.id;
     scene.add(anchorGroup);
 
     // Avatar container: child of anchor — all visual mesh loading/centering goes here
     const avatarContainer = new THREE.Group();
+    avatarContainer.userData.remotePlayerId = playerInfo.id;
     anchorGroup.add(avatarContainer);
 
     // Default avatar goes into avatarContainer
@@ -1434,17 +1710,68 @@ function loadPlayerModel(path, color, container, isLocal = false, remoteId = nul
 // --- Input Handling ---
 const keys = { w: false, a: false, s: false, d: false, ' ': false, e: false };
 const chatInput = document.getElementById('chat-input');
+const chatHistoryContainer = document.getElementById('chat-history-container');
 const chatHistory = document.getElementById('chat-history');
+const chatHistoryEmpty = document.getElementById('chat-history-empty');
+const chatSendBtn = document.getElementById('chat-send-btn');
+
+function sendChatMessage() {
+    const msg = chatInput?.value?.trim();
+    if (!msg || !socket) return;
+    socket.emit('chatMessage', msg);
+    chatInput.value = '';
+    chatInput.focus();
+}
+
+function getRemotePlayerFromObject(object) {
+    let root = object;
+    while (root && root !== scene) {
+        const remotePlayerId = root.userData?.remotePlayerId;
+        if (remotePlayerId && remotePlayers[remotePlayerId]) {
+            return { id: remotePlayerId, player: remotePlayers[remotePlayerId] };
+        }
+        root = root.parent;
+    }
+    return null;
+}
+
+function openPlayerActionMenuForId(playerId, eventOrPosition) {
+    const player = remotePlayers[playerId];
+    if (!player) return;
+
+    const name = player.name || 'Unknown';
+    selectedPlayerPeerId = player.peerId || null;
+    showPlayerActionMenu(name, eventOrPosition);
+}
+
+function syncChatHistoryVisibility() {
+    if (!chatHistoryContainer || !chatHistory) return;
+    const hasMessages = chatHistory.children.length > 0;
+    if (chatHistoryEmpty) {
+        chatHistoryEmpty.classList.toggle('hidden', hasMessages);
+    }
+
+    if (document.body.classList.contains('course-world-mode')) {
+        chatHistoryContainer.classList.remove('hidden');
+        return;
+    }
+
+    chatHistoryContainer.classList.toggle('hidden', !hasMessages);
+}
+
+syncChatHistoryVisibility();
+
+if (chatSendBtn) {
+    chatSendBtn.addEventListener('click', () => sendChatMessage());
+}
 
 window.addEventListener('keydown', (e) => {
     if (document.activeElement === emailInput || document.activeElement === passwordInput) return;
     if (document.activeElement === chatInput) {
         if (e.key === 'Enter') {
-            const msg = chatInput.value.trim();
-            if (msg) {
-                socket.emit('chatMessage', msg);
-                chatInput.value = '';
-            }
+            e.preventDefault();
+            sendChatMessage();
+        } else if (e.key === 'Escape') {
             chatInput.blur();
         }
         return;
@@ -1952,6 +2279,14 @@ function handlePrimaryWorldClick(event) {
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(scene.children, true);
+
+    for (const hit of intersects) {
+        const remotePlayerHit = getRemotePlayerFromObject(hit.object);
+        if (remotePlayerHit) {
+            openPlayerActionMenuForId(remotePlayerHit.id, event);
+            return;
+        }
+    }
 
     for (const hit of intersects) {
         let root = hit.object;
@@ -2558,6 +2893,7 @@ function addMessageToChat(data) {
     while (chatHistory.children.length > 50) {
         chatHistory.removeChild(chatHistory.firstChild);
     }
+    syncChatHistoryVisibility();
 }
 
 // Old model loading functions removed.
@@ -2960,22 +3296,26 @@ const moduleSidebar = document.getElementById('module-sidebar');
 const btnCloseSidebar = document.getElementById('close-module-sidebar');
 const moduleTitle = document.getElementById('module-sidebar-title');
 const moduleDescription = document.getElementById('module-description');
+const moduleGeneralShortcuts = document.getElementById('module-general-shortcuts');
+const moduleGeneralAssets = document.getElementById('module-general-assets');
 const moduleTabBtns = document.querySelectorAll('.module-tab-btn');
 const tabPanes = document.querySelectorAll('.tab-pane');
 
 let currentModuleId = null;
 let currentPlacementId = null;
+let currentCourseModuleId = null;
+let currentModulePayload = null;
+let currentModuleRuntimeState = null;
 
 btnCloseSidebar.onclick = () => moduleSidebar.classList.add('hidden');
 
+function activateModuleTab(tab) {
+    moduleTabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+    tabPanes.forEach(pane => pane.classList.toggle('active', pane.id === `module-tab-${tab}`));
+}
+
 moduleTabBtns.forEach(btn => {
-    btn.onclick = () => {
-        const tab = btn.dataset.tab;
-        moduleTabBtns.forEach(b => b.classList.remove('active'));
-        tabPanes.forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(`module-tab-${tab}`).classList.add('active');
-    };
+    btn.onclick = () => activateModuleTab(btn.dataset.tab);
 });
 
 async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
@@ -2996,10 +3336,12 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
     // Reset UI
     moduleTitle.innerText = 'Carregando...';
     moduleDescription.innerText = '';
+    if (moduleGeneralShortcuts) moduleGeneralShortcuts.innerHTML = '';
+    if (moduleGeneralAssets) moduleGeneralAssets.innerHTML = '';
     document.getElementById('sidebar-preview-banner').classList.remove('active');
     moduleSidebar.classList.remove('hidden');
     // Set default tab
-    moduleTabBtns[0].click();
+    activateModuleTab('general');
 
     try {
         const response = await fetch(`${AUTH_API}/runtime/modules/${moduleId}`, {
@@ -3023,6 +3365,7 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
             document.getElementById('sidebar-preview-banner').classList.add('active');
         }
 
+        renderModuleGeneral(module);
         renderModuleVideos(module.videos);
         renderModuleDocs(module.documents);
         renderModuleQuiz(module.quizzes);
@@ -3122,6 +3465,312 @@ function roundRect(ctx, x, y, width, height, radius, fill) {
     ctx.quadraticCurveTo(x, y, x + radius, y);
     ctx.closePath();
     if (fill) ctx.fill();
+}
+
+function getModuleDocumentUrl(doc) {
+    return `${AUTH_API}/api/documents/download/${doc.documentId || doc.id}`;
+}
+
+function classifyModuleDocument(doc) {
+    const ext = doc.title ? doc.title.split('.').pop().toLowerCase() : '';
+    const tType = (doc.type || '').toLowerCase();
+
+    if (tType === 'application/pdf' || ext === 'pdf') {
+        return { kind: 'pdf', label: 'PDF', accent: '#f87171' };
+    }
+
+    if (tType.includes('word') || tType.includes('officedocument.wordprocessingml') || ['doc', 'docx'].includes(ext)) {
+        return { kind: 'word', label: 'Word', accent: '#60a5fa' };
+    }
+
+    if (tType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+        return { kind: 'img', label: 'Imagem', accent: '#34d399' };
+    }
+
+    return { kind: 'file', label: 'Arquivo', accent: '#94a3b8' };
+}
+
+function trackModuleVideoProgress(videoId) {
+    fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${videoId}/progress`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
+    }).catch(() => {});
+}
+
+function trackModuleDocumentDownload(doc) {
+    fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${doc.id}/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
+    }).catch(() => {});
+}
+
+function previewModuleImageDocument(doc) {
+    previewContent.innerHTML = '';
+
+    const fullImg = document.createElement('img');
+    fullImg.src = getModuleDocumentUrl(doc);
+    fullImg.style.maxWidth = '100%';
+    fullImg.style.maxHeight = '70vh';
+    fullImg.style.objectFit = 'contain';
+    previewContent.appendChild(fullImg);
+
+    btnDownloadPreview.style.display = 'inline-block';
+    btnDownloadPreview.onclick = () => {
+        window.downloadSharedAsset(doc.documentId || doc.id, doc.title);
+    };
+
+    previewModal.classList.remove('hidden');
+}
+
+function openModuleDocumentAsset(doc) {
+    const docMeta = classifyModuleDocument(doc);
+    if (docMeta.kind === 'img') {
+        previewModuleImageDocument(doc);
+        return;
+    }
+
+    window.open(getModuleDocumentUrl(doc), '_blank', 'noopener');
+    trackModuleDocumentDownload(doc);
+}
+
+function downloadModuleDocumentAsset(doc) {
+    window.downloadSharedAsset(doc.documentId || doc.id, doc.title);
+    trackModuleDocumentDownload(doc);
+}
+
+function openModuleVideoAsset(video) {
+    playModuleVideo(video);
+    trackModuleVideoProgress(video.id);
+}
+
+function openModuleForumFromSidebar() {
+    window.open(`${AUTH_API.replace('api', '')}`, '_blank');
+}
+
+function openModuleReportsFromSidebar() {
+    if (localUserRole === 'MASTER' || localUserRole === 'ADMIN') {
+        window.open(`${AUTH_API.replace('api', '')}/dashboard`, '_blank');
+        return;
+    }
+
+    activateModuleTab('reports');
+}
+
+function buildModuleGeneralShortcut(label, count, onClick) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'module-general-shortcut';
+    button.innerHTML = `<span>${label}</span><strong>${count}</strong>`;
+    button.onclick = onClick;
+    return button;
+}
+
+function buildModuleGeneralItem({ label, accent, title, caption, actionLabel, onClick }) {
+    const item = document.createElement('div');
+    item.className = 'module-general-item';
+
+    const meta = document.createElement('div');
+    meta.className = 'module-general-item-meta';
+
+    const pill = document.createElement('span');
+    pill.className = 'module-general-pill';
+    pill.innerText = label;
+    pill.style.color = accent;
+    pill.style.borderColor = `${accent}33`;
+    pill.style.background = `${accent}1a`;
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'module-general-item-title';
+    titleEl.innerText = title;
+
+    meta.appendChild(pill);
+    meta.appendChild(titleEl);
+
+    if (caption) {
+        const captionEl = document.createElement('div');
+        captionEl.className = 'module-general-item-caption';
+        captionEl.innerText = caption;
+        meta.appendChild(captionEl);
+    }
+
+    const action = document.createElement('button');
+    action.type = 'button';
+    action.className = 'btn-open';
+    action.innerText = actionLabel || 'Open';
+    action.onclick = onClick;
+
+    item.appendChild(meta);
+    item.appendChild(action);
+    return item;
+}
+
+function buildModuleGeneralSection(title, helperText, items, actionLabel, onAction) {
+    const section = document.createElement('section');
+    section.className = 'module-general-section';
+
+    const head = document.createElement('div');
+    head.className = 'module-general-section-head';
+
+    const copy = document.createElement('div');
+    const titleEl = document.createElement('h3');
+    titleEl.innerText = title;
+    copy.appendChild(titleEl);
+
+    if (helperText) {
+        const helper = document.createElement('span');
+        helper.innerText = helperText;
+        copy.appendChild(helper);
+    }
+
+    head.appendChild(copy);
+
+    if (actionLabel && typeof onAction === 'function') {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'module-general-link';
+        link.innerText = actionLabel;
+        link.onclick = onAction;
+        head.appendChild(link);
+    }
+
+    const list = document.createElement('div');
+    list.className = 'module-general-list';
+    items.forEach(item => list.appendChild(buildModuleGeneralItem(item)));
+
+    section.appendChild(head);
+    section.appendChild(list);
+    return section;
+}
+
+function renderModuleGeneral(module) {
+    if (!moduleGeneralShortcuts || !moduleGeneralAssets) return;
+
+    const videos = Array.isArray(module.videos) ? module.videos : [];
+    const documents = Array.isArray(module.documents) ? module.documents : [];
+    const quizzes = Array.isArray(module.quizzes) ? module.quizzes : [];
+
+    moduleGeneralShortcuts.innerHTML = '';
+    moduleGeneralAssets.innerHTML = '';
+
+    const shortcuts = [
+        { label: 'Videos', count: videos.length, onClick: () => activateModuleTab('videos') },
+        { label: 'Docs', count: documents.length, onClick: () => activateModuleTab('docs') },
+        { label: 'Quiz', count: quizzes.length, onClick: () => activateModuleTab('quiz') },
+        { label: 'Forum', count: 1, onClick: () => activateModuleTab('forum') },
+        { label: 'Reports', count: 1, onClick: () => activateModuleTab('reports') }
+    ];
+
+    shortcuts
+        .filter(shortcut => shortcut.count > 0)
+        .forEach(shortcut => {
+            moduleGeneralShortcuts.appendChild(
+                buildModuleGeneralShortcut(shortcut.label, shortcut.count, shortcut.onClick)
+            );
+        });
+
+    const sections = [];
+
+    if (videos.length) {
+        sections.push(buildModuleGeneralSection(
+            'Videos',
+            `${videos.length} item${videos.length === 1 ? '' : 's'}`,
+            videos.map(video => ({
+                label: 'Video',
+                accent: '#f59e0b',
+                title: video.title || 'Untitled video',
+                caption: 'Play directly from General.',
+                actionLabel: 'Open',
+                onClick: () => openModuleVideoAsset(video)
+            })),
+            'Open tab',
+            () => activateModuleTab('videos')
+        ));
+    }
+
+    if (documents.length) {
+        sections.push(buildModuleGeneralSection(
+            'Documents',
+            `${documents.length} file${documents.length === 1 ? '' : 's'}`,
+            documents.map(doc => {
+                const docMeta = classifyModuleDocument(doc);
+                return {
+                    label: docMeta.label,
+                    accent: docMeta.accent,
+                    title: doc.title || 'Untitled document',
+                    caption: docMeta.kind === 'img' ? 'Preview image from General.' : 'Open the file directly.',
+                    actionLabel: 'Open',
+                    onClick: () => openModuleDocumentAsset(doc)
+                };
+            }),
+            'Open tab',
+            () => activateModuleTab('docs')
+        ));
+    }
+
+    if (quizzes.length) {
+        sections.push(buildModuleGeneralSection(
+            'Quiz',
+            `${quizzes.length} available`,
+            quizzes.map(quiz => ({
+                label: 'Quiz',
+                accent: '#a78bfa',
+                title: quiz.title || 'Module quiz',
+                caption: 'Jump to the quiz tab and submit answers there.',
+                actionLabel: 'Go to quiz',
+                onClick: () => activateModuleTab('quiz')
+            })),
+            'Open tab',
+            () => activateModuleTab('quiz')
+        ));
+    }
+
+    sections.push(buildModuleGeneralSection(
+        'Forum',
+        'Discuss the module with the team.',
+        [{
+            label: 'Forum',
+            accent: '#38bdf8',
+            title: 'Module discussion',
+            caption: 'Open the forum directly from General.',
+            actionLabel: 'Open',
+            onClick: () => openModuleForumFromSidebar()
+        }],
+        'Open tab',
+        () => activateModuleTab('forum')
+    ));
+
+    sections.push(buildModuleGeneralSection(
+        'Reports',
+        localUserRole === 'MASTER' || localUserRole === 'ADMIN'
+            ? 'Open the reports dashboard for this module.'
+            : 'Check your progress summary.',
+        [{
+            label: 'Reports',
+            accent: '#34d399',
+            title: localUserRole === 'MASTER' || localUserRole === 'ADMIN'
+                ? 'Module analytics dashboard'
+                : 'Progress summary',
+            caption: localUserRole === 'MASTER' || localUserRole === 'ADMIN'
+                ? 'Open the dashboard in a new tab.'
+                : 'View your current module progress.',
+            actionLabel: 'Open',
+            onClick: () => openModuleReportsFromSidebar()
+        }],
+        'Open tab',
+        () => activateModuleTab('reports')
+    ));
+
+    if (!sections.length) {
+        moduleGeneralAssets.innerHTML = '<p class="module-general-empty">No extra content available in this module yet.</p>';
+        return;
+    }
+
+    sections.forEach(section => moduleGeneralAssets.appendChild(section));
 }
 
 function renderModuleVideos(videos) {
@@ -3550,6 +4199,259 @@ function renderModuleReports(module) {
     }
 }
 
+function getActiveCourseRuntimeModule(courseModuleId = currentCourseModuleId, moduleId = currentModuleId) {
+    const runtimeModules = window.__courseWorldContext?.runtime?.modules || [];
+    return runtimeModules.find((entry) => {
+        if (courseModuleId && entry.courseModuleId === courseModuleId) return true;
+        return entry.moduleId === moduleId;
+    }) || null;
+}
+
+function updateRuntimeModuleFromQuizSubmission(score) {
+    const runtimeModule = getActiveCourseRuntimeModule();
+    if (!runtimeModule) return null;
+    const bestQuizScore = runtimeModule.bestQuizScore === null || runtimeModule.bestQuizScore === undefined
+        ? score
+        : Math.max(runtimeModule.bestQuizScore, score);
+    runtimeModule.bestQuizScore = bestQuizScore;
+    runtimeModule.latestQuizScore = score;
+    runtimeModule.quizAttemptCount = Number(runtimeModule.quizAttemptCount || 0) + 1;
+    if (runtimeModule.quizRequirementActive) {
+        runtimeModule.quizPassed = bestQuizScore >= Number(runtimeModule.minimumQuizScore || 0);
+    }
+    currentModuleRuntimeState = runtimeModule;
+    return runtimeModule;
+}
+
+function refreshCourseWorldRuntime() {
+    if (!COURSE_ID_FROM_URL) {
+        currentModuleRuntimeState = getActiveCourseRuntimeModule();
+        return Promise.resolve(window.__courseWorldContext?.runtime || null);
+    }
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const handleRuntimeUpdated = (event) => {
+            settled = true;
+            currentModuleRuntimeState = getActiveCourseRuntimeModule();
+            resolve(event.detail || window.__courseWorldContext?.runtime || null);
+        };
+
+        window.addEventListener('course-world:runtime-updated', handleRuntimeUpdated, { once: true });
+        window.dispatchEvent(new CustomEvent('course-world:refresh-runtime'));
+
+        window.setTimeout(() => {
+            if (settled) return;
+            window.removeEventListener('course-world:runtime-updated', handleRuntimeUpdated);
+            currentModuleRuntimeState = getActiveCourseRuntimeModule();
+            resolve(window.__courseWorldContext?.runtime || null);
+        }, 3000);
+    });
+}
+
+async function openModuleSidebarLegacy(placementId, moduleId, courseModuleId = null) {
+    const isOwner = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
+
+    if (!moduleId) {
+        if (isOwner) {
+            alert('Este sinalizador ainda nÃ£o possui um mÃ³dulo vinculado. Clique com o botÃ£o direito para vincular.');
+        } else {
+            alert('Este mÃ³dulo ainda nÃ£o foi configurado pelo professor.');
+        }
+        return;
+    }
+
+    currentModuleId = moduleId;
+    currentPlacementId = placementId;
+    currentCourseModuleId = courseModuleId || null;
+    currentModulePayload = null;
+    currentModuleRuntimeState = getActiveCourseRuntimeModule(courseModuleId, moduleId);
+
+    moduleTitle.innerText = 'Carregando...';
+    moduleDescription.innerText = '';
+    if (moduleGeneralShortcuts) moduleGeneralShortcuts.innerHTML = '';
+    if (moduleGeneralAssets) moduleGeneralAssets.innerHTML = '';
+    document.getElementById('sidebar-preview-banner').classList.remove('active');
+    moduleSidebar.classList.remove('hidden');
+    activateModuleTab('general');
+
+    try {
+        const response = await fetch(`${AUTH_API}/runtime/modules/${moduleId}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const module = await response.json();
+
+        if (response.status === 403) {
+            const errorMsg = module.error || 'MÃ³dulo indisponÃ­vel ou em manutenÃ§Ã£o.';
+            alert(errorMsg);
+            moduleSidebar.classList.add('hidden');
+            return;
+        }
+
+        if (!response.ok) throw new Error(module.error || 'Erro ao carregar mÃ³dulo');
+
+        currentModulePayload = module;
+        currentModuleRuntimeState = getActiveCourseRuntimeModule(courseModuleId, moduleId);
+        moduleTitle.innerText = module.title;
+        moduleDescription.innerText = module.description || 'Sem descriÃ§Ã£o.';
+
+        if (module.isPreview) {
+            document.getElementById('sidebar-preview-banner').classList.add('active');
+        }
+
+        renderModuleGeneral(module);
+        renderModuleVideos(module.videos);
+        renderModuleDocs(module.documents);
+        renderModuleQuiz(module.quizzes);
+        renderModuleForum(moduleId);
+        renderModuleReports(module);
+
+        fetch(`${AUTH_API}/modules/${moduleId}/access`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                source: 'MULTIPLAYER_WORLD',
+                sceneId: COURSE_ID_FROM_URL ? `course-${COURSE_ID_FROM_URL}` : 'level1',
+                placementId
+            })
+        });
+    } catch (err) {
+        alert('Erro: ' + err.message);
+        moduleSidebar.classList.add('hidden');
+    }
+}
+
+function renderModuleQuizLegacy(quizzes) {
+    const container = document.querySelector('#module-tab-quiz .quiz-container');
+    const submitBtn = document.getElementById('btn-submit-quiz');
+    if (!container || !submitBtn) return;
+
+    currentModuleRuntimeState = getActiveCourseRuntimeModule();
+    const hasQuizzes = Boolean(quizzes && quizzes.length);
+    if (!hasQuizzes) {
+        container.innerHTML = '<p style="padding: 20px; color: #94a3b8;">Nenhum quiz disponÃ­vel.</p>';
+        submitBtn.classList.add('hidden');
+        submitBtn.onclick = null;
+        return;
+    }
+
+    const bestScore = currentModuleRuntimeState?.bestQuizScore;
+    const minimumScore = currentModuleRuntimeState?.minimumQuizScore;
+    const quizGateActive = Boolean(currentModuleRuntimeState?.quizRequirementActive);
+    const quizPassed = Boolean(currentModuleRuntimeState?.quizPassed);
+    const gateCopy = quizGateActive
+        ? `This room only unlocks after you mark it done and score at least ${Math.round(minimumScore || 0)}% on the quiz.`
+        : 'Complete the full module quiz to register your score.';
+    const scoreCopy = bestScore === null || bestScore === undefined
+        ? 'No graded attempt yet.'
+        : `Best attempt: ${bestScore.toFixed(1)}%${quizGateActive ? (quizPassed ? ' • Requirement met' : ' • Requirement not met yet') : ''}`;
+
+    container.innerHTML = `
+        <div style="margin-bottom: 18px; padding: 14px 16px; border-radius: 14px; border: 1px solid ${quizGateActive ? 'rgba(96,165,250,0.28)' : 'rgba(255,255,255,0.08)'}; background: ${quizGateActive ? 'rgba(37,99,235,0.12)' : 'rgba(255,255,255,0.04)'};">
+            <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:center;">
+                <strong style="color:#f8fafc;">${quizGateActive ? 'Quiz gate active' : 'Module quiz'}</strong>
+                ${quizGateActive ? `<span style="font-size:0.75rem; padding:0.25rem 0.55rem; border-radius:999px; color:${quizPassed ? '#d1fae5' : '#dbeafe'}; background:${quizPassed ? 'rgba(16,185,129,0.16)' : 'rgba(59,130,246,0.16)'}; border:1px solid ${quizPassed ? 'rgba(52,211,153,0.3)' : 'rgba(96,165,250,0.26)'};">${quizPassed ? 'Passed' : `Need ${Math.round(minimumScore || 0)}%`}</span>` : ''}
+            </div>
+            <p style="margin:10px 0 6px; color:#cbd5e1; font-size:0.88rem; line-height:1.5;">${gateCopy}</p>
+            <p style="margin:0; color:${bestScore === null || bestScore === undefined ? '#94a3b8' : (quizPassed ? '#86efac' : '#93c5fd')}; font-size:0.82rem;">${scoreCopy}</p>
+        </div>
+    `;
+
+    (quizzes || []).forEach((quiz, quizIndex) => {
+        const questionCount = quiz.questions?.length || 0;
+        const quizBox = document.createElement('div');
+        quizBox.className = 'quiz-box glassmorphism';
+        quizBox.style.marginBottom = '20px';
+        quizBox.style.padding = '15px';
+        quizBox.style.borderRadius = '12px';
+        quizBox.style.background = 'rgba(255,255,255,0.05)';
+        quizBox.innerHTML = `
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+                <h3 style="color: var(--accent-color); margin: 0;">${quiz.title}</h3>
+                <span style="font-size:0.76rem; color:#94a3b8;">${questionCount} question${questionCount === 1 ? '' : 's'}</span>
+            </div>
+        `;
+
+        quiz.questions.forEach((q, qIdx) => {
+            const qDiv = document.createElement('div');
+            qDiv.className = 'quiz-question';
+            qDiv.style.marginBottom = '15px';
+            qDiv.innerHTML = `<p style="margin-bottom: 8px;"><strong>${quizIndex + 1}.${qIdx + 1} ${q.text}</strong></p>`;
+
+            q.options.forEach((opt) => {
+                const optDiv = document.createElement('div');
+                optDiv.style.marginBottom = '4px';
+                optDiv.innerHTML = `
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="radio" name="quiz_${quiz.id}_question_${q.id}" value="${opt.id}">
+                        ${opt.text}
+                    </label>
+                `;
+                qDiv.appendChild(optDiv);
+            });
+            quizBox.appendChild(qDiv);
+        });
+
+        container.appendChild(quizBox);
+    });
+
+    submitBtn.classList.remove('hidden');
+    submitBtn.innerText = 'Submit Full Quiz';
+    submitBtn.disabled = false;
+    submitBtn.onclick = async () => {
+        const answers = [];
+        let totalQuestions = 0;
+
+        (quizzes || []).forEach((quiz) => {
+            quiz.questions.forEach((question) => {
+                totalQuestions += 1;
+                const selected = container.querySelector(`input[name="quiz_${quiz.id}_question_${question.id}"]:checked`);
+                if (selected) {
+                    answers.push({ questionId: question.id, optionId: parseInt(selected.value, 10) });
+                }
+            });
+        });
+
+        if (answers.length < totalQuestions) {
+            alert('Answer every question before submitting the full quiz.');
+            return;
+        }
+
+        try {
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Submitting...';
+            const res = await fetch(`${AUTH_API}/modules/${currentModuleId}/quiz/submit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    answers,
+                    source: 'MULTIPLAYER_WORLD',
+                    courseId: window.__courseWorldContext?.courseId || null
+                })
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Erro ao enviar');
+
+            updateRuntimeModuleFromQuizSubmission(result.score);
+            await refreshCourseWorldRuntime();
+            currentModuleRuntimeState = getActiveCourseRuntimeModule();
+            renderModuleQuiz(quizzes);
+            alert(`Quiz submitted. Score: ${result.score.toFixed(1)}%`);
+        } catch (err) {
+            alert('Erro ao enviar quiz: ' + err.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Submit Full Quiz';
+        }
+    };
+}
+
 async function fetchModulePlacements() {
     if (COURSE_ID_FROM_URL) return;
     try {
@@ -3631,7 +4533,7 @@ async function initPeer() {
             return;
         }
 
-        const callerName = peerIdToName[call.peer] || 'Desconhecido';
+        const callerName = peerIdToName[call.peer] || 'Unknown';
         incomingCaller.innerText = callerName;
         incomingModal.classList.remove('hidden');
 
@@ -3653,7 +4555,7 @@ async function initPeer() {
 }
 
 function makeCall(targetPeerId, name) {
-    if (!localStream) return alert('Microfone não detectado.');
+    if (!localStream) return alert('Microphone not detected.');
     callingName.innerText = name;
     audioCallLayer.classList.remove('hidden');
 
@@ -3663,7 +4565,7 @@ function makeCall(targetPeerId, name) {
 
 function answerCall(call) {
     currentCall = call;
-    const callerName = peerIdToName[call.peer] || 'Conectado';
+    const callerName = peerIdToName[call.peer] || 'Connected';
     callingName.innerText = callerName;
     audioCallLayer.classList.remove('hidden');
     
@@ -3826,8 +4728,13 @@ function showPlayerActionMenu(username, event) {
     selectedPlayerForAction = username;
     actionMenuName.innerText = username;
 
-    playerActionMenu.style.left = event.clientX + 'px';
-    playerActionMenu.style.top = event.clientY + 'px';
+    const point = {
+        x: event?.clientX ?? event?.x ?? window.innerWidth / 2,
+        y: event?.clientY ?? event?.y ?? window.innerHeight / 2
+    };
+
+    playerActionMenu.style.left = point.x + 'px';
+    playerActionMenu.style.top = point.y + 'px';
     playerActionMenu.classList.remove('hidden');
 
     // Auto-close when clicking elsewhere
@@ -3842,7 +4749,7 @@ btnCallPlayer.addEventListener('click', () => {
     if (selectedPlayerPeerId) {
         makeCall(selectedPlayerPeerId, selectedPlayerForAction);
     } else {
-        alert('Este jogador ainda não configurou o canal de voz.');
+        alert('This player has not configured a voice channel yet.');
     }
 });
 
@@ -3858,7 +4765,7 @@ async function showAssetModal(username) {
 
     // UI Setup
     updateTabUI();
-    assetListBody.innerHTML = '<tr><td colspan="2">Carregando assets...</td></tr>';
+    assetListBody.innerHTML = '<tr><td colspan="2">Loading assets...</td></tr>';
     assetGridContainer.innerHTML = 'Carregando...';
     assetModalOverlay.classList.remove('hidden');
     if (btnUploadAsset) {
@@ -3868,13 +4775,13 @@ async function showAssetModal(username) {
 
     try {
         const response = await fetch(`${AUTH_API}/api/documents/user/${encodeURIComponent(username)}`);
-        if (!response.ok) throw new Error('Não foi possível carregar os arquivos.');
+        if (!response.ok) throw new Error('Could not load the files.');
 
         const data = await response.json();
         currentLoadedAssets = data.documents || []; // Use currentLoadedAssets
 
         if (currentLoadedAssets.length === 0) {
-            assetListBody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px;">Nenhum arquivo compartilhado.</td></tr>';
+            assetListBody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px;">No shared files.</td></tr>';
             assetGridContainer.innerHTML = '<div style="text-align: center; width: 100%; padding: 3rem; color: var(--text-secondary);">Nenhum arquivo nesta categoria.</div>';
         } else {
             renderCurrentTab();
@@ -3938,7 +4845,7 @@ tabBtns.forEach(btn => {
 });
 
 async function showSelfAssetModal() {
-    modalUsernameSpan.innerText = `${localUsername} (Meu Perfil)`;
+    modalUsernameSpan.innerText = `${localUsername} (My Profile)`;
     isSelfModal = true;
     currentAssetTab = 'image';
 
@@ -4256,6 +5163,8 @@ window.__worldBridge = {
     getAuthApi: () => AUTH_API,
     getCourseId: () => COURSE_ID_FROM_URL,
     getPlayerRole: () => localUserRole,
+    getCourseRoomLayoutMetrics,
+    getCourseRoomPlacement,
     createModulePlacement,
     openModuleSidebar,
     renderCourseRoomShells,
