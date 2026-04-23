@@ -1236,21 +1236,16 @@ function renderCourseRoomShells(runtime) {
             shellModel.traverse((child) => {
                 if (child.isMesh) {
                     const name = child.name ? child.name.toLowerCase() : '';
-                    if (name.includes('navmesh') || name.includes('node') || name.includes('door') || name.includes('tongue')) {
+                    if (name.includes('navmesh')) {
                         child.visible = false;
-                        if (name.includes('navmesh')) {
-                            const geo = child.geometry.clone();
-                            geo.applyMatrix4(child.matrixWorld);
-                            if (window.__navmeshGeometries) {
-                                window.__navmeshGeometries.push(geo);
-                                console.log(`Collected NavMesh from room ${index}: ${child.name}`);
-                            }
+                        const geo = child.geometry.clone();
+                        geo.applyMatrix4(child.matrixWorld);
+                        if (window.__navmeshGeometries) {
+                            window.__navmeshGeometries.push(geo);
+                            console.log(`Collected NavMesh from room ${index}: ${child.name}`);
                         }
-                    } else {
-                        // User specifically requested to use the low-poly visual models as colliders.
-                        if (name.includes('collision')) {
-                            child.visible = false;
-                        }
+                    } else if (name.includes('collision')) {
+                        child.visible = false;
                         child.userData.id = 'course_coll_' + child.uuid;
                         preciseColliders.push(child);
                     }
@@ -1262,14 +1257,6 @@ function renderCourseRoomShells(runtime) {
                     mesh.visible = false;
                 }
             });
-
-            // CRITICAL FIX: The user wants their GLB geometry to act as the primary physics boundary.
-            // We purge the mathematical procedural walls so they don't block the visual doorways.
-            for (let i = wallBoxes.length - 1; i >= 0; i--) {
-                if (wallBoxes[i].relatedId && wallBoxes[i].relatedId.startsWith(colliderBaseId)) {
-                    wallBoxes.splice(i, 1);
-                }
-            }
 
             if (nextCenter && !nextModule?.unlocked) {
                 addDoorBlocker(roomGroup, center.x + roomSpacing / 2, center.z);
