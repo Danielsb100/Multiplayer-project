@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Pathfinding } from 'three-pathfinding';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Global variables for pathfinding
 const _pathfinding = new Pathfinding();
@@ -337,7 +338,7 @@ joinBtn.addEventListener('click', async () => {
     joinBtn.disabled = true;
     joinBtn.innerText = "Connecting...";
     loginError.classList.add('hidden');
-    
+
     try {
         const response = await fetch(`${AUTH_API}/auth/login`, {
             method: 'POST',
@@ -388,7 +389,7 @@ async function performJoin(token, user) {
 
     playerGroup.visible = true;
     loginScreen.classList.add('hidden');
-    
+
     // We need to wait for socket.id to be available if possible, 
     // but setupSocketListeners will handle it when connected.
     // For local immediate feedback:
@@ -402,10 +403,10 @@ async function performJoin(token, user) {
     await refreshWorldOperationsSummary();
     if (worldOperationsRefreshTimer) clearInterval(worldOperationsRefreshTimer);
     worldOperationsRefreshTimer = setInterval(refreshWorldOperationsSummary, 60000);
-    
+
     if (document.activeElement) document.activeElement.blur();
     window.focus();
-    
+
     console.log(`Successfully joined as ${localUsername} (${localUserRole})`);
 }
 
@@ -420,18 +421,18 @@ async function checkAutoLogin() {
         console.log("Auto-login token detected. Verifying...");
         joinBtn.disabled = true;
         joinBtn.innerText = "Auto-Authenticating...";
-        
+
         try {
             const response = await fetch(`${AUTH_API}/auth/verify`, {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            
+
             const result = await response.json();
             if (!response.ok) throw new Error("Invalid auto-login token");
 
             await performJoin(token, result.user);
-            
+
             // Clean up URL to hide token
             window.history.replaceState({}, document.title, window.location.pathname);
         } catch (err) {
@@ -550,7 +551,7 @@ function setupSocketListeners() {
         if (playerInfo.id === socket.id || playerInfo.id === localPlayerSocketId) return; // Ignore self
         if (remotePlayers[playerInfo.id]) {
             const p = remotePlayers[playerInfo.id];
-            
+
             if (playerInfo.position) {
                 console.log(`[Replication] Received move for ${playerInfo.id}:`, playerInfo.position);
                 p.targetPosition.set(playerInfo.position.x, playerInfo.position.y, playerInfo.position.z);
@@ -776,8 +777,8 @@ function openCatalog(type, onSelect) {
 // --- 1. Scene Setup ---
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#0f172a');
-scene.fog = new THREE.FogExp2('#0f172a', 0.005); // Relaxed fog for production visibility
+scene.background = new THREE.Color('#f8f9fa');
+scene.fog = new THREE.FogExp2('#f8f9fa', 0.005); // Relaxed fog for production visibility
 
 const clock = new THREE.Clock(); // For animations
 
@@ -793,7 +794,7 @@ camera.lookAt(0, 0, 0);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -816,16 +817,16 @@ controls.enableRotate = false; // Keep isometric view
 function createCourseModeBaseEnvironment() {
     const floor = new THREE.Mesh(
         new THREE.PlaneGeometry(220, 220),
-        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95, metalness: 0.05 })
+        new THREE.MeshStandardMaterial({ color: 0xf8f9fa, roughness: 0.95, metalness: 0.05 })
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
+    floor.receiveShadow = false;
     floor.userData.id = 'course_floor';
     scene.add(floor);
 
-    const grid = new THREE.GridHelper(220, 22, 0x334155, 0x1e293b);
-    grid.position.y = 0.01;
-    scene.add(grid);
+    // const grid = new THREE.GridHelper(220, 22, 0x334155, 0x1e293b);
+    // grid.position.y = 0.01;
+    // scene.add(grid);
 }
 
 function prepareCourseRoomModelTemplate(root) {
@@ -879,6 +880,18 @@ function calculateCourseRoomLayoutFromTemplate(template) {
     probe.rotation.y = COURSE_ROOM_MODEL_CONFIG.rotationY;
     probe.updateMatrixWorld(true);
 
+    // Filter out navmesh/nodes so they don't inflate the room width and cause gaps
+    probe.traverse((child) => {
+        if (child.isMesh) {
+            const name = child.name ? child.name.toLowerCase() : '';
+            if (name.includes('navmesh') || name.includes('node') || name.includes('door') || name.includes('tongue')) {
+                child.visible = false;
+                // Temporarily detach/move or just use a more surgical box calculation
+                // For setFromObject, we can just set visible to false and it will be ignored by default
+            }
+        }
+    });
+
     const box = new THREE.Box3().setFromObject(probe);
     const size = box.getSize(new THREE.Vector3());
     const roomWidth = Math.max(COURSE_ROOM_MODEL_CONFIG.minimumWidth, Number.isFinite(size.x) ? size.x : COURSE_ROOM_MODEL_CONFIG.minimumWidth);
@@ -931,7 +944,7 @@ function getCourseRoomLayoutMetrics() {
 
 function getCourseRoomPlacement(index, y = 0) {
     return {
-        x: index * courseRoomLayoutMetrics.roomSpacing,
+        x: index * (courseRoomLayoutMetrics?.roomSpacing || 14),
         y,
         z: 0
     };
@@ -1078,7 +1091,7 @@ function renderCourseRoomShells(runtime) {
     const wallHeight = 3;
     const wallThickness = 0.25;
     const doorWidth = 3.2;
-    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95, metalness: 0.05 });
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.95, metalness: 0.05 });
     const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x1d4ed8, emissiveIntensity: 0.12 });
     const doorBlockerMaterial = new THREE.MeshStandardMaterial({
         color: 0x1d4ed8,
@@ -1151,13 +1164,27 @@ function renderCourseRoomShells(runtime) {
         roomGroup.userData.moduleId = module.moduleId;
         const colliderBaseId = `course_room_${module.moduleId}`;
         const proceduralMeshes = [];
+        
+        // Ensure navmesh array exists in local scope closure
+        if (index === 0) {
+            window.__navmeshGeometries = [];
+            console.log("--- Starting Procedural NavMesh Collection ---");
+        }
 
+        // Procedural floor
         const floor = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, 0.08, roomDepth), accentMaterial.clone());
         floor.position.set(center.x, 0.04, center.z);
         floor.receiveShadow = true;
         floor.userData.courseStructure = true;
+        // CRITICAL FIX: Name it so raycasters/logic can identify it as a floor to ignore or walk on correctly
+        floor.name = "procedural_floor_ignore"; 
         roomGroup.add(floor);
         proceduralMeshes.push(floor);
+
+        const buildNorthSouthWall = (group, center, orientation, colliderBaseId) => {
+            const z = center.z + (orientation === 'south' ? roomDepth / 2 : -roomDepth / 2);
+            return addWallSegment(group, roomWidth, wallThickness, center.x, z, `${colliderBaseId}_${orientation}`);
+        };
 
         proceduralMeshes.push(buildNorthSouthWall(roomGroup, center, 'north', colliderBaseId));
         proceduralMeshes.push(buildNorthSouthWall(roomGroup, center, 'south', colliderBaseId));
@@ -1204,6 +1231,27 @@ function renderCourseRoomShells(runtime) {
             shellModel.rotation.y = COURSE_ROOM_MODEL_CONFIG.rotationY;
             roomGroup.add(shellModel);
 
+            shellModel.updateMatrixWorld(true);
+
+            shellModel.traverse((child) => {
+                if (child.isMesh) {
+                    const name = child.name ? child.name.toLowerCase() : '';
+                    if (name.includes('navmesh')) {
+                        child.visible = false;
+                        const geo = child.geometry.clone();
+                        geo.applyMatrix4(child.matrixWorld);
+                        if (window.__navmeshGeometries) {
+                            window.__navmeshGeometries.push(geo);
+                            console.log(`Collected NavMesh from room ${index}: ${child.name}`);
+                        }
+                    } else if (name.includes('collision')) {
+                        child.visible = false;
+                        child.userData.id = 'course_coll_' + child.uuid;
+                        preciseColliders.push(child);
+                    }
+                }
+            });
+
             proceduralMeshes.forEach((mesh) => {
                 if (mesh) {
                     mesh.visible = false;
@@ -1218,6 +1266,23 @@ function renderCourseRoomShells(runtime) {
 
     syncCoursePlacementObjects(runtime, centers);
     updateCourseRoomContext();
+
+    // Merge NavMeshes and stitch the gaps for the procedural rooms
+    if (window.__navmeshGeometries && window.__navmeshGeometries.length > 0) {
+        console.log(`Total NavMesh pieces collected: ${window.__navmeshGeometries.length}`);
+        try {
+            const mergedGeometry = BufferGeometryUtils.mergeGeometries(window.__navmeshGeometries, false);
+            if (mergedGeometry) {
+                // Stitch vertices that are within 0.50 units of each other to close modeling gaps
+                const stitchedGeometry = BufferGeometryUtils.mergeVertices(mergedGeometry, 0.50);
+                _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(stitchedGeometry));
+                console.log("Procedural NavMesh merged and stitched successfully (50cm tolerance)!");
+            }
+        } catch (err) {
+            console.error("Error merging Procedural NavMeshes:", err);
+        }
+        delete window.__navmeshGeometries;
+    }
 }
 
 // --- Environment Map Loading ---
@@ -1672,11 +1737,11 @@ function loadPlayerModel(path, color, container, isLocal = false, remoteId = nul
         while (container.children.length > 0) container.remove(container.children[0]);
 
         const mesh = gltf.scene;
-        mesh.traverse(child => { 
-            if (child.isMesh) { 
-                child.castShadow = true; 
-                child.receiveShadow = true; 
-            } 
+        mesh.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
         });
 
         // Apply character color
@@ -1802,7 +1867,7 @@ window.addEventListener('keyup', (e) => {
 });
 
 // --- Lighting & Environment ---
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); // Increased to brighten the scene
 scene.add(ambientLight);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -1826,17 +1891,17 @@ const fillLight = new THREE.DirectionalLight(0x88bbff, 0.6);
 fillLight.position.set(-10, 5, -10);
 scene.add(fillLight);
 
-const gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
-gridHelper.position.y = -0.01;
-scene.add(gridHelper);
+// const gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
+// gridHelper.position.y = -0.01;
+// scene.add(gridHelper);
 
-const planeGeometry = new THREE.PlaneGeometry(200, 200);
-const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.4 });
-const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-plane.rotation.x = -Math.PI / 2;
-plane.receiveShadow = true;
-plane.name = "ground";
-scene.add(plane);
+// const planeGeometry = new THREE.PlaneGeometry(200, 200);
+// const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.4 });
+// const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+// plane.rotation.x = -Math.PI / 2;
+// plane.receiveShadow = true;
+// plane.name = "ground";
+// scene.add(plane);
 
 // --- Raycasting & Advanced Cube Placement ---
 const raycaster = new THREE.Raycaster();
@@ -1942,7 +2007,7 @@ window.addEventListener('contextmenu', (event) => {
             const isEnv = contextMenuTarget.userData && contextMenuTarget.userData.id && contextMenuTarget.userData.id.toString().includes('env_');
             if (contextMenuTarget.name === "ground" || (contextMenuTarget.object && contextMenuTarget.object.name === "ground") || isEnv) {
                 menuGroundSection.classList.remove('hidden');
-                
+
                 // Role-based visibility for Module Placement
                 if (localUserRole === 'MASTER' || localUserRole === 'ADMIN') {
                     menuPlaceModule.classList.remove('hidden');
@@ -2069,10 +2134,10 @@ placementModelUpload.addEventListener('change', async (e) => {
         });
 
         if (!response.ok) throw new Error('Falha no upload do modelo');
-        
+
         const data = await response.json();
         alert('Modelo importado com sucesso!');
-        
+
         socket.emit('updateModulePlacementModel', {
             id: id,
             idleAnim: idleAnim,
@@ -2350,10 +2415,10 @@ function handlePrimaryWorldClick(event) {
         }
 
         const path = _pathfinding.findPath(startPos, hitPoint, _navmeshZone, groupID);
-        localPlayerPath = (path && path.length > 0) ? path : [hitPoint];
+        localPlayerPath = (path && path.length > 0) ? path : null;
     } catch (e) {
         console.error("Pathfinding error:", e);
-        localPlayerPath = [hitPoint];
+        localPlayerPath = null;
     }
 }
 
@@ -2605,8 +2670,8 @@ const lastStoredPosition = new THREE.Vector3();
 let lastLogTime = 0;
 
 function checkCollision(targetPosition) {
-    // COMPACT COLLISION: Use a fixed small box for the player (0.4 units wide)
-    const playerBoxSize = new THREE.Vector3(0.4, 1.8, 0.4);
+    // COMPACT COLLISION: Width balanced (0.45 units) to avoid falling through walls but still fit through doors (approx 1m wide)
+    const playerBoxSize = new THREE.Vector3(0.45, 1.8, 0.45);
     const playerCenter = targetPosition.clone().add(new THREE.Vector3(0, 0.9, 0));
     const playerBox = new THREE.Box3().setFromCenterAndSize(playerCenter, playerBoxSize);
 
@@ -2720,7 +2785,7 @@ function updatePlayer(delta) {
             // Pathfinding blocked
             localPlayerPath = null;
         }
-        
+
         playerGroup.rotation.y = Math.atan2(moveX, moveZ);
         handleAnimationState(playerAnims, 'walk');
     } else {
@@ -2754,12 +2819,12 @@ function broadcastMovement() {
             didInteract: didInteractThisFrame,
             interactionPoint: interactionPointGlobal
         };
-        
+
         // Intensified logging for diagnostics
         if (Math.random() < 0.01) { // 1% of frames to avoid lag
             console.log("[Replication] Sending movement sample:", moveData.position);
         }
-        
+
         socket.emit('playerMovement', moveData);
     }
     didInteractThisFrame = false; // Reset for next emit
@@ -3058,7 +3123,7 @@ function createModulePlacement(data) {
     group.userData.moduleId = data.moduleId;
     group.userData.courseModuleId = data.courseModuleId || null;
     group.userData.moduleTitle = data.moduleTitle || '';
-    group.userData.status = data.status || 'NONE'; 
+    group.userData.status = data.status || 'NONE';
     group.userData.isPlacement = true;
     group.userData.isLocked = Boolean(data.isLocked);
     group.userData.isCompleted = Boolean(data.isCompleted);
@@ -3077,9 +3142,9 @@ function createModulePlacement(data) {
 
         // Floating Icon - Octahedron
         const iconGeo = new THREE.OctahedronGeometry(0.3);
-        const iconMat = new THREE.MeshStandardMaterial({ 
-            color: 0x60a5fa, 
-            emissive: 0x3b82f6, 
+        const iconMat = new THREE.MeshStandardMaterial({
+            color: 0x60a5fa,
+            emissive: 0x3b82f6,
             emissiveIntensity: 0.5,
             transparent: true,
             opacity: 0.8
@@ -3091,11 +3156,11 @@ function createModulePlacement(data) {
 
         // Light beam/Glow
         const beamGeo = new THREE.CylinderGeometry(0.3, 0.3, 1, 32, 1, true);
-        const beamMat = new THREE.MeshBasicMaterial({ 
-            color: 0x60a5fa, 
-            transparent: true, 
-            opacity: 0.2, 
-            side: THREE.DoubleSide 
+        const beamMat = new THREE.MeshBasicMaterial({
+            color: 0x60a5fa,
+            transparent: true,
+            opacity: 0.2,
+            side: THREE.DoubleSide
         });
         const beam = new THREE.Mesh(beamGeo, beamMat);
         beam.position.y = 0.6;
@@ -3104,7 +3169,7 @@ function createModulePlacement(data) {
         // Animation loop for the floating icon
         const startTime = Date.now();
         const animateIcon = () => {
-            if (!group.parent || (modelGroup.children.length > 0 && modelGroup.children[0] !== base)) return; 
+            if (!group.parent || (modelGroup.children.length > 0 && modelGroup.children[0] !== base)) return;
             const time = (Date.now() - startTime) * 0.002;
             icon.position.y = 1.2 + Math.sin(time) * 0.1;
             icon.rotation.y = time;
@@ -3120,12 +3185,12 @@ function createModulePlacement(data) {
             modelGroup.clear();
             const model = gltf.scene;
             model.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-            
+
             // Auto-center and ground the model
             const box = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
             model.position.set(-center.x, -box.min.y, -center.z);
-            
+
             modelGroup.add(model);
 
             // Cleanup old mixer
@@ -3137,7 +3202,7 @@ function createModulePlacement(data) {
             if (gltf.animations && gltf.animations.length > 0) {
                 const mixer = new THREE.AnimationMixer(model);
                 const actions = {};
-                
+
                 gltf.animations.forEach(clip => {
                     const name = clip.name.toLowerCase();
                     if (name.includes(group.userData.idleAnimName.toLowerCase())) {
@@ -3165,10 +3230,10 @@ function createModulePlacement(data) {
 
     group.position.set(data.position.x, data.position.y, data.position.z);
     group.rotation.set(data.rotation?.x || 0, data.rotation?.y || 0, data.rotation?.z || 0);
-    
+
     idToUuid[data.id] = group.uuid;
     scene.add(group);
-    
+
     createPlacementBadge(group);
 
     // Store load function for refresh
@@ -3179,15 +3244,15 @@ function createModulePlacement(data) {
 
 menuPlaceModule.addEventListener('click', async () => {
     closeContextMenu();
-    
+
     // Determine if MASTER
     // (Assuming authToken verification in server/socket ensures only authorized can emit if we were doing server-side checks, 
     // but here we just follow the UI logic)
-    
+
     try {
         const response = await fetch(`${AUTH_API}/world/placements`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
@@ -3258,7 +3323,7 @@ document.getElementById('menu-assign-module').addEventListener('click', async ()
         // Show a simple prompt/selection for now (MVP)
         const moduleList = modules.map((m, i) => `${i + 1}. ${m.title} (${m.status})`).join('\n');
         const choice = prompt(`Escolha o módulo para vincular:\n\n${moduleList}\n\nDigite o número:`);
-        
+
         const idx = parseInt(choice) - 1;
         if (isNaN(idx) || !modules[idx]) return;
 
@@ -3266,7 +3331,7 @@ document.getElementById('menu-assign-module').addEventListener('click', async ()
 
         const assignRes = await fetch(`${AUTH_API}/world/placements/${id}/assign-module`, {
             method: 'PATCH',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
@@ -3278,11 +3343,11 @@ document.getElementById('menu-assign-module').addEventListener('click', async ()
             throw new Error(data.error || 'Falha ao vincular');
         }
 
-        socket.emit('updateModuleAssignment', { 
-            id, 
-            moduleId: selectedModule.id, 
+        socket.emit('updateModuleAssignment', {
+            id,
+            moduleId: selectedModule.id,
             moduleTitle: selectedModule.title,
-            status: selectedModule.status 
+            status: selectedModule.status
         });
         alert(`Módulo "${selectedModule.title}" vinculado com sucesso!`);
     } catch (err) {
@@ -3320,7 +3385,7 @@ moduleTabBtns.forEach(btn => {
 
 async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
     const isOwner = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
-    
+
     if (!moduleId) {
         if (isOwner) {
             alert('Este sinalizador ainda não possui um módulo vinculado. Clique com o botão direito para vincular.');
@@ -3375,11 +3440,11 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
         // Analytics: Log Access
         fetch(`${AUTH_API}/modules/${moduleId}/access`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 source: 'MULTIPLAYER_WORLD',
                 sceneId: 'level1',
                 placementId: placementId
@@ -3401,28 +3466,28 @@ function createPlacementBadge(parentGroup) {
     const updateBadge = () => {
         const { status, moduleTitle } = parentGroup.userData;
         const isMaster = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
-        
+
         let label = moduleTitle || (isMaster ? 'Sem Módulo' : 'Interativo');
         let color = '#3b82f6'; // Default blue
 
-        if (status === 'DRAFT') { 
-            color = '#f59e0b'; 
+        if (status === 'DRAFT') {
+            color = '#f59e0b';
             if (isMaster) label = `[Rascunho] ${moduleTitle || ''}`.trim();
         }
-        else if (status === 'PUBLISHED') { 
-            color = '#10b981'; 
+        else if (status === 'PUBLISHED') {
+            color = '#10b981';
         }
-        else if (status === 'ARCHIVED') { 
-            color = '#ef4444'; 
+        else if (status === 'ARCHIVED') {
+            color = '#ef4444';
             if (isMaster) label = `[Arquivado] ${moduleTitle || ''}`.trim();
         }
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
+
         // Background capsule
         ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
         roundRect(ctx, 5, 10, 246, 44, 22, true);
-        
+
         // Dot
         ctx.fillStyle = color;
         ctx.beginPath();
@@ -3498,7 +3563,7 @@ function trackModuleVideoProgress(videoId) {
             'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
-    }).catch(() => {});
+    }).catch(() => { });
 }
 
 function trackModuleDocumentDownload(doc) {
@@ -3506,7 +3571,7 @@ function trackModuleDocumentDownload(doc) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
-    }).catch(() => {});
+    }).catch(() => { });
 }
 
 function previewModuleImageDocument(doc) {
@@ -3777,11 +3842,11 @@ function renderModuleVideos(videos) {
     const grid = document.getElementById('module-videos-grid');
     if (!grid) return;
     grid.innerHTML = videos.length ? '' : '<p style="padding: 20px; color: #94a3b8;">Nenhum vídeo disponível.</p>';
-    
+
     grid.style.display = 'flex';
     grid.style.flexDirection = 'column';
     grid.style.gap = '1.5rem';
-    
+
     videos.forEach(v => {
         const card = document.createElement('div');
         card.style.background = 'rgba(255,255,255,0.05)';
@@ -3791,7 +3856,7 @@ function renderModuleVideos(videos) {
         card.style.display = 'flex';
         card.style.flexDirection = 'column';
         card.style.gap = '10px';
-        
+
         const titleTop = document.createElement('h4');
         titleTop.innerText = v.title;
         titleTop.style.margin = '0';
@@ -3808,7 +3873,7 @@ function renderModuleVideos(videos) {
         thumb.style.display = 'flex';
         thumb.style.alignItems = 'center';
         thumb.style.justifyContent = 'center';
-        
+
         // Thumbnail generation
         let fullUrl = v.url;
         if (fullUrl && fullUrl.startsWith('/api/')) {
@@ -3835,7 +3900,7 @@ function renderModuleVideos(videos) {
             videoElem.style.pointerEvents = 'none';
             // Force load the first frame
             videoElem.currentTime = 0.1;
-            
+
             thumb.appendChild(videoElem);
         }
 
@@ -3846,15 +3911,15 @@ function renderModuleVideos(videos) {
 
         card.appendChild(titleTop);
         card.appendChild(thumb);
-        
+
         card.onclick = () => {
             playModuleVideo(v);
             fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${v.id}/progress`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${authToken}`
-               },
+                },
                 body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
             });
         };
@@ -3864,7 +3929,7 @@ function renderModuleVideos(videos) {
 
 function playModuleVideo(video) {
     previewContent.innerHTML = '';
-    
+
     let url = video.url;
     if (url && url.startsWith('/api/')) {
         url = `${AUTH_API}${url}`;
@@ -3885,9 +3950,9 @@ function playModuleVideo(video) {
         previewContent.appendChild(videoElement);
         btnDownloadPreview.style.display = 'inline-block';
         btnDownloadPreview.onclick = () => {
-             const parts = url.split('/');
-             const id = parts[parts.length - 1];
-             window.downloadSharedAsset(id, video.title || 'video');
+            const parts = url.split('/');
+            const id = parts[parts.length - 1];
+            window.downloadSharedAsset(id, video.title || 'video');
         };
     } else {
         const ytMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.get_video_info|youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
@@ -3906,17 +3971,17 @@ function playModuleVideo(video) {
             return;
         }
     }
-    
+
     previewModal.classList.remove('hidden');
 }
 
-window.switchModuleDocTab = function(type) {
+window.switchModuleDocTab = function (type) {
     document.querySelectorAll('.module-doc-sub-tab').forEach(btn => {
         btn.classList.remove('active');
         btn.style.color = 'var(--text-muted)';
         btn.style.borderBottomColor = 'transparent';
     });
-    
+
     const activeBtn = document.querySelector(`.module-doc-sub-tab[data-type="${type}"]`);
     if (activeBtn) {
         activeBtn.classList.add('active');
@@ -3930,7 +3995,7 @@ window.switchModuleDocTab = function(type) {
         p.style.display = 'none';
         p.style.opacity = '0';
     });
-    
+
     const activePane = document.getElementById(`module-doc-pane-${type}`);
     if (activePane) {
         activePane.classList.remove('hidden');
@@ -3945,7 +4010,7 @@ function renderModuleDocs(docs) {
     const wordList = document.getElementById('module-word-list');
     const imgGrid = document.getElementById('module-img-grid');
 
-    if(!pdfList || !wordList || !imgGrid) return; 
+    if (!pdfList || !wordList || !imgGrid) return;
 
     pdfList.innerHTML = '';
     wordList.innerHTML = '';
@@ -3954,11 +4019,11 @@ function renderModuleDocs(docs) {
     docs.forEach(d => {
         const ext = d.title ? d.title.split('.').pop().toLowerCase() : '';
         const tType = (d.type || '').toLowerCase();
-        
+
         const isPdf = tType === 'application/pdf' || ext === 'pdf';
         const isWord = tType.includes('word') || tType.includes('officedocument.wordprocessingml') || ['doc', 'docx'].includes(ext);
         const isImg = tType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
-        
+
         if (isPdf) {
             const li = document.createElement('li');
             li.style.display = 'flex';
@@ -4053,10 +4118,10 @@ function renderModuleDocs(docs) {
                 fullImg.style.maxHeight = '70vh';
                 fullImg.style.objectFit = 'contain';
                 previewContent.appendChild(fullImg);
-                
+
                 btnDownloadPreview.style.display = 'inline-block';
                 btnDownloadPreview.onclick = () => {
-                     window.downloadSharedAsset(d.documentId || d.id, d.title);
+                    window.downloadSharedAsset(d.documentId || d.id, d.title);
                 };
                 previewModal.classList.remove('hidden');
             };
@@ -4068,7 +4133,7 @@ function renderModuleDocs(docs) {
     if (pdfList.innerHTML === '') pdfList.innerHTML = '<div style="color: #94a3b8; padding: 10px;">Nenhum arquivo PDF.</div>';
     if (wordList.innerHTML === '') wordList.innerHTML = '<div style="color: #94a3b8; padding: 10px;">Nenhum arquivo Word.</div>';
     if (imgGrid.innerHTML === '') imgGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #94a3b8; padding: 10px;">Nenhuma imagem.</div>';
-    
+
     if (typeof window.switchModuleDocTab === 'function') {
         window.switchModuleDocTab('pdf');
     }
@@ -4077,7 +4142,7 @@ function renderModuleDocs(docs) {
 function renderModuleQuiz(quizzes) {
     const container = document.querySelector('#module-tab-quiz .quiz-container');
     container.innerHTML = (quizzes && quizzes.length) ? '' : '<p style="padding: 20px; color: #94a3b8;">Nenhum quiz disponível.</p>';
-    
+
     (quizzes || []).forEach((quiz) => {
         const quizBox = document.createElement('div');
         quizBox.className = 'quiz-box glassmorphism';
@@ -4085,15 +4150,15 @@ function renderModuleQuiz(quizzes) {
         quizBox.style.padding = '15px';
         quizBox.style.borderRadius = '12px';
         quizBox.style.background = 'rgba(255,255,255,0.05)';
-        
+
         quizBox.innerHTML = `<h3 style="color: var(--accent-color); margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">${quiz.title}</h3>`;
-        
+
         quiz.questions.forEach((q, qIdx) => {
             const qDiv = document.createElement('div');
             qDiv.className = 'quiz-question';
             qDiv.style.marginBottom = '15px';
             qDiv.innerHTML = `<p style="margin-bottom: 8px;"><strong>${qIdx + 1}. ${q.text}</strong></p>`;
-            
+
             q.options.forEach(opt => {
                 const optDiv = document.createElement('div');
                 optDiv.style.marginBottom = '4px';
@@ -4131,7 +4196,7 @@ function renderModuleQuiz(quizzes) {
                     submitBtn.innerText = 'Submitting...';
                     const res = await fetch(`${AUTH_API}/modules/${currentModuleId}/quiz/submit`, {
                         method: 'POST',
-                        headers: { 
+                        headers: {
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${authToken}`
                         },
@@ -4568,7 +4633,7 @@ function answerCall(call) {
     const callerName = peerIdToName[call.peer] || 'Connected';
     callingName.innerText = callerName;
     audioCallLayer.classList.remove('hidden');
-    
+
     setupCallListeners(currentCall);
     currentCall.answer(localStream);
 }
@@ -4578,7 +4643,7 @@ function setupCallListeners(call) {
     call.on('stream', (remoteStream) => {
         console.log("Stream remoto recebido");
         const hasVideo = remoteStream.getVideoTracks().length > 0;
-        
+
         if (hasVideo) {
             videoContainer.classList.remove('hidden');
             remoteVideo.srcObject = remoteStream;
@@ -4589,7 +4654,7 @@ function setupCallListeners(call) {
 
         remoteAudio.srcObject = remoteStream;
         setupVisualizer(remoteStream);
-        
+
         if (!callDurationInterval) {
             startTimer();
         }
@@ -4693,13 +4758,13 @@ btnCamera.onclick = async () => {
             try {
                 const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 const newTrack = tempStream.getVideoTracks()[0];
-                
+
                 if (videoTrack) localStream.removeTrack(videoTrack);
                 localStream.addTrack(newTrack);
                 localVideo.srcObject = localStream;
                 btnCamera.classList.add('active');
                 videoContainer.classList.remove('hidden');
-                
+
                 if (currentCall && currentCall.peerConnection) {
                     const senders = currentCall.peerConnection.getSenders();
                     const videoSender = senders.find(s => s.track && s.track.kind === 'video');
