@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Pathfinding } from 'three-pathfinding';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Global variables for pathfinding
 const _pathfinding = new Pathfinding();
@@ -1151,6 +1152,11 @@ function renderCourseRoomShells(runtime) {
         roomGroup.userData.moduleId = module.moduleId;
         const colliderBaseId = `course_room_${module.moduleId}`;
         const proceduralMeshes = [];
+        
+        // Ensure navmesh array exists in local scope closure
+        if (index === 0) {
+            window.__navmeshGeometries = [];
+        }
 
         const floor = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, 0.08, roomDepth), accentMaterial.clone());
         floor.position.set(center.x, 0.04, center.z);
@@ -1210,6 +1216,23 @@ function renderCourseRoomShells(runtime) {
                 }
             });
 
+            shellModel.updateMatrixWorld(true);
+            shellModel.traverse((child) => {
+                if (child.isMesh) {
+                    const name = child.name ? child.name.toLowerCase() : '';
+                    if (name.includes('navmesh')) {
+                        child.visible = false;
+                        const geo = child.geometry.clone();
+                        geo.applyMatrix4(child.matrixWorld);
+                        if (window.__navmeshGeometries) window.__navmeshGeometries.push(geo);
+                    } else if (name.includes('collision')) {
+                        child.visible = false;
+                        child.userData.id = 'course_coll_' + child.uuid;
+                        preciseColliders.push(child);
+                    }
+                }
+            });
+
             if (nextCenter && !nextModule?.unlocked) {
                 addDoorBlocker(roomGroup, center.x + roomSpacing / 2, center.z);
             }
@@ -1218,6 +1241,22 @@ function renderCourseRoomShells(runtime) {
 
     syncCoursePlacementObjects(runtime, centers);
     updateCourseRoomContext();
+    
+    // Merge NavMeshes and stitch the gaps for the procedural rooms
+    if (window.__navmeshGeometries && window.__navmeshGeometries.length > 0) {
+        try {
+            const mergedGeometry = BufferGeometryUtils.mergeGeometries(window.__navmeshGeometries, false);
+            if (mergedGeometry) {
+                // Stitch vertices that are within 0.1 units of each other to close the modeling gaps
+                const stitchedGeometry = BufferGeometryUtils.mergeVertices(mergedGeometry, 0.1);
+                _pathfinding.setZoneData(_navmeshZone, Pathfinding.createZone(stitchedGeometry));
+                console.log("Procedural NavMesh merged and stitched successfully!");
+            }
+        } catch (err) {
+            console.error("Error merging Procedural NavMeshes:", err);
+        }
+        delete window.__navmeshGeometries;
+    }
 }
 
 // --- Environment Map Loading ---
@@ -1802,7 +1841,7 @@ window.addEventListener('keyup', (e) => {
 });
 
 // --- Lighting & Environment ---
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); // Increased to brighten the scene
 scene.add(ambientLight);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -1826,17 +1865,17 @@ const fillLight = new THREE.DirectionalLight(0x88bbff, 0.6);
 fillLight.position.set(-10, 5, -10);
 scene.add(fillLight);
 
-const gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
-gridHelper.position.y = -0.01;
-scene.add(gridHelper);
+// const gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
+// gridHelper.position.y = -0.01;
+// scene.add(gridHelper);
 
-const planeGeometry = new THREE.PlaneGeometry(200, 200);
-const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.4 });
-const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-plane.rotation.x = -Math.PI / 2;
-plane.receiveShadow = true;
-plane.name = "ground";
-scene.add(plane);
+// const planeGeometry = new THREE.PlaneGeometry(200, 200);
+// const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.4 });
+// const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+// plane.rotation.x = -Math.PI / 2;
+// plane.receiveShadow = true;
+// plane.name = "ground";
+// scene.add(plane);
 
 // --- Raycasting & Advanced Cube Placement ---
 const raycaster = new THREE.Raycaster();
@@ -2350,10 +2389,10 @@ function handlePrimaryWorldClick(event) {
         }
 
         const path = _pathfinding.findPath(startPos, hitPoint, _navmeshZone, groupID);
-        localPlayerPath = (path && path.length > 0) ? path : [hitPoint];
+        localPlayerPath = (path && path.length > 0) ? path : null;
     } catch (e) {
         console.error("Pathfinding error:", e);
-        localPlayerPath = [hitPoint];
+        localPlayerPath = null;
     }
 }
 
@@ -2605,8 +2644,8 @@ const lastStoredPosition = new THREE.Vector3();
 let lastLogTime = 0;
 
 function checkCollision(targetPosition) {
-    // COMPACT COLLISION: Use a fixed small box for the player (0.4 units wide)
-    const playerBoxSize = new THREE.Vector3(0.4, 1.8, 0.4);
+    // COMPACT COLLISION: Box increased requested by user to avoid tight clipping (0.6x1.8x0.6 units)
+    const playerBoxSize = new THREE.Vector3(0.6, 1.8, 0.6);
     const playerCenter = targetPosition.clone().add(new THREE.Vector3(0, 0.9, 0));
     const playerBox = new THREE.Box3().setFromCenterAndSize(playerCenter, playerBoxSize);
 
