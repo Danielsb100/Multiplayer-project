@@ -4576,14 +4576,15 @@ async function initPeer() {
         }
     }
 
-    // Official audio-call-app URL on Railway
-    const AUDIO_SERVER_HOST = 'audio-call-app-production.up.railway.app';
+    // Connect to the PeerServer running on the same host
+    const AUDIO_SERVER_HOST = window.location.hostname;
+    const AUDIO_SERVER_PORT = window.location.port || (window.location.protocol === 'https:' ? 443 : 80);
 
     peer = new Peer({
         host: AUDIO_SERVER_HOST,
-        port: 443,
+        port: AUDIO_SERVER_PORT,
         path: '/peerjs',
-        secure: true
+        secure: window.location.protocol === 'https:'
     });
 
     peer.on('open', (id) => {
@@ -5222,6 +5223,41 @@ assetModalOverlay.addEventListener('click', (e) => {
         assetModalOverlay.classList.add('hidden');
     }
 });
+
+// --- Top Right Toggles Logic ---
+const btnToggleNotifications = document.getElementById('btn-toggle-notifications');
+const btnToggleCourseInfo = document.getElementById('btn-toggle-course-info');
+
+if (btnToggleNotifications) {
+    btnToggleNotifications.addEventListener('click', () => {
+        const worldOperationsCardElement = document.getElementById('world-operations-card');
+        if (worldOperationsCardElement) {
+            worldOperationsCardElement.classList.toggle('hidden');
+            btnToggleNotifications.classList.toggle('active', !worldOperationsCardElement.classList.contains('hidden'));
+        }
+    });
+}
+
+if (btnToggleCourseInfo) {
+    btnToggleCourseInfo.addEventListener('click', () => {
+        const courseRoomContextCardElement = document.getElementById('course-room-context');
+        const courseTrailPanelElement = document.getElementById('course-trail-panel');
+
+        let isActive = false;
+        
+        if (courseRoomContextCardElement) {
+            courseRoomContextCardElement.classList.toggle('hidden');
+            if (!courseRoomContextCardElement.classList.contains('hidden')) isActive = true;
+        }
+
+        if (courseTrailPanelElement && document.body.classList.contains('course-world-mode')) {
+            courseTrailPanelElement.classList.toggle('hidden');
+            if (!courseTrailPanelElement.classList.contains('hidden')) isActive = true;
+        }
+
+        btnToggleCourseInfo.classList.toggle('active', isActive);
+    });
+}
 
 window.__worldBridge = {
     getAuthToken: () => authToken,

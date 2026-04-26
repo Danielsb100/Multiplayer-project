@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const fs = require('fs');
 const path = require('path');
+const { ExpressPeerServer } = require('peer');
 
 const app = express();
 const server = http.createServer(app);
@@ -12,6 +13,15 @@ const io = new Server(server, {
         methods: ["GET", "POST"]
     }
 });
+
+// Setup PeerServer integrated with Express
+const peerServer = ExpressPeerServer(server, {
+    debug: true,
+    path: '/'
+});
+
+// Use the peerServer middleware at /peerjs
+app.use('/peerjs', peerServer);
 
 // Helper: Scan assets catalog
 function getCatalogItems(subDir) {
