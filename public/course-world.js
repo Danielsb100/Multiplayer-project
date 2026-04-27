@@ -112,7 +112,7 @@
                     </div>
                     ${quizProgressText ? `<div style="font-size:0.78rem; color:${module.quizPassed ? '#86efac' : '#93c5fd'};">${escapeHtml(quizProgressText)}</div>` : ''}
                     <div style="display:flex; gap:0.55rem; flex-wrap:wrap;">
-                        ${!isCurrentRoom ? `<button type="button" data-course-trail-action="teleport" data-module-id="${module.moduleId}" style="${actionButtonStyle} background:linear-gradient(135deg, #2563eb, #38bdf8); color:white; box-shadow:0 10px 24px rgba(37,99,235,0.28);">Go to room</button>` : ''}
+                        ${module.unlocked && !isCurrentRoom ? `<button type="button" data-course-trail-action="teleport" data-module-id="${module.moduleId}" style="${actionButtonStyle} background:linear-gradient(135deg, #2563eb, #38bdf8); color:white; box-shadow:0 10px 24px rgba(37,99,235,0.28);">Go to room</button>` : ''}
                         ${module.unlocked ? `<button type="button" data-course-trail-action="open" data-module-id="${module.moduleId}" style="${actionButtonStyle} background:rgba(255,255,255,0.1); color:#f8fafc; border:1px solid rgba(255,255,255,0.14);">Open module</button>` : ''}
                         ${showCompleteButton ? `<button type="button" data-course-trail-action="complete" data-module-id="${module.moduleId}" style="${completeButtonStyle}" ${module.canMarkComplete ? '' : 'data-completion-blocked="true"'}>${completeButtonLabel}</button>` : ''}
                     </div>
@@ -130,6 +130,11 @@
                 const moduleId = Number(button.dataset.moduleId);
                 const module = runtime.modules.find((entry) => entry.moduleId === moduleId);
                 if (!module) return;
+                if (!module.unlocked && button.dataset.courseTrailAction !== 'complete') {
+                    alert(module.completionBlockedReason || 'Complete the required previous module before entering this room.');
+                    return;
+                }
+
                 const placement = normalizePlacement(module, runtime.modules.findIndex((entry) => entry.moduleId === moduleId));
 
                 if (button.dataset.courseTrailAction === 'teleport') {

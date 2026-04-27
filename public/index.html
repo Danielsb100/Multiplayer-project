@@ -246,6 +246,7 @@
             <button class="module-tab-btn" data-tab="docs">Documentos</button>
             <button class="module-tab-btn" data-tab="quiz">Quiz</button>
             <button class="module-tab-btn" data-tab="forum">Forum</button>
+            <button class="module-tab-btn" data-tab="assistant">Assistant</button>
             <button class="module-tab-btn" data-tab="reports">Reports</button>
         </div>
         <div class="sidebar-content">
@@ -293,6 +294,21 @@
             </div>
             <div id="module-tab-forum" class="tab-pane">
                 <div id="module-forum-container" class="forum-container"></div>
+            </div>
+            <div id="module-tab-assistant" class="tab-pane">
+                <div class="module-assistant-panel">
+                    <div class="module-assistant-intro">
+                        <span class="module-assistant-eyebrow">Module AI assistant</span>
+                        <h3>Ask AI about this module</h3>
+                        <p>Use this assistant to clarify concepts, summarize content, or get help with module activities.</p>
+                    </div>
+                    <div id="module-assistant-history" class="module-assistant-history" aria-live="polite"></div>
+                    <div id="module-assistant-status" class="module-assistant-status" role="status"></div>
+                    <div class="module-assistant-input-row">
+                        <textarea id="module-assistant-input" class="module-assistant-input" rows="2" placeholder="Ask a question about this module..."></textarea>
+                        <button id="module-assistant-send" class="btn-open" type="button">Send</button>
+                    </div>
+                </div>
             </div>
             <div id="module-tab-reports" class="tab-pane">
                 <div id="module-reports-container" class="reports-container"></div>
