@@ -3365,12 +3365,18 @@ const moduleGeneralShortcuts = document.getElementById('module-general-shortcuts
 const moduleGeneralAssets = document.getElementById('module-general-assets');
 const moduleTabBtns = document.querySelectorAll('.module-tab-btn');
 const tabPanes = document.querySelectorAll('.tab-pane');
+const moduleAssistantHistoryEl = document.getElementById('module-assistant-history');
+const moduleAssistantStatusEl = document.getElementById('module-assistant-status');
+const moduleAssistantInput = document.getElementById('module-assistant-input');
+const moduleAssistantSend = document.getElementById('module-assistant-send');
 
 let currentModuleId = null;
 let currentPlacementId = null;
 let currentCourseModuleId = null;
 let currentModulePayload = null;
 let currentModuleRuntimeState = null;
+let moduleAssistantLoading = false;
+const moduleAssistantHistories = new Map();
 
 btnCloseSidebar.onclick = () => moduleSidebar.classList.add('hidden');
 
@@ -3382,6 +3388,129 @@ function activateModuleTab(tab) {
 moduleTabBtns.forEach(btn => {
     btn.onclick = () => activateModuleTab(btn.dataset.tab);
 });
+
+function getModuleAssistantHistoryKey() {
+    return currentCourseModuleId || currentModuleId || 'unselected-module';
+}
+
+function getCurrentModuleAssistantHistory() {
+    const key = getModuleAssistantHistoryKey();
+    if (!moduleAssistantHistories.has(key)) {
+        moduleAssistantHistories.set(key, []);
+    }
+    return moduleAssistantHistories.get(key);
+}
+
+function setModuleAssistantStatus(message = '', type = '') {
+    if (!moduleAssistantStatusEl) return;
+    moduleAssistantStatusEl.textContent = message;
+    moduleAssistantStatusEl.className = `module-assistant-status${type ? ` ${type}` : ''}`;
+}
+
+function updateModuleAssistantControls() {
+    if (moduleAssistantSend) {
+        moduleAssistantSend.disabled = moduleAssistantLoading || !currentModuleId;
+        moduleAssistantSend.innerText = moduleAssistantLoading ? 'Sending...' : 'Send';
+    }
+
+    if (moduleAssistantInput) {
+        moduleAssistantInput.disabled = moduleAssistantLoading || !currentModuleId;
+    }
+}
+
+function renderModuleAssistant() {
+    if (!moduleAssistantHistoryEl) return;
+
+    const history = getCurrentModuleAssistantHistory();
+    if (!history.length) {
+        moduleAssistantHistoryEl.innerHTML = `
+            <div class="module-assistant-empty">
+                Ask a question to start a module-specific AI conversation.
+            </div>
+        `;
+    } else {
+        moduleAssistantHistoryEl.innerHTML = history.map((entry) => {
+            const skippedFiles = Array.isArray(entry.skippedFiles) && entry.skippedFiles.length
+                ? `<div class="module-assistant-skipped">Skipped files: ${entry.skippedFiles.map(escapeWorldHtml).join(', ')}</div>`
+                : '';
+
+            return `
+                <div class="module-assistant-message ${entry.role === 'user' ? 'user' : 'assistant'}">
+                    <span>${entry.role === 'user' ? 'You' : 'AI'}</span>
+                    <p>${escapeWorldHtml(entry.content)}</p>
+                    ${skippedFiles}
+                </div>
+            `;
+        }).join('');
+        moduleAssistantHistoryEl.scrollTop = moduleAssistantHistoryEl.scrollHeight;
+    }
+
+    updateModuleAssistantControls();
+}
+
+async function sendModuleAssistantMessage() {
+    if (!moduleAssistantInput || moduleAssistantLoading || !currentModuleId) return;
+
+    const message = moduleAssistantInput.value.trim();
+    if (!message) return;
+
+    const history = getCurrentModuleAssistantHistory();
+    history.push({ role: 'user', content: message });
+    moduleAssistantInput.value = '';
+    moduleAssistantLoading = true;
+    setModuleAssistantStatus('AI is thinking...', 'loading');
+    renderModuleAssistant();
+
+    try {
+        const response = await fetch(`${AUTH_API}/modules/${currentModuleId}/assistant/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                message,
+                courseId: window.__courseWorldContext?.courseId || null,
+                courseModuleId: currentCourseModuleId || null
+            })
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(result.error || result.message || 'Failed to get an assistant answer.');
+        }
+
+        history.push({
+            role: 'assistant',
+            content: result.answer || 'No answer returned.',
+            skippedFiles: result.skippedFiles
+        });
+        setModuleAssistantStatus('');
+    } catch (error) {
+        history.push({
+            role: 'assistant',
+            content: `Sorry, I could not answer right now. ${error.message}`
+        });
+        setModuleAssistantStatus(error.message, 'error');
+    } finally {
+        moduleAssistantLoading = false;
+        renderModuleAssistant();
+        if (moduleAssistantInput) moduleAssistantInput.focus();
+    }
+}
+
+if (moduleAssistantSend) {
+    moduleAssistantSend.addEventListener('click', sendModuleAssistantMessage);
+}
+
+if (moduleAssistantInput) {
+    moduleAssistantInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendModuleAssistantMessage();
+        }
+    });
+}
 
 async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
     const isOwner = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
@@ -3397,12 +3526,16 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
 
     currentModuleId = moduleId;
     currentPlacementId = placementId;
+    currentCourseModuleId = courseModuleId || null;
 
     // Reset UI
     moduleTitle.innerText = 'Carregando...';
     moduleDescription.innerText = '';
     if (moduleGeneralShortcuts) moduleGeneralShortcuts.innerHTML = '';
     if (moduleGeneralAssets) moduleGeneralAssets.innerHTML = '';
+    moduleAssistantLoading = false;
+    setModuleAssistantStatus('');
+    renderModuleAssistant();
     document.getElementById('sidebar-preview-banner').classList.remove('active');
     moduleSidebar.classList.remove('hidden');
     // Set default tab
@@ -3727,6 +3860,7 @@ function renderModuleGeneral(module) {
         { label: 'Docs', count: documents.length, onClick: () => activateModuleTab('docs') },
         { label: 'Quiz', count: quizzes.length, onClick: () => activateModuleTab('quiz') },
         { label: 'Forum', count: 1, onClick: () => activateModuleTab('forum') },
+        { label: 'Assistant', count: 1, onClick: () => activateModuleTab('assistant') },
         { label: 'Reports', count: 1, onClick: () => activateModuleTab('reports') }
     ];
 
@@ -3807,6 +3941,21 @@ function renderModuleGeneral(module) {
         }],
         'Open tab',
         () => activateModuleTab('forum')
+    ));
+
+    sections.push(buildModuleGeneralSection(
+        'Ask AI',
+        'Get contextual help from the module assistant.',
+        [{
+            label: 'AI',
+            accent: '#818cf8',
+            title: 'Module AI assistant',
+            caption: 'Ask questions about this module and keep the conversation here.',
+            actionLabel: 'Ask AI',
+            onClick: () => activateModuleTab('assistant')
+        }],
+        'Open tab',
+        () => activateModuleTab('assistant')
     ));
 
     sections.push(buildModuleGeneralSection(
@@ -4336,6 +4485,9 @@ async function openModuleSidebarLegacy(placementId, moduleId, courseModuleId = n
     moduleDescription.innerText = '';
     if (moduleGeneralShortcuts) moduleGeneralShortcuts.innerHTML = '';
     if (moduleGeneralAssets) moduleGeneralAssets.innerHTML = '';
+    moduleAssistantLoading = false;
+    setModuleAssistantStatus('');
+    renderModuleAssistant();
     document.getElementById('sidebar-preview-banner').classList.remove('active');
     moduleSidebar.classList.remove('hidden');
     activateModuleTab('general');
