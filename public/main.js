@@ -3889,18 +3889,25 @@ function renderModuleVideos(videos) {
             img.style.objectFit = 'cover';
             thumb.appendChild(img);
         } else {
+            let vidSrc = fullUrl || '';
+            // Add #t=0.1 to automatically use the first frame as the poster/thumbnail
+            if (vidSrc && !vidSrc.includes('#t=')) {
+                vidSrc += '#t=0.1';
+            }
             const videoElem = document.createElement('video');
-            videoElem.src = fullUrl || '';
+            videoElem.src = vidSrc;
             videoElem.crossOrigin = 'anonymous';
             videoElem.preload = 'metadata';
             videoElem.muted = true;
+            videoElem.playsInline = true;
             videoElem.style.width = '100%';
             videoElem.style.height = '100%';
             videoElem.style.objectFit = 'cover';
             videoElem.style.pointerEvents = 'none';
-            // Force load the first frame safely after metadata loads to prevent InvalidStateError
+            
+            // Fallback for browsers that don't support media fragments well
             videoElem.addEventListener('loadedmetadata', () => {
-                videoElem.currentTime = 0.1;
+                try { videoElem.currentTime = 0.1; } catch (e) {}
             });
 
             thumb.appendChild(videoElem);
