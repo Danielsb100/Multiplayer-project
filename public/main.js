@@ -3846,6 +3846,10 @@ function renderModuleVideos(videos) {
     grid.style.display = 'flex';
     grid.style.flexDirection = 'column';
     grid.style.gap = '1.5rem';
+    // Explicit overrides to prevent CSS class collisions from making it look like a single container
+    grid.style.background = 'transparent';
+    grid.style.padding = '0';
+    grid.style.aspectRatio = 'auto';
 
     videos.forEach(v => {
         const card = document.createElement('div');
@@ -3858,7 +3862,7 @@ function renderModuleVideos(videos) {
         card.style.gap = '10px';
 
         const titleTop = document.createElement('h4');
-        titleTop.innerText = v.title;
+        titleTop.innerText = v.title || 'Vídeo sem título';
         titleTop.style.margin = '0';
         titleTop.style.fontSize = '1.1rem';
         titleTop.style.color = '#fff';
@@ -3890,7 +3894,6 @@ function renderModuleVideos(videos) {
             thumb.appendChild(img);
         } else {
             let vidSrc = fullUrl || '';
-            // Add #t=0.1 to automatically use the first frame as the poster/thumbnail
             if (vidSrc && !vidSrc.includes('#t=')) {
                 vidSrc += '#t=0.1';
             }
@@ -3904,8 +3907,7 @@ function renderModuleVideos(videos) {
             videoElem.style.height = '100%';
             videoElem.style.objectFit = 'cover';
             videoElem.style.pointerEvents = 'none';
-            
-            // Fallback for browsers that don't support media fragments well
+
             videoElem.addEventListener('loadedmetadata', () => {
                 try { videoElem.currentTime = 0.1; } catch (e) {}
             });
@@ -3915,9 +3917,10 @@ function renderModuleVideos(videos) {
 
         const playIcon = document.createElement('div');
         playIcon.innerHTML = '▶';
-        playIcon.style.cssText = 'position: absolute; color: white; font-size: 3rem; filter: drop-shadow(0 0 8px rgba(0,0,0,0.8)); top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; text-shadow: 0 0 10px rgba(0,0,0,0.5);';
+        playIcon.style.cssText = 'position: absolute; color: white; font-size: 3rem; filter: drop-shadow(0 0 8px rgba(0,0,0,0.8)); top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; text-shadow: 0 0 10px rgba(0,0,0,0.5); z-index: 10;';
         thumb.appendChild(playIcon);
 
+        // Append in the original order requested by user
         card.appendChild(titleTop);
         card.appendChild(thumb);
 
@@ -3930,8 +3933,9 @@ function renderModuleVideos(videos) {
                     'Authorization': `Bearer ${authToken}`
                 },
                 body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
-            });
+            }).catch(()=>{});
         };
+        
         grid.appendChild(card);
     });
 }
