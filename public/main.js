@@ -3898,8 +3898,10 @@ function renderModuleVideos(videos) {
             videoElem.style.height = '100%';
             videoElem.style.objectFit = 'cover';
             videoElem.style.pointerEvents = 'none';
-            // Force load the first frame
-            videoElem.currentTime = 0.1;
+            // Force load the first frame safely after metadata loads to prevent InvalidStateError
+            videoElem.addEventListener('loadedmetadata', () => {
+                videoElem.currentTime = 0.1;
+            });
 
             thumb.appendChild(videoElem);
         }
