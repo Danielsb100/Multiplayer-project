@@ -1407,7 +1407,7 @@ body.course-world-mode #chat-input-container {
     to { height: 25px; opacity: 1; }
 }
 
-.video-grid {
+#audio-call-layer .video-grid {
     width: 100%;
     aspect-ratio: 16/9;
     background: rgba(0, 0, 0, 0.4);

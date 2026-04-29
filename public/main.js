@@ -3994,31 +3994,36 @@ function renderModuleVideos(videos) {
 
     grid.style.display = 'flex';
     grid.style.flexDirection = 'column';
-    grid.style.gap = '1.5rem';
+    grid.style.gap = '2rem'; // Increased gap to force visual separation
+    grid.style.background = 'transparent';
+    grid.style.padding = '10px';
 
     videos.forEach(v => {
         const card = document.createElement('div');
-        card.style.background = 'rgba(255,255,255,0.05)';
+        // Solid background and border to make it undeniably a separate container
+        card.style.background = '#1e293b'; 
+        card.style.border = '1px solid #334155';
         card.style.borderRadius = '12px';
         card.style.padding = '15px';
         card.style.cursor = 'pointer';
         card.style.display = 'flex';
         card.style.flexDirection = 'column';
-        card.style.gap = '10px';
+        card.style.gap = '15px';
+        card.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
 
         const titleTop = document.createElement('h4');
-        titleTop.innerText = v.title;
+        titleTop.innerText = v.title || 'Vídeo sem título';
         titleTop.style.margin = '0';
         titleTop.style.fontSize = '1.1rem';
         titleTop.style.color = '#fff';
 
         const thumb = document.createElement('div');
         thumb.style.width = '100%';
-        thumb.style.height = '180px';
+        thumb.style.height = '200px'; // Slightly taller
         thumb.style.position = 'relative';
         thumb.style.borderRadius = '8px';
         thumb.style.overflow = 'hidden';
-        thumb.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        thumb.style.backgroundColor = '#000'; // Black background for contain
         thumb.style.display = 'flex';
         thumb.style.alignItems = 'center';
         thumb.style.justifyContent = 'center';
@@ -4035,27 +4040,34 @@ function renderModuleVideos(videos) {
             img.src = `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
             img.style.width = '100%';
             img.style.height = '100%';
-            img.style.objectFit = 'cover';
+            img.style.objectFit = 'contain'; // changed to contain
             thumb.appendChild(img);
         } else {
+            let vidSrc = fullUrl || '';
+            if (vidSrc && !vidSrc.includes('#t=')) {
+                vidSrc += '#t=0.1';
+            }
             const videoElem = document.createElement('video');
-            videoElem.src = fullUrl || '';
+            videoElem.src = vidSrc;
             videoElem.crossOrigin = 'anonymous';
             videoElem.preload = 'metadata';
             videoElem.muted = true;
+            videoElem.playsInline = true;
             videoElem.style.width = '100%';
             videoElem.style.height = '100%';
-            videoElem.style.objectFit = 'cover';
+            videoElem.style.objectFit = 'contain'; // Changed to contain so vertical videos aren't cropped
             videoElem.style.pointerEvents = 'none';
-            // Force load the first frame
-            videoElem.currentTime = 0.1;
+
+            videoElem.addEventListener('loadedmetadata', () => {
+                try { videoElem.currentTime = 0.1; } catch (e) {}
+            });
 
             thumb.appendChild(videoElem);
         }
 
         const playIcon = document.createElement('div');
         playIcon.innerHTML = '▶';
-        playIcon.style.cssText = 'position: absolute; color: white; font-size: 3rem; filter: drop-shadow(0 0 8px rgba(0,0,0,0.8)); top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; text-shadow: 0 0 10px rgba(0,0,0,0.5);';
+        playIcon.style.cssText = 'position: absolute; color: white; font-size: 3rem; filter: drop-shadow(0 0 8px rgba(0,0,0,0.8)); top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; text-shadow: 0 0 10px rgba(0,0,0,0.5); z-index: 10;';
         thumb.appendChild(playIcon);
 
         card.appendChild(titleTop);
@@ -4070,8 +4082,9 @@ function renderModuleVideos(videos) {
                     'Authorization': `Bearer ${authToken}`
                 },
                 body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
-            });
+            }).catch(()=>{});
         };
+        
         grid.appendChild(card);
     });
 }
