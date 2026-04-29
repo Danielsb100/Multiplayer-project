@@ -573,17 +573,17 @@ input[type="file"] {
 }
 
 body.course-world-mode #player-list-container {
-    top: 6.4rem;
-    left: 1rem;
-    width: min(320px, calc(100vw - 32px));
-    max-height: calc(100vh - 7.4rem);
+    top: 2rem;
+    left: 88px;
+    width: min(320px, calc(100vw - 120px));
+    max-height: calc(100vh - 20rem);
     z-index: 1100;
 }
 
 body.course-world-mode #chat-history-container {
     top: auto;
     right: auto;
-    left: 1rem;
+    left: 88px;
     bottom: 5.7rem;
     width: min(340px, calc(100vw - 32px));
     max-height: min(240px, calc(100vh - 18rem));
@@ -685,10 +685,10 @@ body.course-world-mode .world-operations-card {
 }
 
 body.course-world-mode #chat-input-container {
-    left: 1rem;
+    left: 88px;
     right: auto;
     bottom: 1rem;
-    width: min(340px, calc(100vw - 32px));
+    width: min(340px, calc(100vw - 120px));
     z-index: 1095;
 }
 
@@ -698,11 +698,88 @@ body.course-world-mode #chat-input-container {
     }
 
     body.course-world-mode #chat-input-container {
-        width: min(340px, calc(100vw - 24px));
-        left: 0.75rem;
+        width: min(340px, calc(100vw - 100px));
+        left: 88px;
         bottom: 0.75rem;
     }
 }
+
+/* --- Left Vertical Sidebar --- */
+#left-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 68px;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(16px);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem 0;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+}
+
+.sidebar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.sidebar-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0.5;
+}
+
+.sidebar-btn.active {
+    opacity: 1;
+    color: var(--accent-color);
+}
+
+.sidebar-btn:hover {
+    transform: scale(1.1);
+    color: white;
+    opacity: 1;
+}
+
+body.course-world-mode #audio-call-layer {
+    bottom: 22rem;
+    left: 88px;
+}
+
+/* Screen Share and Expanded Mode */
+#audio-call-layer.expanded {
+    bottom: auto !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 80vw !important;
+    max-width: 1200px !important;
+    z-index: 3000;
+}
+
+#audio-call-layer.expanded .audio-call-card {
+    width: 100% !important;
+    height: auto !important;
+}
+
+#audio-call-layer.expanded .video-grid {
+    aspect-ratio: auto !important;
+    height: 70vh !important;
+}
+
+#audio-call-layer.expanded #remote-video {
+    object-fit: contain; /* Better for screen sharing */
+}
+
 
 /* Animação suave para novas mensagens */
 @keyframes fadeIn {

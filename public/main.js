@@ -238,11 +238,16 @@ const incomingModal = document.getElementById('incoming-modal');
 const incomingCaller = document.getElementById('incoming-caller');
 const btnMute = document.getElementById('btn-mute');
 const btnCamera = document.getElementById('btn-camera'); // New
+const btnScreen = document.getElementById('btn-screen'); // New
+const btnExpand = document.getElementById('btn-expand'); // New
 const btnHangup = document.getElementById('btn-hangup');
 const btnAnswer = document.getElementById('btn-answer');
 const btnReject = document.getElementById('btn-reject');
 
-// Video Elements
+// Sidebar Elements
+const btnTogglePlayers = document.getElementById('btn-toggle-players');
+const btnToggleChat = document.getElementById('btn-toggle-chat');
+
 const videoContainer = document.getElementById('video-container');
 const remoteVideo = document.getElementById('remote-video');
 const localVideo = document.getElementById('local-video');
@@ -1469,7 +1474,8 @@ playerGroup.visible = false; // Hidden until join
 function createGametag(id, name, color, isLocal, profilePictureUrl = null) {
     const resolveAvatarSrc = (url) => {
         if (!url || typeof url !== 'string') return `https://ui-avatars.com/api/?name=${name}&background=random`;
-        return url.startsWith('http') ? url : `${AUTH_API}${url}`;
+        if (url.startsWith('http') || url.startsWith('data:')) return url;
+        return `${AUTH_API}${url}`;
     };
 
     if (gametags[id]) {
@@ -5136,6 +5142,105 @@ btnCamera.onclick = async () => {
         if (!remoteHasVideo) videoContainer.classList.add('hidden');
     }
 };
+
+// Screen Sharing Logic
+let screenStream = null;
+
+btnScreen.onclick = async () => {
+    if (!screenStream) {
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+            const newTrack = screenStream.getVideoTracks()[0];
+
+            newTrack.onended = () => {
+                stopScreenShare();
+            };
+
+            // Switch track
+            const currentVideoTrack = localStream.getVideoTracks()[0];
+            if (currentVideoTrack) {
+                localStream.removeTrack(currentVideoTrack);
+                currentVideoTrack.enabled = false; // Disable camera visually
+            }
+            localStream.addTrack(newTrack);
+            localVideo.srcObject = localStream;
+            btnScreen.classList.add('active');
+            btnCamera.classList.remove('active');
+            videoContainer.classList.remove('hidden');
+
+            if (currentCall && currentCall.peerConnection) {
+                const senders = currentCall.peerConnection.getSenders();
+                const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                if (videoSender) {
+                    videoSender.replaceTrack(newTrack);
+                } else {
+                    currentCall.peerConnection.addTrack(newTrack, localStream);
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    } else {
+        stopScreenShare();
+    }
+};
+
+async function stopScreenShare() {
+    if (screenStream) {
+        screenStream.getTracks().forEach(t => t.stop());
+        screenStream = null;
+    }
+    btnScreen.classList.remove('active');
+    
+    // Attempt to restore camera
+    const currentVideoTrack = localStream.getVideoTracks()[0];
+    if (currentVideoTrack && currentVideoTrack.label.includes('screen')) {
+        localStream.removeTrack(currentVideoTrack);
+    }
+    
+    // Call the camera logic to re-enable it if needed, or just let user click camera again
+    // For now, let's just leave it blank or simulate camera click to turn it back on
+    btnCamera.classList.remove('active');
+    localVideo.srcObject = localStream;
+    
+    if (currentCall && currentCall.peerConnection) {
+        const senders = currentCall.peerConnection.getSenders();
+        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+        if (videoSender) {
+            // Replace with dummy or stop video for remote
+             const canvas = document.createElement('canvas');
+             canvas.width = 1; canvas.height = 1;
+             const dummyStream = canvas.captureStream();
+             videoSender.replaceTrack(dummyStream.getVideoTracks()[0]);
+        }
+    }
+}
+
+// Expand Video UI Logic
+btnExpand.onclick = () => {
+    const isExpanded = audioCallLayer.classList.toggle('expanded');
+    if (isExpanded) {
+        btnExpand.innerText = '🗗';
+    } else {
+        btnExpand.innerText = '⛶';
+    }
+};
+
+// Sidebar Toggle Logic
+if (btnTogglePlayers) {
+    btnTogglePlayers.onclick = () => {
+        const isHidden = playerListContainer.classList.toggle('hidden');
+        btnTogglePlayers.classList.toggle('active', !isHidden);
+    };
+}
+
+if (btnToggleChat) {
+    btnToggleChat.onclick = () => {
+        const isHidden = chatHistoryContainer.classList.toggle('hidden');
+        document.getElementById('chat-input-container').classList.toggle('hidden', isHidden);
+        btnToggleChat.classList.toggle('active', !isHidden);
+    };
+}
 
 // --- Player Interaction Menu & Asset Modal ---
 

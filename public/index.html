@@ -177,6 +177,16 @@
     <!-- Container onde o Three.js irá renderizar a cena 3D -->
     <div id="canvas-container"></div>
 
+    <!-- Left Vertical Sidebar -->
+    <div id="left-sidebar" class="ui-layer">
+        <img id="sidebar-profile-pic" src="https://ui-avatars.com/api/?name=User&background=random" title="Open Dashboard" onclick="window.open(AUTH_API.replace('/api', '') + '/dashboard.html', '_blank')">
+        <div class="sidebar-actions">
+            <button id="btn-toggle-players" class="sidebar-btn active" title="Toggle Player List">👥</button>
+            <button id="btn-toggle-chat" class="sidebar-btn active" title="Toggle Chat">💬</button>
+            <button id="btn-settings" class="sidebar-btn" title="Settings">⚙️</button>
+        </div>
+    </div>
+
     <!-- Player List Container -->
     <div id="player-list-container" class="ui-layer hidden">
         <div class="player-list-header">
@@ -402,9 +412,11 @@
                 <div class="bar"></div>
             </div>
             <div class="call-actions">
-                <button id="btn-camera" class="secondary-btn">📷</button>
-                <button id="btn-mute" class="secondary-btn">🎤</button>
-                <button id="btn-hangup" class="danger-btn">✖</button>
+                <button id="btn-camera" class="secondary-btn" title="Toggle Camera">📷</button>
+                <button id="btn-screen" class="secondary-btn" title="Share Screen">🖥️</button>
+                <button id="btn-mute" class="secondary-btn" title="Toggle Mute">🎤</button>
+                <button id="btn-expand" class="secondary-btn" title="Fullscreen">⛶</button>
+                <button id="btn-hangup" class="danger-btn" title="Hangup">✖</button>
             </div>
         </div>
     </div>
