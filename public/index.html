@@ -179,20 +179,72 @@
 
     <!-- Left Vertical Sidebar -->
     <div id="left-sidebar" class="ui-layer">
-        <img id="sidebar-profile-pic" src="https://ui-avatars.com/api/?name=User&background=random" title="Open Dashboard" onclick="window.open(AUTH_API.replace('/api', '') + '/dashboard.html', '_blank')">
+        <img id="sidebar-profile-pic" src="https://ui-avatars.com/api/?name=User&background=random" title="Open Dashboard">
         <div class="sidebar-actions">
             <button id="btn-toggle-players" class="sidebar-btn active" title="Toggle Player List">👥</button>
             <button id="btn-toggle-chat" class="sidebar-btn active" title="Toggle Chat">💬</button>
             <button id="btn-settings" class="sidebar-btn" title="Settings">⚙️</button>
         </div>
+        <button id="btn-toggle-theme" class="sidebar-btn" title="Toggle Theme" style="margin-top: auto;">☀️</button>
     </div>
 
-    <!-- Player List Container -->
-    <div id="player-list-container" class="ui-layer hidden">
-        <div class="player-list-header">
-            <h3>Online Players</h3>
+    <!-- Left UI Column Wrapper -->
+    <div id="left-ui-column" class="ui-layer">
+        <!-- Player List Container -->
+        <div id="player-list-container" class="hidden">
+            <div class="player-list-header">
+                <h3>Online Players</h3>
+            </div>
+            <div id="player-list-content"></div>
         </div>
-        <div id="player-list-content"></div>
+
+        <!-- Audio call UI Elements -->
+        <div id="audio-call-layer" class="hidden">
+            <div class="audio-call-card glass">
+                <div id="video-container" class="video-grid hidden">
+                    <video id="remote-video" autoplay playsinline></video>
+                    <video id="local-video" autoplay playsinline muted></video>
+                </div>
+                <h2 id="calling-name">Chamando...</h2>
+                <div id="call-timer" class="call-timer">00:00</div>
+                <div class="audio-visualizer">
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                </div>
+                <div class="call-actions">
+                    <button id="btn-camera" class="secondary-btn" title="Toggle Camera">📷</button>
+                    <button id="btn-screen" class="secondary-btn" title="Share Screen">🖥️</button>
+                    <button id="btn-mute" class="secondary-btn" title="Toggle Mute">🎤</button>
+                    <button id="btn-expand" class="secondary-btn" title="Fullscreen">⛶</button>
+                    <button id="btn-hangup" class="danger-btn" title="Hangup">✖</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Wrapper -->
+        <div id="chat-wrapper">
+            <!-- Estrutura do Chat Global - Histórico -->
+            <div id="chat-history-container">
+                <div class="chat-panel-header">
+                    <div>
+                        <span class="chat-panel-eyebrow">Room chat</span>
+                        <strong>Conversation</strong>
+                    </div>
+                    <span class="chat-panel-hint">Enter to focus</span>
+                </div>
+                <div id="chat-history-empty">No messages yet. Press <kbd>Enter</kbd> or use the field below to start chatting.</div>
+                <div id="chat-history"></div>
+            </div>
+
+            <!-- Estrutura do Chat Global - Entrada de Texto -->
+            <div id="chat-input-container">
+                <input type="text" id="chat-input" placeholder="Type your message and press Enter" autocomplete="off">
+                <button type="button" id="chat-send-btn">Send</button>
+            </div>
+        </div>
     </div>
 
     <div id="world-operations-card" class="ui-layer world-operations-card hidden">
@@ -212,33 +264,33 @@
         </ul>
     </div>
 
-    <div id="course-room-context" class="ui-layer hidden" style="position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:1200; width:min(760px, calc(100vw - 24px)); padding:0.85rem 1.25rem; border-radius:16px; background:rgba(15,23,42,0.92); border:1px solid rgba(255,255,255,0.08); box-shadow:0 20px 60px rgba(0,0,0,0.35); backdrop-filter:blur(18px); text-align:center;">
-        <div id="course-room-context-course" style="font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase; color:#60a5fa; margin-bottom:0.25rem;">Course world</div>
-        <div id="course-room-context-room" style="font-size:1rem; font-weight:700; color:white;">Entering course world...</div>
-        <button id="btn-show-course-landing" class="hidden" style="margin-top: 0.6rem; background: linear-gradient(135deg, #2563eb, #3b82f6); color: white; border: 1px solid rgba(96,165,250,0.5); padding: 0.35rem 1.2rem; border-radius: 999px; cursor: pointer; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; transition: all 150ms ease;">Ver Landing Page</button>
+    <div id="course-room-context" class="ui-layer hidden" style="position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:1200; width:min(760px, calc(100vw - 24px)); padding:0.85rem 1.25rem; border-radius:16px; background:var(--panel-bg); border:1px solid var(--panel-border); box-shadow:0 20px 60px rgba(0,0,0,0.15); backdrop-filter:blur(18px); text-align:center;">
+        <div id="course-room-context-course" style="font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent-color); margin-bottom:0.25rem;">Course world</div>
+        <div id="course-room-context-room" style="font-size:1rem; font-weight:700; color:var(--text-primary);">Entering course world...</div>
+        <button id="btn-show-course-landing" class="hidden" style="margin-top: 0.6rem; background: var(--accent-color); color: white; border: none; padding: 0.35rem 1.2rem; border-radius: 999px; cursor: pointer; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; transition: all 150ms ease;">Ver Landing Page</button>
     </div>
 
-    <aside id="course-trail-panel" class="ui-layer hidden" style="position:fixed; right:16px; top:96px; bottom:16px; width:min(360px, calc(100vw - 24px)); overflow:auto; padding:1rem; border-radius:20px; background:rgba(15,23,42,0.94); border:1px solid rgba(255,255,255,0.08); box-shadow:0 20px 60px rgba(0,0,0,0.35); backdrop-filter:blur(18px); overscroll-behavior:contain; z-index:1150;">
+    <aside id="course-trail-panel" class="ui-layer hidden" style="position:fixed; right:16px; top:96px; bottom:16px; width:min(360px, calc(100vw - 24px)); overflow:auto; padding:1rem; border-radius:20px; background:var(--panel-bg); border:1px solid var(--panel-border); box-shadow:0 20px 60px rgba(0,0,0,0.15); backdrop-filter:blur(18px); overscroll-behavior:contain; z-index:1150;">
         <div style="display:flex; flex-direction:column; gap:0.35rem; margin-bottom:1rem;">
-            <span style="font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase; color:#60a5fa;">Course world</span>
-            <h3 id="course-trail-title" style="margin:0; font-size:1.15rem;">Course trail</h3>
-            <p id="course-trail-summary" style="margin:0; font-size:0.85rem; color:#94a3b8;">Loading course trail...</p>
+            <span style="font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent-color);">Course world</span>
+            <h3 id="course-trail-title" style="margin:0; font-size:1.15rem; color:var(--text-primary);">Course trail</h3>
+            <p id="course-trail-summary" style="margin:0; font-size:0.85rem; color:var(--text-secondary);">Loading course trail...</p>
         </div>
-        <div id="course-trail-progress" style="margin-bottom:1rem; font-size:0.82rem; color:#cbd5e1;">0% complete</div>
+        <div id="course-trail-progress" style="margin-bottom:1rem; font-size:0.82rem; color:var(--text-secondary);">0% complete</div>
         <div id="course-trail-list" style="display:flex; flex-direction:column; gap:0.75rem;"></div>
     </aside>
 
     <!-- Course Landing Page Modal -->
-    <div id="course-landing-modal" class="hidden ui-layer" style="position:fixed; inset:0; background:rgba(15,23,42,0.85); backdrop-filter:blur(12px); z-index:1300; display:flex; justify-content:center; align-items:center; padding: 2rem;">
-        <div style="background:rgba(15,23,42,0.95); border:1px solid rgba(255,255,255,0.1); border-radius:24px; width:100%; max-width:1000px; height:90vh; display:flex; flex-direction:column; box-shadow:0 25px 80px rgba(0,0,0,0.5); overflow:hidden;">
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:1.25rem 1.5rem; border-bottom:1px solid rgba(255,255,255,0.08);">
-                <h2 id="course-landing-title" style="margin:0; font-size:1.25rem; color:white; font-weight:600;">Course Information</h2>
-                <button id="close-course-landing" style="background:none; border:none; color:#94a3b8; font-size:1.75rem; cursor:pointer; display:flex; justify-content:center; align-items:center; transition:color 0.2s;">&times;</button>
+    <div id="course-landing-modal" class="hidden ui-layer" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(12px); z-index:1300; display:flex; justify-content:center; align-items:center; padding: 2rem;">
+        <div style="background:var(--bg-color); border:1px solid var(--panel-border); border-radius:24px; width:100%; max-width:1000px; height:90vh; display:flex; flex-direction:column; box-shadow:0 25px 80px rgba(0,0,0,0.2); overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:1.25rem 1.5rem; border-bottom:1px solid var(--panel-border);">
+                <h2 id="course-landing-title" style="margin:0; font-size:1.25rem; color:var(--text-primary); font-weight:600;">Course Information</h2>
+                <button id="close-course-landing" style="background:none; border:none; color:var(--text-secondary); font-size:1.75rem; cursor:pointer; display:flex; justify-content:center; align-items:center; transition:color 0.2s;">&times;</button>
             </div>
             <style id="course-landing-custom-css"></style>
-            <div id="course-landing-content" style="flex:1; overflow-y:auto; padding:0; position:relative; background:#0f172a;">
+            <div id="course-landing-content" style="flex:1; overflow-y:auto; padding:0; position:relative; background:var(--bg-color);">
                 <!-- Compiled HTML will be injected here -->
-                <div style="padding: 3rem; text-align: center; color: #94a3b8;">Loading landing page...</div>
+                <div style="padding: 3rem; text-align: center; color: var(--text-secondary);">Loading landing page...</div>
             </div>
         </div>
     </div>
@@ -326,24 +378,7 @@
         </div>
     </div>
 
-    <!-- Estrutura do Chat Global - Histórico (Canto Superior Direito) -->
-    <div id="chat-history-container" class="ui-layer">
-        <div class="chat-panel-header">
-            <div>
-                <span class="chat-panel-eyebrow">Room chat</span>
-                <strong>Conversation</strong>
-            </div>
-            <span class="chat-panel-hint">Enter to focus</span>
-        </div>
-        <div id="chat-history-empty">No messages yet. Press <kbd>Enter</kbd> or use the field below to start chatting.</div>
-        <div id="chat-history"></div>
-    </div>
 
-    <!-- Estrutura do Chat Global - Entrada de Texto (Canto Inferior Direito) -->
-    <div id="chat-input-container" class="ui-layer">
-        <input type="text" id="chat-input" placeholder="Type your message and press Enter" autocomplete="off">
-        <button type="button" id="chat-send-btn">Send</button>
-    </div>
 
     <!-- Menu de Contexto (Botão Direito) -->
     <div id="context-menu" class="context-menu hidden">
@@ -395,31 +430,7 @@
     <!-- Biblioteca Socket.io para comunicação em tempo real -->
     <script src="/socket.io/socket.io.js"></script>
 
-    <!-- Audio call UI Elements -->
-    <div id="audio-call-layer" class="ui-layer hidden">
-        <div class="audio-call-card glass">
-            <div id="video-container" class="video-grid hidden">
-                <video id="remote-video" autoplay playsinline></video>
-                <video id="local-video" autoplay playsinline muted></video>
-            </div>
-            <h2 id="calling-name">Chamando...</h2>
-            <div id="call-timer" class="call-timer">00:00</div>
-            <div class="audio-visualizer">
-                <div class="bar"></div>
-                <div class="bar"></div>
-                <div class="bar"></div>
-                <div class="bar"></div>
-                <div class="bar"></div>
-            </div>
-            <div class="call-actions">
-                <button id="btn-camera" class="secondary-btn" title="Toggle Camera">📷</button>
-                <button id="btn-screen" class="secondary-btn" title="Share Screen">🖥️</button>
-                <button id="btn-mute" class="secondary-btn" title="Toggle Mute">🎤</button>
-                <button id="btn-expand" class="secondary-btn" title="Fullscreen">⛶</button>
-                <button id="btn-hangup" class="danger-btn" title="Hangup">✖</button>
-            </div>
-        </div>
-    </div>
+
 
     <!-- Incoming Call Notification -->
     <div id="incoming-modal" class="modal hidden ui-layer">

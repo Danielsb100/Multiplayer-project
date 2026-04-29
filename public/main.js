@@ -247,6 +247,7 @@ const btnReject = document.getElementById('btn-reject');
 // Sidebar Elements
 const btnTogglePlayers = document.getElementById('btn-toggle-players');
 const btnToggleChat = document.getElementById('btn-toggle-chat');
+const btnToggleTheme = document.getElementById('btn-toggle-theme');
 
 const videoContainer = document.getElementById('video-container');
 const remoteVideo = document.getElementById('remote-video');
@@ -387,6 +388,15 @@ async function performJoin(token, user) {
             }
         }
         sidebarPic.src = finalAvatarSrc;
+        
+        // Proper Dashboard route
+        sidebarPic.onclick = () => {
+            let dashboardUrl = AUTH_API.replace('/api', '') + '/dashboard.html';
+            if (!dashboardUrl || dashboardUrl.startsWith('/dashboard.html')) {
+                 dashboardUrl = '/dashboard.html';
+            }
+            window.open(dashboardUrl, '_blank');
+        };
     }
 
     // Initialize socket with the received token
@@ -5253,6 +5263,22 @@ if (btnToggleChat) {
         const isHidden = chatHistoryContainer.classList.toggle('hidden');
         document.getElementById('chat-input-container').classList.toggle('hidden', isHidden);
         btnToggleChat.classList.toggle('active', !isHidden);
+    };
+}
+
+// Theme Toggle Logic
+if (btnToggleTheme) {
+    btnToggleTheme.onclick = () => {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        if (isLight) {
+            document.documentElement.removeAttribute('data-theme');
+            btnToggleTheme.innerText = '☀️';
+            btnToggleTheme.classList.remove('active');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+            btnToggleTheme.innerText = '🌙';
+            btnToggleTheme.classList.add('active');
+        }
     };
 }
 
