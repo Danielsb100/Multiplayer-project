@@ -5204,30 +5204,39 @@ async function stopScreenShare() {
     btnScreen.classList.remove('active');
     if (socket) socket.emit('setStreamType', { isScreenShare: false });
     
-    // Attempt to restore dummy track to override the frozen screen frame
+    // Remove screen track
     const currentVideoTrack = localStream.getVideoTracks()[0];
     if (currentVideoTrack) {
         localStream.removeTrack(currentVideoTrack);
     }
     
-    // Create black dummy track
-    const canvas = document.createElement('canvas');
-    canvas.width = 1; canvas.height = 1;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'black';
-    ctx.fillRect(0, 0, 1, 1);
-    const dummyTrack = canvas.captureStream().getVideoTracks()[0];
-    localStream.addTrack(dummyTrack);
-    localVideo.srcObject = localStream;
-    
-    if (currentCall && currentCall.peerConnection) {
-        const senders = currentCall.peerConnection.getSenders();
-        const sender = senders.find(s => s.track && s.track.kind === 'video');
-        if (sender) {
-            sender.replaceTrack(dummyTrack);
+    // Try to restore the camera automatically
+    try {
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newTrack = tempStream.getVideoTracks()[0];
+        localStream.addTrack(newTrack);
+        localVideo.srcObject = localStream;
+        btnCamera.classList.add('active');
+        videoContainer.classList.remove('hidden');
+        
+        if (currentCall && currentCall.peerConnection) {
+            const senders = currentCall.peerConnection.getSenders();
+            const sender = senders.find(s => s.track && s.track.kind === 'video');
+            if (sender) {
+                sender.replaceTrack(newTrack);
+            }
         }
+    } catch (err) {
+        console.warn('Could not restore camera after screen share', err);
+        videoContainer.classList.add('hidden');
     }
-    videoContainer.classList.add('hidden');
+    
+    // Reset any expanded state
+    audioCallLayer.classList.remove('expanded');
+    audioCallLayer.classList.remove('expanded-screen');
+    btnExpand.innerText = '⛶';
+    const column = document.getElementById('left-ui-column');
+    if (column) column.style.zIndex = '1100';
     
     // Call the camera logic to re-enable it if needed, or just let user click camera again
     // For now, let's just leave it blank or simulate camera click to turn it back on
