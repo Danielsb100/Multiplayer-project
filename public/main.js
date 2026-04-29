@@ -5204,11 +5204,30 @@ async function stopScreenShare() {
     btnScreen.classList.remove('active');
     if (socket) socket.emit('setStreamType', { isScreenShare: false });
     
-    // Attempt to restore camera
+    // Attempt to restore dummy track to override the frozen screen frame
     const currentVideoTrack = localStream.getVideoTracks()[0];
-    if (currentVideoTrack && currentVideoTrack.label.includes('screen')) {
+    if (currentVideoTrack) {
         localStream.removeTrack(currentVideoTrack);
     }
+    
+    // Create black dummy track
+    const canvas = document.createElement('canvas');
+    canvas.width = 1; canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, 1, 1);
+    const dummyTrack = canvas.captureStream().getVideoTracks()[0];
+    localStream.addTrack(dummyTrack);
+    localVideo.srcObject = localStream;
+    
+    if (currentCall && currentCall.peerConnection) {
+        const senders = currentCall.peerConnection.getSenders();
+        const sender = senders.find(s => s.track && s.track.kind === 'video');
+        if (sender) {
+            sender.replaceTrack(dummyTrack);
+        }
+    }
+    videoContainer.classList.add('hidden');
     
     // Call the camera logic to re-enable it if needed, or just let user click camera again
     // For now, let's just leave it blank or simulate camera click to turn it back on
@@ -5230,9 +5249,13 @@ async function stopScreenShare() {
 
 // Expand Video UI Logic
 btnExpand.onclick = () => {
-    // Check if the current call peer is screen sharing
+    // Check if the local user is sharing OR if the remote peer is sharing
     let isScreenShare = false;
-    if (currentCall) {
+    
+    if (screenStream) {
+        // If I am sharing my screen, I want to expand my own screen share fully
+        isScreenShare = true;
+    } else if (currentCall) {
         const peerId = currentCall.peer;
         const remotePlayer = Object.values(remotePlayers).find(p => p.peerId === peerId);
         if (remotePlayer && remotePlayer.isScreenShare) {
@@ -5240,14 +5263,22 @@ btnExpand.onclick = () => {
         }
     }
 
+    const column = document.getElementById('left-ui-column');
+    let isExpandedNow = false;
+
     if (isScreenShare) {
-        const isExpandedScreen = audioCallLayer.classList.toggle('expanded-screen');
+        isExpandedNow = audioCallLayer.classList.toggle('expanded-screen');
         audioCallLayer.classList.remove('expanded'); // ensure webcam expand is off
-        btnExpand.innerText = isExpandedScreen ? '🗗' : '⛶';
+        btnExpand.innerText = isExpandedNow ? '🗗' : '⛶';
     } else {
-        const isExpandedWebcam = audioCallLayer.classList.toggle('expanded');
+        isExpandedNow = audioCallLayer.classList.toggle('expanded');
         audioCallLayer.classList.remove('expanded-screen'); // ensure screen expand is off
-        btnExpand.innerText = isExpandedWebcam ? '🗗' : '⛶';
+        btnExpand.innerText = isExpandedNow ? '🗗' : '⛶';
+    }
+
+    // Elevate the parent container z-index to overlap course headers (z-index 1200+)
+    if (column) {
+        column.style.zIndex = isExpandedNow ? '9999' : '1100';
     }
 };
 
