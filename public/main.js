@@ -375,6 +375,20 @@ async function performJoin(token, user) {
     localProfilePicture = user?.profilePicture || null;
     localUserRole = user?.role || 'USER';
 
+    // Update Sidebar Profile Picture
+    const sidebarPic = document.getElementById('sidebar-profile-pic');
+    if (sidebarPic) {
+        let finalAvatarSrc = `https://ui-avatars.com/api/?name=${localUsername}&background=random`;
+        if (localProfilePicture) {
+            if (localProfilePicture.startsWith('http') || localProfilePicture.startsWith('data:')) {
+                finalAvatarSrc = localProfilePicture;
+            } else {
+                finalAvatarSrc = `${AUTH_API}${localProfilePicture}`;
+            }
+        }
+        sidebarPic.src = finalAvatarSrc;
+    }
+
     // Initialize socket with the received token
     // @ts-ignore
     socket = io({

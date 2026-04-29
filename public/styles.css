@@ -573,10 +573,10 @@ input[type="file"] {
 }
 
 body.course-world-mode #player-list-container {
-    top: 2rem;
+    top: 1.5rem;
     left: 88px;
     width: min(320px, calc(100vw - 120px));
-    max-height: calc(100vh - 20rem);
+    max-height: 30vh;
     z-index: 1100;
 }
 
@@ -707,51 +707,71 @@ body.course-world-mode #chat-input-container {
 /* --- Left Vertical Sidebar --- */
 #left-sidebar {
     position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
+    top: 1.5rem;
+    left: 1.5rem;
+    bottom: 1.5rem;
     width: 68px;
-    background: rgba(15, 23, 42, 0.95);
-    backdrop-filter: blur(16px);
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    background: #ffffff;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
     z-index: 2000;
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 1.5rem 0;
-    box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+}
+
+#sidebar-profile-pic {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+
+#sidebar-profile-pic:hover {
+    transform: scale(1.05);
 }
 
 .sidebar-actions {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
     margin-top: 2rem;
 }
 
 .sidebar-btn {
-    background: none;
+    background: transparent;
     border: none;
-    color: var(--text-secondary);
-    font-size: 1.5rem;
+    color: #94a3b8;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
     cursor: pointer;
     transition: all 0.2s;
-    opacity: 0.5;
+    opacity: 1;
 }
 
 .sidebar-btn.active {
-    opacity: 1;
-    color: var(--accent-color);
+    background: #eff6ff;
+    color: #3b82f6;
 }
 
 .sidebar-btn:hover {
-    transform: scale(1.1);
-    color: white;
-    opacity: 1;
+    background: #f1f5f9;
+    color: #3b82f6;
 }
 
 body.course-world-mode #audio-call-layer {
-    bottom: 22rem;
+    top: calc(1.5rem + 30vh + 1rem);
+    bottom: auto;
     left: 88px;
 }
 
