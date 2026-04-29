@@ -221,6 +221,7 @@ if (tabLogin && tabRegister) {
 let peer = null;
 let localStream = null;
 let currentCall = null;
+let activeRemoteStream = null;
 const peerIdToName = {};
 let callDurationInterval = null;
 let secondsElapsed = 0;
@@ -606,6 +607,12 @@ function setupSocketListeners() {
             }
         }
         updatePlayerList();
+    });
+
+    socket.on('streamTypeChanged', (data) => {
+        if (remotePlayers[data.id]) {
+            remotePlayers[data.id].isScreenShare = data.isScreenShare;
+        }
     });
 
     socket.on('playerDisconnected', (id) => {
@@ -1481,6 +1488,46 @@ function createGametag(id, name, color, isLocal, profilePictureUrl = null) {
         element.addEventListener('click', (e) => {
             e.stopPropagation();
             openPlayerActionMenuForId(id, e);
+        });
+
+        // Gametag mini-webcam logic
+        const imgEl = element.querySelector('.gametag-avatar');
+        imgEl.style.cursor = 'pointer';
+        imgEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const player = remotePlayers[id];
+            
+            // Allow showing mini-video only if we are in a call, have a stream, and it's NOT a screen share
+            const isInCallWithPlayer = currentCall && currentCall.peer === player.peerId;
+            
+            if (isInCallWithPlayer && activeRemoteStream && !player.isScreenShare) {
+                // Check if video already exists
+                let videoEl = element.querySelector('.gametag-video');
+                if (videoEl) {
+                    // Toggle back to image
+                    videoEl.remove();
+                    imgEl.style.display = 'block';
+                } else {
+                    // Hide image and show video
+                    imgEl.style.display = 'none';
+                    videoEl = document.createElement('video');
+                    videoEl.className = 'gametag-video';
+                    videoEl.autoplay = true;
+                    videoEl.playsInline = true;
+                    videoEl.muted = true; // prevent double audio since we already have the call audio playing
+                    videoEl.style.width = '36px';
+                    videoEl.style.height = '36px';
+                    videoEl.style.borderRadius = '50%';
+                    videoEl.style.objectFit = 'cover';
+                    videoEl.style.border = `2px solid ${color || '#fff'}`;
+                    videoEl.style.boxShadow = '0 2px 4px rgba(0,0,0,0.5)';
+                    videoEl.srcObject = activeRemoteStream;
+                    imgEl.parentElement.insertBefore(videoEl, imgEl);
+                }
+            } else {
+                // If not available, maybe just trigger the menu anyway or do nothing
+                openPlayerActionMenuForId(id, e);
+            }
         });
 
         const callBtn = document.createElement('button');
@@ -4962,6 +5009,7 @@ function setupCallListeners(call) {
 
         if (hasVideo) {
             videoContainer.classList.remove('hidden');
+            activeRemoteStream = remoteStream;
             remoteVideo.srcObject = remoteStream;
             remoteVideo.play().catch(e => console.warn(e));
         } else {
@@ -5024,6 +5072,7 @@ function resetAudioUI() {
 
     remoteAudio.srcObject = null;
     remoteVideo.srcObject = null;
+    activeRemoteStream = null;
 
     // Stop local video track but keep audio for future calls if needed
     // or just leave it if we want users to "stay ready"
@@ -5080,6 +5129,7 @@ btnCamera.onclick = async () => {
                 localVideo.srcObject = localStream;
                 btnCamera.classList.add('active');
                 videoContainer.classList.remove('hidden');
+                if (socket) socket.emit('setStreamType', { isScreenShare: false });
 
                 if (currentCall && currentCall.peerConnection) {
                     const senders = currentCall.peerConnection.getSenders();
@@ -5127,6 +5177,7 @@ btnScreen.onclick = async () => {
             btnScreen.classList.add('active');
             btnCamera.classList.remove('active');
             videoContainer.classList.remove('hidden');
+            if (socket) socket.emit('setStreamType', { isScreenShare: true });
 
             if (currentCall && currentCall.peerConnection) {
                 const senders = currentCall.peerConnection.getSenders();
@@ -5151,6 +5202,7 @@ async function stopScreenShare() {
         screenStream = null;
     }
     btnScreen.classList.remove('active');
+    if (socket) socket.emit('setStreamType', { isScreenShare: false });
     
     // Attempt to restore camera
     const currentVideoTrack = localStream.getVideoTracks()[0];
@@ -5178,11 +5230,24 @@ async function stopScreenShare() {
 
 // Expand Video UI Logic
 btnExpand.onclick = () => {
-    const isExpanded = audioCallLayer.classList.toggle('expanded');
-    if (isExpanded) {
-        btnExpand.innerText = '🗗';
+    // Check if the current call peer is screen sharing
+    let isScreenShare = false;
+    if (currentCall) {
+        const peerId = currentCall.peer;
+        const remotePlayer = Object.values(remotePlayers).find(p => p.peerId === peerId);
+        if (remotePlayer && remotePlayer.isScreenShare) {
+            isScreenShare = true;
+        }
+    }
+
+    if (isScreenShare) {
+        const isExpandedScreen = audioCallLayer.classList.toggle('expanded-screen');
+        audioCallLayer.classList.remove('expanded'); // ensure webcam expand is off
+        btnExpand.innerText = isExpandedScreen ? '🗗' : '⛶';
     } else {
-        btnExpand.innerText = '⛶';
+        const isExpandedWebcam = audioCallLayer.classList.toggle('expanded');
+        audioCallLayer.classList.remove('expanded-screen'); // ensure screen expand is off
+        btnExpand.innerText = isExpandedWebcam ? '🗗' : '⛶';
     }
 };
 

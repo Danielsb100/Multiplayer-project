@@ -214,6 +214,17 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle stream type sync (Webcam vs ScreenShare)
+    socket.on('setStreamType', (data) => {
+        if (players[socket.id]) {
+            players[socket.id].isScreenShare = data.isScreenShare;
+            socket.broadcast.emit('streamTypeChanged', {
+                id: socket.id,
+                isScreenShare: data.isScreenShare
+            });
+        }
+    });
+
     // Handle movement
     let movementLogCounter = 0;
     socket.on('playerMovement', (movementData) => {
