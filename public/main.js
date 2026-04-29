@@ -2774,7 +2774,7 @@ function updatePlayer(delta) {
 }
 
 let lastBroadcastTime = 0;
-const BROADCAST_INTERVAL = 1000 / 20; // 20Hz
+const BROADCAST_INTERVAL = 1000 / 40; // 40Hz para suavidade de movimento
 
 function broadcastMovement() {
     if (!socket) return;
@@ -2863,7 +2863,7 @@ function animate() {
         scene.updateMatrixWorld(true);
 
         // Update remote players with time-based interpolation
-        const SMOOTHING_FACTOR = 12.0; // Ajuste para equilibrar suavidade e atraso (12-15 é o ideal)
+        const SMOOTHING_FACTOR = 8.0; // Diminuído para 8.0 para um "deslizamento" mais constante sem "teleporte"
         const alpha = 1.0 - Math.exp(-SMOOTHING_FACTOR * delta);
         
         for (const id in remotePlayers) {

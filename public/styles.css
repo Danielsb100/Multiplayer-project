@@ -702,6 +702,12 @@ body.course-world-mode #chat-input-container {
     margin-top: 0.5rem;
 }
 
+#chat-wrapper {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+}
+
 @media (max-width: 900px) {
     body.course-world-mode #chat-history-container {
         max-height: min(200px, calc(100vh - 17rem));
@@ -793,7 +799,8 @@ body.course-world-mode #audio-call-layer {
     width: 340px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 1rem;
     pointer-events: none;
     z-index: 1100;
 }
