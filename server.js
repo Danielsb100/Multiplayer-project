@@ -228,12 +228,11 @@ io.on('connection', (socket) => {
                     console.log(`[Movement Sync] Player ${players[socket.id].name} (${socket.id}) at:`, movementData.position);
                 }
 
-                // Use io.emit for movement to ensure maximum availability, then filter on client
-                io.emit('playerMoved', {
+                // Use socket.broadcast.emit to send to everyone EXCEPT the sender
+                socket.broadcast.emit('playerMoved', {
                     id: socket.id,
                     position: movementData.position,
                     rotation: movementData.rotation,
-                    animation: movementData.animation,
                     isJumping: movementData.isJumping,
                     jumpAlpha: movementData.jumpAlpha,
                     didInteract: movementData.didInteract,

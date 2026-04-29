@@ -1419,53 +1419,9 @@ function applyCharacterColor(model, color) {
     });
 }
 
-function handleAnimationState(animObj, state, duration = 0.2, loop = true) {
-    if (!animObj.mixer || animObj.currentState === state) return;
-
-    // Restriction: This only handles 'idle' and 'walk' base states now.
-    // 'jump' and 'interact' are handled as overlays.
-    if (state !== 'idle' && state !== 'walk') return;
-
-    const nextAction = animObj.actions[state];
-    if (!nextAction) return;
-
-    if (animObj.currentAction) {
-        animObj.currentAction.fadeOut(duration);
-    }
-
-    nextAction.reset().fadeIn(duration).play();
-    nextAction.loop = loop ? THREE.LoopRepeat : THREE.LoopOnce;
-    nextAction.clampWhenFinished = !loop;
-
-    animObj.currentAction = nextAction;
-    animObj.currentState = state;
-}
-
-function triggerInteract(animObj, targetPoint = null) {
-    if (!animObj.mixer || !animObj.actions['interact']) return;
-
-    // Rotate to face the point if provided
-    if (targetPoint && animObj.mixer.getRoot().parent) {
-        const root = animObj.mixer.getRoot();
-        const parent = root.parent;
-        const dir = new THREE.Vector3().subVectors(targetPoint, parent.position);
-        parent.rotation.y = Math.atan2(dir.x, dir.z);
-    }
-
-    const action = animObj.actions['interact'];
-    action.reset();
-    action.setLoop(THREE.LoopOnce);
-    action.clampWhenFinished = false;
-    action.setEffectiveWeight(1);
-    action.play();
-}
-
 // --- Multiplayer & Player Setup ---
 const remotePlayers = {}; // Stores meshes and groups
 const gametags = {}; // Stores UI elements
-
-// Polyfill for legacy animation calls
-let playerAnims = { mixer: null, actions: {}, currentAction: null, currentState: 'idle' };
 
 const playerGroup = new THREE.Group();
 let characterMesh = null;
@@ -1740,13 +1696,7 @@ function addOtherPlayer(playerInfo) {
         peerId: playerInfo.peerId || null, // FIX: Store PeerJS ID for audio calls
         // --- Interpolation Targets ---
         targetPosition: anchorGroup.position.clone(),
-        targetRotation: anchorGroup.rotation.clone(),
-        anims: {
-            mixer: null,
-            actions: {},
-            currentState: null,
-            currentAction: null
-        }
+        targetRotation: anchorGroup.rotation.clone()
     };
 
     createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false, playerInfo.profilePicture);
@@ -1884,7 +1834,6 @@ window.addEventListener('keydown', (e) => {
 
     // Interact trigger
     if (key === 'e') {
-        triggerInteract(playerAnims);
         didInteractThisFrame = true;
     }
 });
@@ -2090,8 +2039,7 @@ document.getElementById('menu-catalog-models').addEventListener('click', () => {
             });
         }
 
-        // Trigger interact animation
-        triggerInteract(playerAnims, contextMenuPoint);
+        // Trigger interact
         didInteractThisFrame = true;
         // Object will appear when server confirms via 'modelAdded'
     });
@@ -2114,7 +2062,6 @@ menuCatalogStructs.onclick = () => {
             });
         }
 
-        triggerInteract(playerAnims, contextMenuPoint);
         didInteractThisFrame = true;
         catalogOverlay.classList.add('hidden'); // Explicitly hide after selection
         closeContextMenu();
@@ -2494,7 +2441,6 @@ window.addEventListener('mousedown', (event) => {
                         color: localUserColor
                     });
                 }
-                triggerInteract(playerAnims, contextMenuPoint);
                 didInteractThisFrame = true;
                 cancelPlacement();
                 event.stopImmediatePropagation();
@@ -2817,9 +2763,6 @@ function updatePlayer(delta) {
         }
 
         playerGroup.rotation.y = Math.atan2(moveX, moveZ);
-        handleAnimationState(playerAnims, 'walk');
-    } else {
-        handleAnimationState(playerAnims, 'idle');
     }
 
     // Camera follow
@@ -2843,7 +2786,6 @@ function broadcastMovement() {
         const moveData = {
             position: { x: playerGroup.position.x, y: playerGroup.position.y, z: playerGroup.position.z },
             rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
-            animation: playerAnims.currentState,
             isJumping: isJumping,
             jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
             didInteract: didInteractThisFrame,
@@ -2920,25 +2862,20 @@ function animate() {
         // Update matrices first
         scene.updateMatrixWorld(true);
 
-        // Update local mixer
-        if (playerAnims && playerAnims.mixer) playerAnims.mixer.update(delta);
-
-        // Update remote players with interpolation (lers/slerp)
-        const LERP_SPEED = 0.2;
+        // Update remote players with time-based interpolation
+        const SMOOTHING_FACTOR = 12.0; // Ajuste para equilibrar suavidade e atraso (12-15 é o ideal)
+        const alpha = 1.0 - Math.exp(-SMOOTHING_FACTOR * delta);
+        
         for (const id in remotePlayers) {
             const p = remotePlayers[id];
 
             // Smooth Position
-            p.group.position.lerp(p.targetPosition, LERP_SPEED);
+            p.group.position.lerp(p.targetPosition, alpha);
 
-            // Smooth Rotation (Simple lerp for Y axis is usually enough for characters)
-            p.group.rotation.x = THREE.MathUtils.lerp(p.group.rotation.x, p.targetRotation.x, LERP_SPEED);
-            p.group.rotation.y = THREE.MathUtils.lerp(p.group.rotation.y, p.targetRotation.y, LERP_SPEED);
-            p.group.rotation.z = THREE.MathUtils.lerp(p.group.rotation.z, p.targetRotation.z, LERP_SPEED);
-
-            if (p.anims && p.anims.mixer) {
-                p.anims.mixer.update(delta);
-            }
+            // Smooth Rotation
+            p.group.rotation.x = THREE.MathUtils.lerp(p.group.rotation.x, p.targetRotation.x, alpha);
+            p.group.rotation.y = THREE.MathUtils.lerp(p.group.rotation.y, p.targetRotation.y, alpha);
+            p.group.rotation.z = THREE.MathUtils.lerp(p.group.rotation.z, p.targetRotation.z, alpha);
         }
 
         // Update placement mixers
@@ -3305,7 +3242,6 @@ menuPlaceModule.addEventListener('click', async () => {
             rotation: { x: 0, y: 0, z: 0 }
         });
 
-        triggerInteract(playerAnims, contextMenuPoint);
         didInteractThisFrame = true;
     } catch (err) {
         alert('Erro ao criar módulo interativo: ' + err.message);
