@@ -3365,12 +3365,18 @@ const moduleGeneralShortcuts = document.getElementById('module-general-shortcuts
 const moduleGeneralAssets = document.getElementById('module-general-assets');
 const moduleTabBtns = document.querySelectorAll('.module-tab-btn');
 const tabPanes = document.querySelectorAll('.tab-pane');
+const moduleAssistantHistoryEl = document.getElementById('module-assistant-history');
+const moduleAssistantStatusEl = document.getElementById('module-assistant-status');
+const moduleAssistantInput = document.getElementById('module-assistant-input');
+const moduleAssistantSend = document.getElementById('module-assistant-send');
 
 let currentModuleId = null;
 let currentPlacementId = null;
 let currentCourseModuleId = null;
 let currentModulePayload = null;
 let currentModuleRuntimeState = null;
+let moduleAssistantLoading = false;
+const moduleAssistantHistories = new Map();
 
 btnCloseSidebar.onclick = () => moduleSidebar.classList.add('hidden');
 
@@ -3382,6 +3388,129 @@ function activateModuleTab(tab) {
 moduleTabBtns.forEach(btn => {
     btn.onclick = () => activateModuleTab(btn.dataset.tab);
 });
+
+function getModuleAssistantHistoryKey() {
+    return currentCourseModuleId || currentModuleId || 'unselected-module';
+}
+
+function getCurrentModuleAssistantHistory() {
+    const key = getModuleAssistantHistoryKey();
+    if (!moduleAssistantHistories.has(key)) {
+        moduleAssistantHistories.set(key, []);
+    }
+    return moduleAssistantHistories.get(key);
+}
+
+function setModuleAssistantStatus(message = '', type = '') {
+    if (!moduleAssistantStatusEl) return;
+    moduleAssistantStatusEl.textContent = message;
+    moduleAssistantStatusEl.className = `module-assistant-status${type ? ` ${type}` : ''}`;
+}
+
+function updateModuleAssistantControls() {
+    if (moduleAssistantSend) {
+        moduleAssistantSend.disabled = moduleAssistantLoading || !currentModuleId;
+        moduleAssistantSend.innerText = moduleAssistantLoading ? 'Sending...' : 'Send';
+    }
+
+    if (moduleAssistantInput) {
+        moduleAssistantInput.disabled = moduleAssistantLoading || !currentModuleId;
+    }
+}
+
+function renderModuleAssistant() {
+    if (!moduleAssistantHistoryEl) return;
+
+    const history = getCurrentModuleAssistantHistory();
+    if (!history.length) {
+        moduleAssistantHistoryEl.innerHTML = `
+            <div class="module-assistant-empty">
+                Ask a question to start a module-specific AI conversation.
+            </div>
+        `;
+    } else {
+        moduleAssistantHistoryEl.innerHTML = history.map((entry) => {
+            const skippedFiles = Array.isArray(entry.skippedFiles) && entry.skippedFiles.length
+                ? `<div class="module-assistant-skipped">Skipped files: ${entry.skippedFiles.map(escapeWorldHtml).join(', ')}</div>`
+                : '';
+
+            return `
+                <div class="module-assistant-message ${entry.role === 'user' ? 'user' : 'assistant'}">
+                    <span>${entry.role === 'user' ? 'You' : 'AI'}</span>
+                    <p>${escapeWorldHtml(entry.content)}</p>
+                    ${skippedFiles}
+                </div>
+            `;
+        }).join('');
+        moduleAssistantHistoryEl.scrollTop = moduleAssistantHistoryEl.scrollHeight;
+    }
+
+    updateModuleAssistantControls();
+}
+
+async function sendModuleAssistantMessage() {
+    if (!moduleAssistantInput || moduleAssistantLoading || !currentModuleId) return;
+
+    const message = moduleAssistantInput.value.trim();
+    if (!message) return;
+
+    const history = getCurrentModuleAssistantHistory();
+    history.push({ role: 'user', content: message });
+    moduleAssistantInput.value = '';
+    moduleAssistantLoading = true;
+    setModuleAssistantStatus('AI is thinking...', 'loading');
+    renderModuleAssistant();
+
+    try {
+        const response = await fetch(`${AUTH_API}/modules/${currentModuleId}/assistant/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                message,
+                courseId: window.__courseWorldContext?.courseId || null,
+                courseModuleId: currentCourseModuleId || null
+            })
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(result.error || result.message || 'Failed to get an assistant answer.');
+        }
+
+        history.push({
+            role: 'assistant',
+            content: result.answer || 'No answer returned.',
+            skippedFiles: result.skippedFiles
+        });
+        setModuleAssistantStatus('');
+    } catch (error) {
+        history.push({
+            role: 'assistant',
+            content: `Sorry, I could not answer right now. ${error.message}`
+        });
+        setModuleAssistantStatus(error.message, 'error');
+    } finally {
+        moduleAssistantLoading = false;
+        renderModuleAssistant();
+        if (moduleAssistantInput) moduleAssistantInput.focus();
+    }
+}
+
+if (moduleAssistantSend) {
+    moduleAssistantSend.addEventListener('click', sendModuleAssistantMessage);
+}
+
+if (moduleAssistantInput) {
+    moduleAssistantInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendModuleAssistantMessage();
+        }
+    });
+}
 
 async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
     const isOwner = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
@@ -3397,12 +3526,16 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
 
     currentModuleId = moduleId;
     currentPlacementId = placementId;
+    currentCourseModuleId = courseModuleId || null;
 
     // Reset UI
     moduleTitle.innerText = 'Carregando...';
     moduleDescription.innerText = '';
     if (moduleGeneralShortcuts) moduleGeneralShortcuts.innerHTML = '';
     if (moduleGeneralAssets) moduleGeneralAssets.innerHTML = '';
+    moduleAssistantLoading = false;
+    setModuleAssistantStatus('');
+    renderModuleAssistant();
     document.getElementById('sidebar-preview-banner').classList.remove('active');
     moduleSidebar.classList.remove('hidden');
     // Set default tab
@@ -3614,7 +3747,7 @@ function openModuleVideoAsset(video) {
 }
 
 function openModuleForumFromSidebar() {
-    window.open(`${AUTH_API.replace('api', '')}`, '_blank');
+    activateModuleTab('forum');
 }
 
 function openModuleReportsFromSidebar() {
@@ -3727,6 +3860,7 @@ function renderModuleGeneral(module) {
         { label: 'Docs', count: documents.length, onClick: () => activateModuleTab('docs') },
         { label: 'Quiz', count: quizzes.length, onClick: () => activateModuleTab('quiz') },
         { label: 'Forum', count: 1, onClick: () => activateModuleTab('forum') },
+        { label: 'Assistant', count: 1, onClick: () => activateModuleTab('assistant') },
         { label: 'Reports', count: 1, onClick: () => activateModuleTab('reports') }
     ];
 
@@ -3807,6 +3941,21 @@ function renderModuleGeneral(module) {
         }],
         'Open tab',
         () => activateModuleTab('forum')
+    ));
+
+    sections.push(buildModuleGeneralSection(
+        'Ask AI',
+        'Get contextual help from the module assistant.',
+        [{
+            label: 'AI',
+            accent: '#818cf8',
+            title: 'Module AI assistant',
+            caption: 'Ask questions about this module and keep the conversation here.',
+            actionLabel: 'Ask AI',
+            onClick: () => activateModuleTab('assistant')
+        }],
+        'Open tab',
+        () => activateModuleTab('assistant')
     ));
 
     sections.push(buildModuleGeneralSection(
@@ -4231,16 +4380,200 @@ function renderModuleQuiz(quizzes) {
     });
 }
 
-function renderModuleForum(moduleId) {
-    const container = document.getElementById('module-forum-container');
-    if (!container) return;
+function buildForumQueryString() {
+    const params = new URLSearchParams();
+    if (COURSE_ID_FROM_URL) params.set('courseId', COURSE_ID_FROM_URL);
+    return params.toString() ? `?${params.toString()}` : '';
+}
+
+async function fetchModuleForumThreads(moduleId) {
+    const response = await fetch(`${AUTH_API}/modules/${moduleId}/forum/threads${buildForumQueryString()}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const payload = await response.json().catch(() => []);
+    if (!response.ok) throw new Error(payload.error || 'Failed to load forum threads.');
+    return Array.isArray(payload) ? payload : [];
+}
+
+function renderForumThreadList(container, moduleId, threads) {
+    const threadList = threads.length
+        ? threads.map((thread) => `
+            <button class="forum-thread-card" type="button" onclick="openModuleForumThread(${Number(thread.id)})">
+                <div>
+                    <strong>${escapeWorldHtml(thread.title || 'Untitled discussion')}</strong>
+                    <p>${escapeWorldHtml(thread.content || '').slice(0, 140)}${String(thread.content || '').length > 140 ? '…' : ''}</p>
+                    <span>${escapeWorldHtml(thread.user?.username || 'User')} • ${Number(thread._count?.replies || 0)} repl${Number(thread._count?.replies || 0) === 1 ? 'y' : 'ies'}</span>
+                </div>
+            </button>
+        `).join('')
+        : '<div class="forum-empty-state">No discussions yet. Start the first one for this module.</div>';
+
     container.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px;">
-            <p style="color: #94a3b8; margin-bottom: 20px;">Participe das discussões deste módulo.</p>
-            <button class="upload-btn" onclick="window.open('${AUTH_API.replace('api', '')}', '_blank')">Abrir Fórum</button>
+        <div class="module-forum-panel">
+            <div class="forum-header-row">
+                <div>
+                    <h3>Module Forum</h3>
+                    <p>Discuss this module with learners and tutors.</p>
+                </div>
+                <button class="upload-btn forum-new-thread-btn" type="button" onclick="showModuleForumNewThread(${Number(moduleId)})">+ New discussion</button>
+            </div>
+            <div id="module-forum-compose" class="forum-compose hidden"></div>
+            <div class="forum-thread-list">${threadList}</div>
         </div>
     `;
 }
+
+async function renderModuleForum(moduleId) {
+    const container = document.getElementById('module-forum-container');
+    if (!container) return;
+    if (!moduleId) {
+        container.innerHTML = '<div class="forum-empty-state">Open a module to view its forum.</div>';
+        return;
+    }
+
+    container.innerHTML = '<div class="forum-empty-state"><i class="fas fa-spinner fa-spin"></i> Loading forum...</div>';
+    try {
+        const threads = await fetchModuleForumThreads(moduleId);
+        renderForumThreadList(container, moduleId, threads);
+    } catch (error) {
+        container.innerHTML = `
+            <div class="forum-empty-state forum-error-state">
+                <strong>Forum unavailable</strong>
+                <p>${escapeWorldHtml(error.message)}</p>
+                <button class="upload-btn" type="button" onclick="renderModuleForum(${Number(moduleId)})">Try again</button>
+            </div>
+        `;
+    }
+}
+
+function showModuleForumNewThread(moduleId = currentModuleId) {
+    const compose = document.getElementById('module-forum-compose');
+    if (!compose) return;
+    compose.classList.remove('hidden');
+    compose.innerHTML = `
+        <div class="forum-compose-card">
+            <label>Discussion title</label>
+            <input id="forum-thread-title" type="text" placeholder="What should we discuss?">
+            <label>Message</label>
+            <textarea id="forum-thread-content" rows="4" placeholder="Write the first message..."></textarea>
+            <div class="forum-compose-actions">
+                <button class="upload-btn" type="button" onclick="createModuleForumThread(${Number(moduleId)})">Post discussion</button>
+                <button class="upload-btn forum-secondary-btn" type="button" onclick="document.getElementById('module-forum-compose').classList.add('hidden')">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.getElementById('forum-thread-title')?.focus();
+}
+
+async function createModuleForumThread(moduleId = currentModuleId) {
+    const titleInput = document.getElementById('forum-thread-title');
+    const contentInput = document.getElementById('forum-thread-content');
+    const title = titleInput?.value.trim();
+    const content = contentInput?.value.trim();
+    if (!title || !content) {
+        alert('Please enter a title and message.');
+        return;
+    }
+
+    const response = await fetch(`${AUTH_API}/modules/${moduleId}/forum/threads`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ title, content, courseId: COURSE_ID_FROM_URL || undefined })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        alert(payload.error || 'Failed to create discussion.');
+        return;
+    }
+
+    await renderModuleForum(moduleId);
+    await openModuleForumThread(payload.id);
+}
+
+async function openModuleForumThread(threadId) {
+    const container = document.getElementById('module-forum-container');
+    if (!container) return;
+    container.innerHTML = '<div class="forum-empty-state"><i class="fas fa-spinner fa-spin"></i> Loading discussion...</div>';
+
+    try {
+        const response = await fetch(`${AUTH_API}/forum/threads/${threadId}${buildForumQueryString()}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const thread = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(thread.error || 'Failed to load discussion.');
+
+        const replies = (thread.replies || []).map((reply) => `
+            <div class="forum-reply-card">
+                <strong>${escapeWorldHtml(reply.user?.username || 'User')}</strong>
+                <p>${escapeWorldHtml(reply.content || '')}</p>
+            </div>
+        `).join('');
+
+        container.innerHTML = `
+            <div class="module-forum-panel">
+                <button class="forum-back-btn" type="button" onclick="renderModuleForum(${Number(thread.moduleId || currentModuleId)})">← Back to discussions</button>
+                <article class="forum-thread-detail">
+                    <h3>${escapeWorldHtml(thread.title || 'Discussion')}</h3>
+                    <span>${escapeWorldHtml(thread.user?.username || 'User')}</span>
+                    <p>${escapeWorldHtml(thread.content || '')}</p>
+                </article>
+                <div class="forum-replies-list">
+                    <h4>Replies</h4>
+                    ${replies || '<div class="forum-empty-state">No replies yet.</div>'}
+                </div>
+                <div class="forum-compose-card">
+                    <label>Add a reply</label>
+                    <textarea id="forum-reply-content" rows="3" placeholder="Write a reply..."></textarea>
+                    <div class="forum-compose-actions">
+                        <button class="upload-btn" type="button" onclick="createModuleForumReply(${Number(thread.id)})">Post reply</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        container.innerHTML = `
+            <div class="forum-empty-state forum-error-state">
+                <strong>Could not load discussion</strong>
+                <p>${escapeWorldHtml(error.message)}</p>
+                <button class="upload-btn" type="button" onclick="renderModuleForum(${Number(currentModuleId)})">Back to forum</button>
+            </div>
+        `;
+    }
+}
+
+async function createModuleForumReply(threadId) {
+    const textarea = document.getElementById('forum-reply-content');
+    const content = textarea?.value.trim();
+    if (!content) {
+        alert('Please write a reply first.');
+        return;
+    }
+
+    const response = await fetch(`${AUTH_API}/forum/threads/${threadId}/replies`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ content, courseId: COURSE_ID_FROM_URL || undefined })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        alert(payload.error || 'Failed to post reply.');
+        return;
+    }
+
+    await openModuleForumThread(threadId);
+}
+
+window.renderModuleForum = renderModuleForum;
+window.showModuleForumNewThread = showModuleForumNewThread;
+window.createModuleForumThread = createModuleForumThread;
+window.openModuleForumThread = openModuleForumThread;
+window.createModuleForumReply = createModuleForumReply;
 
 function renderModuleReports(module) {
     const container = document.getElementById('module-reports-container');
@@ -4349,6 +4682,9 @@ async function openModuleSidebarLegacy(placementId, moduleId, courseModuleId = n
     moduleDescription.innerText = '';
     if (moduleGeneralShortcuts) moduleGeneralShortcuts.innerHTML = '';
     if (moduleGeneralAssets) moduleGeneralAssets.innerHTML = '';
+    moduleAssistantLoading = false;
+    setModuleAssistantStatus('');
+    renderModuleAssistant();
     document.getElementById('sidebar-preview-banner').classList.remove('active');
     moduleSidebar.classList.remove('hidden');
     activateModuleTab('general');

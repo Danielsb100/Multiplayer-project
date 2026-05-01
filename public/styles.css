@@ -2110,3 +2110,307 @@ body.course-world-mode #chat-input-container {
     border-color: rgba(96, 165, 250, 0.5);
     box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
 }
+
+.module-assistant-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: calc(100vh - 190px);
+}
+
+.module-assistant-intro {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.14), rgba(129, 140, 248, 0.08));
+    border: 1px solid rgba(129, 140, 248, 0.2);
+    border-radius: 16px;
+    padding: 16px;
+}
+
+.module-assistant-eyebrow {
+    display: inline-block;
+    color: #93c5fd;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.module-assistant-intro h3 {
+    color: #f8fafc;
+    font-size: 1rem;
+    margin: 0 0 6px;
+}
+
+.module-assistant-intro p {
+    color: #cbd5e1;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.module-assistant-history {
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 260px;
+    max-height: 48vh;
+    overflow-y: auto;
+    padding: 14px;
+}
+
+.module-assistant-empty {
+    align-items: center;
+    color: #94a3b8;
+    display: flex;
+    flex: 1;
+    font-size: 0.88rem;
+    justify-content: center;
+    min-height: 180px;
+    text-align: center;
+}
+
+.module-assistant-message {
+    border-radius: 14px;
+    max-width: 88%;
+    padding: 10px 12px;
+}
+
+.module-assistant-message span {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.module-assistant-message p {
+    color: #e2e8f0;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.module-assistant-message.user {
+    align-self: flex-end;
+    background: rgba(37, 99, 235, 0.25);
+    border: 1px solid rgba(96, 165, 250, 0.25);
+}
+
+.module-assistant-message.user span {
+    color: #93c5fd;
+}
+
+.module-assistant-message.assistant {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.module-assistant-message.assistant span {
+    color: #c4b5fd;
+}
+
+.module-assistant-skipped {
+    color: #fbbf24;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    margin-top: 8px;
+}
+
+.module-assistant-status {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    min-height: 1rem;
+}
+
+.module-assistant-status.loading {
+    color: #93c5fd;
+}
+
+.module-assistant-status.error {
+    color: #f87171;
+}
+
+.module-assistant-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.module-assistant-input {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    color: #f8fafc;
+    flex: 1;
+    font-family: inherit;
+    font-size: 0.9rem;
+    min-height: 46px;
+    outline: none;
+    padding: 10px 12px;
+    resize: vertical;
+}
+
+.module-assistant-input:focus {
+    border-color: rgba(96, 165, 250, 0.6);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.module-assistant-input::placeholder {
+    color: #64748b;
+}
+
+.module-assistant-input:disabled,
+.module-assistant-input-row .btn-open:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Module forum */
+.module-forum-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 12px;
+}
+
+.forum-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
+.forum-header-row h3,
+.forum-thread-detail h3 {
+    color: var(--text-primary);
+    font-size: 1rem;
+    margin: 0 0 6px;
+}
+
+.forum-header-row p,
+.forum-thread-detail p,
+.forum-thread-card p,
+.forum-empty-state p,
+.forum-reply-card p {
+    color: var(--text-secondary);
+    font-size: 0.86rem;
+    line-height: 1.45;
+    margin: 0;
+}
+
+.forum-new-thread-btn {
+    white-space: nowrap;
+    padding: 0.65rem 0.8rem;
+}
+
+.forum-thread-list,
+.forum-replies-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.forum-thread-card,
+.forum-reply-card,
+.forum-compose-card,
+.forum-thread-detail,
+.forum-empty-state {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    background: rgba(15, 23, 42, 0.56);
+    padding: 13px 14px;
+}
+
+.forum-thread-card {
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+    transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.forum-thread-card:hover {
+    border-color: rgba(96, 165, 250, 0.45);
+    background: rgba(37, 99, 235, 0.16);
+    transform: translateY(-1px);
+}
+
+.forum-thread-card strong,
+.forum-reply-card strong {
+    display: block;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.forum-thread-card span,
+.forum-thread-detail span {
+    display: block;
+    color: #60a5fa;
+    font-size: 0.74rem;
+    margin-top: 8px;
+}
+
+.forum-compose-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.forum-compose-card label,
+.forum-replies-list h4 {
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.forum-compose-card input,
+.forum-compose-card textarea {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    background: rgba(2, 6, 23, 0.58);
+    color: var(--text-primary);
+    padding: 0.75rem;
+    font: inherit;
+    resize: vertical;
+}
+
+.forum-compose-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.forum-secondary-btn,
+.forum-back-btn {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--text-primary) !important;
+}
+
+.forum-back-btn {
+    align-self: flex-start;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    padding: 0.55rem 0.8rem;
+    cursor: pointer;
+}
+
+.forum-empty-state {
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.forum-error-state {
+    border-color: rgba(239, 68, 68, 0.35);
+    background: rgba(127, 29, 29, 0.18);
+}
