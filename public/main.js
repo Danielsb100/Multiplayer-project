@@ -246,6 +246,7 @@ const btnAnswer = document.getElementById('btn-answer');
 const btnReject = document.getElementById('btn-reject');
 
 // Sidebar Elements
+const btnToggleAiAssistant = document.getElementById('btn-toggle-ai-assistant');
 const btnTogglePlayers = document.getElementById('btn-toggle-players');
 const btnToggleChat = document.getElementById('btn-toggle-chat');
 const btnToggleTheme = document.getElementById('btn-toggle-theme');
@@ -281,8 +282,10 @@ function renderWorldOperationsSummary(summary) {
     if (!worldOperationsCard || !worldOperationsList || !summary?.counts) return;
 
     const hasPending = summary.counts.unread > 0 || summary.counts.totalPending > 0 || summary.counts.remindersOpen > 0;
-    worldOperationsCard.classList.toggle('hidden', !hasPending);
-    if (!hasPending) return;
+    if (!hasPending) {
+        worldOperationsCard.classList.add('hidden');
+        return;
+    }
 
     worldOperationsUnread.textContent = `${summary.counts.unread} unread`;
     worldOperationsUrgent.textContent = `${summary.counts.urgent} urgent`;
@@ -428,7 +431,6 @@ async function performJoin(token, user) {
     // Initialize PeerJS for audio calls
     initPeer();
 
-    playerListContainer.classList.remove('hidden');
     updatePlayerList();
     await refreshWorldOperationsSummary();
     if (worldOperationsRefreshTimer) clearInterval(worldOperationsRefreshTimer);
@@ -3384,6 +3386,14 @@ const moduleAssistantInput = document.getElementById('module-assistant-input');
 const moduleAssistantSend = document.getElementById('module-assistant-send');
 const moduleAssistantVoice = document.getElementById('module-assistant-voice');
 const moduleAssistantSpeak = document.getElementById('module-assistant-speak');
+const generalAiWrapper = document.getElementById('general-ai-wrapper');
+const generalAiClose = document.getElementById('general-ai-close');
+const generalAiHistoryEl = document.getElementById('general-ai-history');
+const generalAiStatusEl = document.getElementById('general-ai-status');
+const generalAiInput = document.getElementById('general-ai-input');
+const generalAiSend = document.getElementById('general-ai-send');
+const generalAiVoice = document.getElementById('general-ai-voice');
+const generalAiSpeak = document.getElementById('general-ai-speak');
 
 let currentModuleId = null;
 let currentPlacementId = null;
@@ -3396,6 +3406,12 @@ let moduleAssistantStream = null;
 let moduleAssistantChunks = [];
 let moduleAssistantLastAudio = null;
 const moduleAssistantHistories = new Map();
+let generalAiLoading = false;
+let generalAiRecorder = null;
+let generalAiStream = null;
+let generalAiChunks = [];
+let generalAiLastAudio = null;
+const generalAiHistory = [];
 
 btnCloseSidebar.onclick = () => {
     stopModuleAssistantRecording();
@@ -3662,6 +3678,229 @@ if (moduleAssistantSpeak) {
         playModuleAssistantLastAnswer().catch((error) => setModuleAssistantStatus(error.message, 'error'));
     });
 }
+
+function stopGeneralAiRecording() {
+    if (generalAiRecorder && generalAiRecorder.state === 'recording') {
+        generalAiRecorder.stop();
+    }
+    if (generalAiStream) {
+        generalAiStream.getTracks().forEach(track => track.stop());
+        generalAiStream = null;
+    }
+}
+
+function setGeneralAiStatus(message = '', type = '') {
+    if (!generalAiStatusEl) return;
+    generalAiStatusEl.textContent = message;
+    generalAiStatusEl.className = `module-assistant-status${type ? ` ${type}` : ''}`;
+}
+
+function getLastGeneralAiText() {
+    return [...generalAiHistory].reverse().find((entry) => entry.role === 'assistant' && entry.content)?.content || '';
+}
+
+function updateGeneralAiControls() {
+    if (generalAiSend) {
+        generalAiSend.disabled = generalAiLoading;
+        generalAiSend.innerText = generalAiLoading ? 'Sending...' : 'Send';
+    }
+    if (generalAiInput) generalAiInput.disabled = generalAiLoading;
+    if (generalAiVoice) {
+        const isRecording = generalAiRecorder && generalAiRecorder.state === 'recording';
+        generalAiVoice.disabled = generalAiLoading;
+        generalAiVoice.innerText = isRecording ? 'Stop' : 'Record';
+    }
+    if (generalAiSpeak) {
+        generalAiSpeak.disabled = !generalAiLastAudio?.audioBase64 && !getLastGeneralAiText();
+    }
+}
+
+function renderGeneralAi() {
+    if (!generalAiHistoryEl) return;
+    if (!generalAiHistory.length) {
+        generalAiHistoryEl.innerHTML = `
+            <div class="module-assistant-empty">
+                Ask the general AI assistant anything about the Training knowledge bases. Voice input is supported with Record.
+            </div>
+        `;
+    } else {
+        generalAiHistoryEl.innerHTML = generalAiHistory.map((entry) => `
+            <div class="module-assistant-message ${entry.role === 'user' ? 'user' : 'assistant'}">
+                <span>${entry.role === 'user' ? 'You' : 'AI'}</span>
+                <p>${escapeWorldHtml(entry.content)}</p>
+            </div>
+        `).join('');
+        generalAiHistoryEl.scrollTop = generalAiHistoryEl.scrollHeight;
+    }
+    updateGeneralAiControls();
+}
+
+function openGeneralAiAssistant() {
+    if (!generalAiWrapper) return;
+    generalAiWrapper.classList.remove('hidden');
+    btnToggleAiAssistant?.classList.add('active');
+    renderGeneralAi();
+    setTimeout(() => generalAiInput?.focus(), 0);
+}
+
+function closeGeneralAiAssistant() {
+    stopGeneralAiRecording();
+    generalAiWrapper?.classList.add('hidden');
+    btnToggleAiAssistant?.classList.remove('active');
+}
+
+async function sendGeneralAiMessage() {
+    if (!generalAiInput || generalAiLoading) return;
+    const message = generalAiInput.value.trim();
+    if (!message) return;
+
+    generalAiHistory.push({ role: 'user', content: message });
+    generalAiInput.value = '';
+    generalAiLoading = true;
+    generalAiLastAudio = null;
+    setGeneralAiStatus('AI is thinking across the selected KBs...', 'loading');
+    renderGeneralAi();
+
+    try {
+        const response = await fetch(`${AUTH_API}/api/ai/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                message,
+                courseId: window.__courseWorldContext?.courseId || null,
+                conversationId: `training-general-ai-${window.__courseWorldContext?.courseId || 'world'}-${localUsername || 'user'}`,
+                returnAudio: false
+            })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || result.message || 'Failed to get an AI answer.');
+
+        generalAiHistory.push({ role: 'assistant', content: result.answer || 'No answer returned.' });
+        generalAiLastAudio = result.audioBase64 ? result : null;
+        setGeneralAiStatus('');
+    } catch (error) {
+        generalAiHistory.push({ role: 'assistant', content: `Sorry, I could not answer right now. ${error.message}` });
+        setGeneralAiStatus(error.message, 'error');
+    } finally {
+        generalAiLoading = false;
+        renderGeneralAi();
+        generalAiInput?.focus();
+    }
+}
+
+async function transcribeGeneralAiAudio(audioBlob) {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'general-ai.webm');
+    setGeneralAiStatus('Transcribing voice...', 'loading');
+    const response = await fetch(`${AUTH_API}/api/ai/transcribe`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` },
+        body: formData
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || 'Failed to transcribe audio.');
+    const text = String(payload.text || '').trim();
+    if (!text) throw new Error('Could not transcribe audio.');
+    if (generalAiInput) generalAiInput.value = text;
+    await sendGeneralAiMessage();
+}
+
+async function toggleGeneralAiVoice() {
+    if (generalAiRecorder && generalAiRecorder.state === 'recording') {
+        generalAiRecorder.stop();
+        updateGeneralAiControls();
+        return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        setGeneralAiStatus('Voice recording is not available in this browser context.', 'error');
+        return;
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    generalAiStream = stream;
+    generalAiChunks = [];
+    try {
+        generalAiRecorder = new MediaRecorder(stream);
+    } catch (error) {
+        stopGeneralAiRecording();
+        throw error;
+    }
+    generalAiRecorder.ondataavailable = (event) => {
+        if (event.data?.size) generalAiChunks.push(event.data);
+    };
+    generalAiRecorder.onstop = async () => {
+        if (generalAiStream) {
+            generalAiStream.getTracks().forEach(track => track.stop());
+            generalAiStream = null;
+        }
+        updateGeneralAiControls();
+        const audioBlob = new Blob(generalAiChunks, { type: generalAiRecorder.mimeType || 'audio/webm' });
+        if (!generalAiChunks.length || !audioBlob.size) {
+            setGeneralAiStatus('No audio was captured.', 'error');
+            return;
+        }
+        try {
+            await transcribeGeneralAiAudio(audioBlob);
+        } catch (error) {
+            setGeneralAiStatus(error.message, 'error');
+        }
+    };
+    generalAiRecorder.start();
+    setGeneralAiStatus('Recording... click Stop when finished.', 'loading');
+    updateGeneralAiControls();
+}
+
+async function playGeneralAiLastAnswer() {
+    if (!generalAiLastAudio?.audioBase64) {
+        const lastAssistant = [...generalAiHistory].reverse().find((entry) => entry.role === 'assistant' && entry.content);
+        if (!lastAssistant) {
+            setGeneralAiStatus('No spoken answer is available yet.', 'error');
+            return;
+        }
+        setGeneralAiStatus('Generating speech...', 'loading');
+        const response = await fetch(`${AUTH_API}/api/ai/tts`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ text: lastAssistant.content })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || 'Failed to generate speech.');
+        generalAiLastAudio = {
+            audioBase64: payload.audio_base64 || payload.audioBase64,
+            audioFormat: payload.audio_format || payload.audioFormat || 'mp3'
+        };
+    }
+    const audio = new Audio(`data:audio/${generalAiLastAudio.audioFormat || 'mp3'};base64,${generalAiLastAudio.audioBase64}`);
+    audio.play().catch((error) => setGeneralAiStatus(error.message, 'error'));
+    setGeneralAiStatus('');
+}
+
+btnToggleAiAssistant?.addEventListener('click', () => {
+    const isHidden = generalAiWrapper?.classList.contains('hidden');
+    if (isHidden) openGeneralAiAssistant();
+    else closeGeneralAiAssistant();
+});
+
+generalAiClose?.addEventListener('click', closeGeneralAiAssistant);
+generalAiSend?.addEventListener('click', sendGeneralAiMessage);
+generalAiInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendGeneralAiMessage();
+    }
+});
+generalAiVoice?.addEventListener('click', () => {
+    toggleGeneralAiVoice().catch((error) => setGeneralAiStatus(error.message, 'error'));
+});
+generalAiSpeak?.addEventListener('click', () => {
+    playGeneralAiLastAnswer().catch((error) => setGeneralAiStatus(error.message, 'error'));
+});
+renderGeneralAi();
 
 async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
     const isOwner = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
@@ -4013,7 +4252,6 @@ function renderModuleGeneral(module) {
         { label: 'Docs', count: documents.length, onClick: () => activateModuleTab('docs') },
         { label: 'Quiz', count: quizzes.length, onClick: () => activateModuleTab('quiz') },
         { label: 'Forum', count: 1, onClick: () => activateModuleTab('forum') },
-        { label: 'Assistant', count: 1, onClick: () => activateModuleTab('assistant') },
         { label: 'Reports', count: 1, onClick: () => activateModuleTab('reports') }
     ];
 
@@ -4094,21 +4332,6 @@ function renderModuleGeneral(module) {
         }],
         'Open tab',
         () => activateModuleTab('forum')
-    ));
-
-    sections.push(buildModuleGeneralSection(
-        'Ask AI',
-        'Get contextual help from the module assistant.',
-        [{
-            label: 'AI',
-            accent: '#818cf8',
-            title: 'Module AI assistant',
-            caption: 'Ask questions about this module and keep the conversation here.',
-            actionLabel: 'Ask AI',
-            onClick: () => activateModuleTab('assistant')
-        }],
-        'Open tab',
-        () => activateModuleTab('assistant')
     ));
 
     sections.push(buildModuleGeneralSection(

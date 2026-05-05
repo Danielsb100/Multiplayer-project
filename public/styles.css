@@ -702,6 +702,56 @@ body.course-world-mode #chat-input-container {
     margin-top: 0.5rem;
 }
 
+.general-ai-wrapper {
+    width: min(440px, calc(100vw - 120px));
+    max-height: calc(100vh - 3rem);
+    pointer-events: auto;
+}
+
+.general-ai-wrapper.hidden {
+    display: none !important;
+}
+
+.general-ai-panel {
+    min-height: min(640px, calc(100vh - 3rem));
+    max-height: calc(100vh - 3rem);
+    padding: 14px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(18px);
+}
+
+.general-ai-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.general-ai-header .close-btn {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+}
+
+.general-ai-intro {
+    flex: 1;
+}
+
+.general-ai-input-row {
+    flex-wrap: wrap;
+}
+
+.general-ai-input-row textarea {
+    min-width: 220px;
+}
+
 #chat-wrapper {
     margin-top: auto;
     display: flex;
