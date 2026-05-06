@@ -3948,6 +3948,8 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
 
         if (!response.ok) throw new Error(module.error || 'Erro ao carregar módulo');
 
+        currentModulePayload = module;
+        currentModuleRuntimeState = getActiveCourseRuntimeModule(courseModuleId, moduleId);
         moduleTitle.innerText = module.title;
         moduleDescription.innerText = module.description || 'Sem descrição.';
 
@@ -4081,22 +4083,123 @@ function classifyModuleDocument(doc) {
 }
 
 function trackModuleVideoProgress(videoId) {
-    fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${videoId}/progress`, {
+    return fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${videoId}/progress`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
-    }).catch(() => { });
+    }).catch(() => null);
 }
 
 function trackModuleDocumentDownload(doc) {
-    fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${doc.id}/download`, {
+    return fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${doc.id}/download`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
-    }).catch(() => { });
+    }).catch(() => null);
+}
+
+function getModuleMaterialGroups(module = currentModulePayload) {
+    return {
+        videos: Array.isArray(module?.videos) ? module.videos : [],
+        documents: Array.isArray(module?.documents) ? module.documents : [],
+        quizzes: Array.isArray(module?.quizzes) ? module.quizzes : []
+    };
+}
+
+function getModuleMaterialItems(module = currentModulePayload) {
+    const { videos, documents, quizzes } = getModuleMaterialGroups(module);
+    return [
+        ...videos.map(item => ({ type: 'video', id: item.id, title: item.title || 'Untitled video', viewed: Boolean(item.viewed || item.completed || Number(item.progress || 0) >= 80), source: item })),
+        ...documents.map(item => ({ type: 'document', id: item.id, title: item.title || 'Untitled document', viewed: Boolean(item.viewed), source: item })),
+        ...quizzes.map(item => ({ type: 'quiz', id: item.id, title: item.title || 'Module quiz', viewed: Boolean(item.submitted), bestScore: item.bestScore, source: item }))
+    ];
+}
+
+function refreshModuleProgressSurfaces() {
+    if (!currentModulePayload) return;
+    renderModuleGeneral(currentModulePayload);
+    renderModuleVideos(currentModulePayload.videos || []);
+    renderModuleDocs(currentModulePayload.documents || []);
+    renderModuleQuiz(currentModulePayload.quizzes || []);
+}
+
+async function maybeAutoCompleteCurrentCourseModule() {
+    if (!COURSE_ID_FROM_URL || !currentModuleId || !currentModulePayload) return;
+    const materials = getModuleMaterialItems(currentModulePayload);
+    if (!materials.length || materials.some(item => !item.viewed)) return;
+    currentModuleRuntimeState = getActiveCourseRuntimeModule();
+    if (currentModuleRuntimeState?.completed) return;
+    if (currentModuleRuntimeState && currentModuleRuntimeState.canMarkComplete === false) return;
+
+    try {
+        const response = await fetch(`${AUTH_API}/courses/${COURSE_ID_FROM_URL}/modules/${currentModuleId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
+        });
+        if (!response.ok) return;
+        await refreshCourseWorldRuntime();
+        currentModuleRuntimeState = getActiveCourseRuntimeModule();
+        refreshModuleProgressSurfaces();
+    } catch (error) {
+        console.warn('Could not auto-complete course module:', error);
+    }
+}
+
+function markModuleMaterialViewed(type, id, extra = {}) {
+    if (!currentModulePayload) return;
+    const groups = getModuleMaterialGroups(currentModulePayload);
+    const itemsByType = { video: groups.videos, document: groups.documents, quiz: groups.quizzes };
+    const item = (itemsByType[type] || []).find(entry => Number(entry.id) === Number(id));
+    if (!item) return;
+    item.viewed = true;
+    if (type === 'video') {
+        item.completed = true;
+        item.progress = Math.max(Number(item.progress || 0), 100);
+    }
+    if (type === 'quiz') {
+        item.submitted = true;
+        if (extra.bestScore !== undefined && extra.bestScore !== null) {
+            const nextScore = Number(extra.bestScore);
+            item.bestScore = item.bestScore === null || item.bestScore === undefined ? nextScore : Math.max(Number(item.bestScore || 0), nextScore);
+        }
+    }
+    refreshModuleProgressSurfaces();
+    maybeAutoCompleteCurrentCourseModule();
+}
+
+function buildViewedStatusPill(viewed) {
+    return `<span style="font-size:0.76rem; border-radius:999px; padding:0.24rem 0.55rem; color:${viewed ? '#86efac' : '#94a3b8'}; border:1px solid ${viewed ? 'rgba(52,211,153,0.35)' : 'rgba(148,163,184,0.22)'}; background:${viewed ? 'rgba(16,185,129,0.14)' : 'rgba(148,163,184,0.08)'}; white-space:nowrap;">${viewed ? 'Visualizado' : 'Not viewed'}</span>`;
+}
+
+function buildModuleMaterialProgressSection(module = currentModulePayload) {
+    const items = getModuleMaterialItems(module);
+    if (!items.length) return null;
+    const viewedCount = items.filter(item => item.viewed).length;
+    const section = buildModuleGeneralSection(
+        'Materials / Progress',
+        `${viewedCount}/${items.length} visualized`,
+        items.map((item) => ({
+            label: item.type === 'video' ? 'Video' : item.type === 'document' ? 'Material' : 'Quiz',
+            accent: item.viewed ? '#34d399' : '#94a3b8',
+            title: item.title,
+            caption: `${item.viewed ? '✓ Visualizado' : '○ Not viewed'}${item.type === 'quiz' && item.bestScore !== null && item.bestScore !== undefined ? ` · Best ${Number(item.bestScore).toFixed(1)}%` : ''}`,
+            actionLabel: item.type === 'video' ? 'Open' : item.type === 'document' ? 'Open' : 'Go to quiz',
+            onClick: () => {
+                if (item.type === 'video') openModuleVideoAsset(item.source);
+                else if (item.type === 'document') openModuleDocumentAsset(item.source);
+                else activateModuleTab('quiz');
+            }
+        })),
+        viewedCount === items.length ? 'Complete' : 'In progress',
+        () => {}
+    );
+    section.style.borderColor = viewedCount === items.length ? 'rgba(52,211,153,0.24)' : 'rgba(255,255,255,0.08)';
+    section.style.background = viewedCount === items.length ? 'rgba(16,185,129,0.08)' : 'rgba(15,23,42,0.45)';
+    return section;
 }
 
 function previewModuleImageDocument(doc) {
@@ -4121,21 +4224,26 @@ function openModuleDocumentAsset(doc) {
     const docMeta = classifyModuleDocument(doc);
     if (docMeta.kind === 'img') {
         previewModuleImageDocument(doc);
+        markModuleMaterialViewed('document', doc.id);
+        trackModuleDocumentDownload(doc).then(() => markModuleMaterialViewed('document', doc.id));
         return;
     }
 
     window.open(getModuleDocumentUrl(doc), '_blank', 'noopener');
-    trackModuleDocumentDownload(doc);
+    markModuleMaterialViewed('document', doc.id);
+    trackModuleDocumentDownload(doc).then(() => markModuleMaterialViewed('document', doc.id));
 }
 
 function downloadModuleDocumentAsset(doc) {
     window.downloadSharedAsset(doc.documentId || doc.id, doc.title);
-    trackModuleDocumentDownload(doc);
+    markModuleMaterialViewed('document', doc.id);
+    trackModuleDocumentDownload(doc).then(() => markModuleMaterialViewed('document', doc.id));
 }
 
 function openModuleVideoAsset(video) {
     playModuleVideo(video);
-    trackModuleVideoProgress(video.id);
+    markModuleMaterialViewed('video', video.id);
+    trackModuleVideoProgress(video.id).then(() => markModuleMaterialViewed('video', video.id));
 }
 
 function openModuleForumFromSidebar() {
@@ -4264,6 +4372,8 @@ function renderModuleGeneral(module) {
         });
 
     const sections = [];
+    const progressSection = buildModuleMaterialProgressSection(module);
+    if (progressSection) sections.push(progressSection);
 
     if (videos.length) {
         sections.push(buildModuleGeneralSection(
@@ -4393,6 +4503,10 @@ function renderModuleVideos(videos) {
         titleTop.style.fontSize = '1.1rem';
         titleTop.style.color = '#fff';
 
+        const videoViewed = Boolean(v.viewed || v.completed || Number(v.progress || 0) >= 80);
+        const statusPill = document.createElement('div');
+        statusPill.innerHTML = buildViewedStatusPill(videoViewed);
+
         const thumb = document.createElement('div');
         thumb.style.width = '100%';
         thumb.style.height = '200px'; // Slightly taller
@@ -4447,19 +4561,10 @@ function renderModuleVideos(videos) {
         thumb.appendChild(playIcon);
 
         card.appendChild(titleTop);
+        card.appendChild(statusPill);
         card.appendChild(thumb);
 
-        card.onclick = () => {
-            playModuleVideo(v);
-            fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${v.id}/progress`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
-            }).catch(()=>{});
-        };
+        card.onclick = () => openModuleVideoAsset(v);
         
         grid.appendChild(card);
     });
@@ -4574,17 +4679,11 @@ function renderModuleDocs(docs) {
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="color: #ff4444; font-weight:bold;">📄 PDF</span>
                     <span>${d.title}</span>
+                    ${buildViewedStatusPill(Boolean(d.viewed))}
                 </div>
                 <button class="btn-sm" style="background: var(--primary); color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Download</button>
             `;
-            li.querySelector('button').onclick = () => {
-                window.downloadSharedAsset(d.documentId || d.id, d.title);
-                fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${d.id}/download`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-                    body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
-                });
-            };
+            li.querySelector('button').onclick = () => downloadModuleDocumentAsset(d);
             pdfList.appendChild(li);
         } else if (isWord) {
             const li = document.createElement('li');
@@ -4598,17 +4697,11 @@ function renderModuleDocs(docs) {
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="color: #4488ff; font-weight:bold;">📝 Word</span>
                     <span>${d.title}</span>
+                    ${buildViewedStatusPill(Boolean(d.viewed))}
                 </div>
                 <button class="btn-sm" style="background: var(--primary); color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Download</button>
             `;
-            li.querySelector('button').onclick = () => {
-                window.downloadSharedAsset(d.documentId || d.id, d.title);
-                fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${d.id}/download`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-                    body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
-                });
-            };
+            li.querySelector('button').onclick = () => downloadModuleDocumentAsset(d);
             wordList.appendChild(li);
         } else if (isImg) {
             const card = document.createElement('div');
@@ -4645,10 +4738,17 @@ function renderModuleDocs(docs) {
             name.style.textOverflow = 'ellipsis';
             name.innerText = d.title;
 
+            const status = document.createElement('div');
+            status.style.marginTop = '0.35rem';
+            status.style.textAlign = 'center';
+            status.innerHTML = buildViewedStatusPill(Boolean(d.viewed));
             card.appendChild(thumb);
             card.appendChild(name);
+            card.appendChild(status);
 
             card.onclick = () => {
+                markModuleMaterialViewed('document', d.id);
+                trackModuleDocumentDownload(d).then(() => markModuleMaterialViewed('document', d.id));
                 previewContent.innerHTML = '';
                 const fullImg = document.createElement('img');
                 fullImg.src = `${AUTH_API}/api/documents/download/${d.documentId || d.id}`;
@@ -4742,6 +4842,9 @@ function renderModuleQuiz(quizzes) {
                     });
                     const result = await res.json();
                     if (!res.ok) throw new Error(result.error || 'Erro ao enviar');
+                    markModuleMaterialViewed('quiz', quiz.id, { bestScore: result.score });
+                    updateRuntimeModuleFromQuizSubmission(result.score);
+                    await refreshCourseWorldRuntime();
                     alert(`Quiz "${quiz.title}" enviado! Sua nota parcial: ${result.score.toFixed(1)}%`);
                 } catch (err) {
                     alert('Erro ao enviar quiz: ' + err.message);
