@@ -92,10 +92,10 @@
 
     <!-- Top Right UI Toggles -->
     <div id="top-right-toggles" class="top-right-toggles ui-layer">
-        <button id="btn-toggle-notifications" class="icon-toggle-btn active" title="Toggle Notifications">
+        <button id="btn-toggle-notifications" class="icon-toggle-btn" title="Toggle Notifications">
             🔔
         </button>
-        <button id="btn-toggle-course-info" class="icon-toggle-btn active" title="Toggle Course Info">
+        <button id="btn-toggle-course-info" class="icon-toggle-btn" title="Toggle Course Info">
             📖
         </button>
     </div>
@@ -181,8 +181,9 @@
     <div id="left-sidebar" class="ui-layer">
         <img id="sidebar-profile-pic" src="https://ui-avatars.com/api/?name=User&background=random" title="Open Dashboard">
         <div class="sidebar-actions">
-            <button id="btn-toggle-players" class="sidebar-btn active" title="Toggle Player List">👥</button>
-            <button id="btn-toggle-chat" class="sidebar-btn active" title="Toggle Chat">💬</button>
+            <button id="btn-toggle-ai-assistant" class="sidebar-btn" title="Open General AI Assistant">🤖</button>
+            <button id="btn-toggle-players" class="sidebar-btn" title="Toggle Player List">👥</button>
+            <button id="btn-toggle-chat" class="sidebar-btn" title="Toggle Chat">💬</button>
             <button id="btn-settings" class="sidebar-btn" title="Settings">⚙️</button>
         </div>
         <button id="btn-toggle-theme" class="sidebar-btn" title="Toggle Theme" style="margin-top: auto;">☀️</button>
@@ -227,7 +228,7 @@
         <!-- Chat Wrapper -->
         <div id="chat-wrapper">
             <!-- Estrutura do Chat Global - Histórico -->
-            <div id="chat-history-container">
+            <div id="chat-history-container" class="hidden">
                 <div class="chat-panel-header">
                     <div>
                         <span class="chat-panel-eyebrow">Room chat</span>
@@ -240,9 +241,31 @@
             </div>
 
             <!-- Estrutura do Chat Global - Entrada de Texto -->
-            <div id="chat-input-container">
+            <div id="chat-input-container" class="hidden">
                 <input type="text" id="chat-input" placeholder="Type your message and press Enter" autocomplete="off">
                 <button type="button" id="chat-send-btn">Send</button>
+            </div>
+        </div>
+
+        <!-- General AI Assistant: Training-wide, all selected Eurobot KBs -->
+        <div id="general-ai-wrapper" class="general-ai-wrapper hidden">
+            <div class="general-ai-panel module-assistant-panel">
+                <div class="general-ai-header">
+                    <div class="module-assistant-intro general-ai-intro">
+                        <span class="module-assistant-eyebrow">General AI assistant</span>
+                        <h3>Ask across all selected knowledge bases</h3>
+                        <p>This assistant uses the Training AI knowledge-base selection configured in the dashboard, not only the current module.</p>
+                    </div>
+                    <button id="general-ai-close" class="close-btn" type="button" title="Close AI assistant">&times;</button>
+                </div>
+                <div id="general-ai-history" class="module-assistant-history" aria-live="polite"></div>
+                <div id="general-ai-status" class="module-assistant-status" role="status"></div>
+                <div class="module-assistant-input-row general-ai-input-row">
+                    <textarea id="general-ai-input" class="module-assistant-input" rows="2" placeholder="Ask the general AI assistant..."></textarea>
+                    <button id="general-ai-voice" class="btn-open secondary" type="button">Record</button>
+                    <button id="general-ai-speak" class="btn-open secondary" type="button">Play</button>
+                    <button id="general-ai-send" class="btn-open" type="button">Send</button>
+                </div>
             </div>
         </div>
     </div>
@@ -308,7 +331,6 @@
             <button class="module-tab-btn" data-tab="docs">Documentos</button>
             <button class="module-tab-btn" data-tab="quiz">Quiz</button>
             <button class="module-tab-btn" data-tab="forum">Forum</button>
-            <button class="module-tab-btn" data-tab="assistant">Assistant</button>
             <button class="module-tab-btn" data-tab="reports">Reports</button>
         </div>
         <div class="sidebar-content">
@@ -356,21 +378,6 @@
             </div>
             <div id="module-tab-forum" class="tab-pane">
                 <div id="module-forum-container" class="forum-container"></div>
-            </div>
-            <div id="module-tab-assistant" class="tab-pane">
-                <div class="module-assistant-panel">
-                    <div class="module-assistant-intro">
-                        <span class="module-assistant-eyebrow">Module AI assistant</span>
-                        <h3>Ask AI about this module</h3>
-                        <p>Use this assistant to clarify concepts, summarize content, or get help with module activities.</p>
-                    </div>
-                    <div id="module-assistant-history" class="module-assistant-history" aria-live="polite"></div>
-                    <div id="module-assistant-status" class="module-assistant-status" role="status"></div>
-                    <div class="module-assistant-input-row">
-                        <textarea id="module-assistant-input" class="module-assistant-input" rows="2" placeholder="Ask a question about this module..."></textarea>
-                        <button id="module-assistant-send" class="btn-open" type="button">Send</button>
-                    </div>
-                </div>
             </div>
             <div id="module-tab-reports" class="tab-pane">
                 <div id="module-reports-container" class="reports-container"></div>
@@ -459,8 +466,8 @@
     </div>
 
     <!-- Main Logic -->
-    <script type="module" src="main.js?v=1.3.2"></script>
+    <script type="module" src="main.js?v=1.3.4"></script>
     <script src="course-world.js?v=1"></script>
-    <div style="position: fixed; bottom: 5px; right: 5px; font-size: 0.6rem; color: #475569; z-index: 1000; pointer-events: none;">v1.3.2</div>
+    <div style="position: fixed; bottom: 5px; right: 5px; font-size: 0.6rem; color: #475569; z-index: 1000; pointer-events: none;">v1.3.4</div>
 </body>
 </html>
