@@ -221,6 +221,7 @@ if (tabLogin && tabRegister) {
 let peer = null;
 let localStream = null;
 let currentCall = null;
+let activeRemoteStream = null;
 const peerIdToName = {};
 let callDurationInterval = null;
 let secondsElapsed = 0;
@@ -238,11 +239,18 @@ const incomingModal = document.getElementById('incoming-modal');
 const incomingCaller = document.getElementById('incoming-caller');
 const btnMute = document.getElementById('btn-mute');
 const btnCamera = document.getElementById('btn-camera'); // New
+const btnScreen = document.getElementById('btn-screen'); // New
+const btnExpand = document.getElementById('btn-expand'); // New
 const btnHangup = document.getElementById('btn-hangup');
 const btnAnswer = document.getElementById('btn-answer');
 const btnReject = document.getElementById('btn-reject');
 
-// Video Elements
+// Sidebar Elements
+const btnToggleAiAssistant = document.getElementById('btn-toggle-ai-assistant');
+const btnTogglePlayers = document.getElementById('btn-toggle-players');
+const btnToggleChat = document.getElementById('btn-toggle-chat');
+const btnToggleTheme = document.getElementById('btn-toggle-theme');
+
 const videoContainer = document.getElementById('video-container');
 const remoteVideo = document.getElementById('remote-video');
 const localVideo = document.getElementById('local-video');
@@ -274,8 +282,10 @@ function renderWorldOperationsSummary(summary) {
     if (!worldOperationsCard || !worldOperationsList || !summary?.counts) return;
 
     const hasPending = summary.counts.unread > 0 || summary.counts.totalPending > 0 || summary.counts.remindersOpen > 0;
-    worldOperationsCard.classList.toggle('hidden', !hasPending);
-    if (!hasPending) return;
+    if (!hasPending) {
+        worldOperationsCard.classList.add('hidden');
+        return;
+    }
 
     worldOperationsUnread.textContent = `${summary.counts.unread} unread`;
     worldOperationsUrgent.textContent = `${summary.counts.urgent} urgent`;
@@ -370,6 +380,29 @@ async function performJoin(token, user) {
     localProfilePicture = user?.profilePicture || null;
     localUserRole = user?.role || 'USER';
 
+    // Update Sidebar Profile Picture
+    const sidebarPic = document.getElementById('sidebar-profile-pic');
+    if (sidebarPic) {
+        let finalAvatarSrc = `https://ui-avatars.com/api/?name=${localUsername}&background=random`;
+        if (localProfilePicture) {
+            if (localProfilePicture.startsWith('http') || localProfilePicture.startsWith('data:')) {
+                finalAvatarSrc = localProfilePicture;
+            } else {
+                finalAvatarSrc = `${AUTH_API}${localProfilePicture}`;
+            }
+        }
+        sidebarPic.src = finalAvatarSrc;
+        
+        // Proper Dashboard route
+        sidebarPic.onclick = () => {
+            let dashboardUrl = AUTH_API.replace('/api', '') + '/dashboard.html';
+            if (!dashboardUrl || dashboardUrl.startsWith('/dashboard.html')) {
+                 dashboardUrl = '/dashboard.html';
+            }
+            window.open(dashboardUrl, '_blank');
+        };
+    }
+
     // Initialize socket with the received token
     // @ts-ignore
     socket = io({
@@ -398,7 +431,6 @@ async function performJoin(token, user) {
     // Initialize PeerJS for audio calls
     initPeer();
 
-    playerListContainer.classList.remove('hidden');
     updatePlayerList();
     await refreshWorldOperationsSummary();
     if (worldOperationsRefreshTimer) clearInterval(worldOperationsRefreshTimer);
@@ -577,6 +609,12 @@ function setupSocketListeners() {
             }
         }
         updatePlayerList();
+    });
+
+    socket.on('streamTypeChanged', (data) => {
+        if (remotePlayers[data.id]) {
+            remotePlayers[data.id].isScreenShare = data.isScreenShare;
+        }
     });
 
     socket.on('playerDisconnected', (id) => {
@@ -1390,53 +1428,9 @@ function applyCharacterColor(model, color) {
     });
 }
 
-function handleAnimationState(animObj, state, duration = 0.2, loop = true) {
-    if (!animObj.mixer || animObj.currentState === state) return;
-
-    // Restriction: This only handles 'idle' and 'walk' base states now.
-    // 'jump' and 'interact' are handled as overlays.
-    if (state !== 'idle' && state !== 'walk') return;
-
-    const nextAction = animObj.actions[state];
-    if (!nextAction) return;
-
-    if (animObj.currentAction) {
-        animObj.currentAction.fadeOut(duration);
-    }
-
-    nextAction.reset().fadeIn(duration).play();
-    nextAction.loop = loop ? THREE.LoopRepeat : THREE.LoopOnce;
-    nextAction.clampWhenFinished = !loop;
-
-    animObj.currentAction = nextAction;
-    animObj.currentState = state;
-}
-
-function triggerInteract(animObj, targetPoint = null) {
-    if (!animObj.mixer || !animObj.actions['interact']) return;
-
-    // Rotate to face the point if provided
-    if (targetPoint && animObj.mixer.getRoot().parent) {
-        const root = animObj.mixer.getRoot();
-        const parent = root.parent;
-        const dir = new THREE.Vector3().subVectors(targetPoint, parent.position);
-        parent.rotation.y = Math.atan2(dir.x, dir.z);
-    }
-
-    const action = animObj.actions['interact'];
-    action.reset();
-    action.setLoop(THREE.LoopOnce);
-    action.clampWhenFinished = false;
-    action.setEffectiveWeight(1);
-    action.play();
-}
-
 // --- Multiplayer & Player Setup ---
 const remotePlayers = {}; // Stores meshes and groups
 const gametags = {}; // Stores UI elements
-
-// Polyfill for legacy animation calls
-let playerAnims = { mixer: null, actions: {}, currentAction: null, currentState: 'idle' };
 
 const playerGroup = new THREE.Group();
 let characterMesh = null;
@@ -1469,7 +1463,8 @@ playerGroup.visible = false; // Hidden until join
 function createGametag(id, name, color, isLocal, profilePictureUrl = null) {
     const resolveAvatarSrc = (url) => {
         if (!url || typeof url !== 'string') return `https://ui-avatars.com/api/?name=${name}&background=random`;
-        return url.startsWith('http') ? url : `${AUTH_API}${url}`;
+        if (url.startsWith('http') || url.startsWith('data:')) return url;
+        return `${AUTH_API}${url}`;
     };
 
     if (gametags[id]) {
@@ -1495,6 +1490,46 @@ function createGametag(id, name, color, isLocal, profilePictureUrl = null) {
         element.addEventListener('click', (e) => {
             e.stopPropagation();
             openPlayerActionMenuForId(id, e);
+        });
+
+        // Gametag mini-webcam logic
+        const imgEl = element.querySelector('.gametag-avatar');
+        imgEl.style.cursor = 'pointer';
+        imgEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const player = remotePlayers[id];
+            
+            // Allow showing mini-video only if we are in a call, have a stream, and it's NOT a screen share
+            const isInCallWithPlayer = currentCall && currentCall.peer === player.peerId;
+            
+            if (isInCallWithPlayer && activeRemoteStream && !player.isScreenShare) {
+                // Check if video already exists
+                let videoEl = element.querySelector('.gametag-video');
+                if (videoEl) {
+                    // Toggle back to image
+                    videoEl.remove();
+                    imgEl.style.display = 'block';
+                } else {
+                    // Hide image and show video
+                    imgEl.style.display = 'none';
+                    videoEl = document.createElement('video');
+                    videoEl.className = 'gametag-video';
+                    videoEl.autoplay = true;
+                    videoEl.playsInline = true;
+                    videoEl.muted = true; // prevent double audio since we already have the call audio playing
+                    videoEl.style.width = '36px';
+                    videoEl.style.height = '36px';
+                    videoEl.style.borderRadius = '50%';
+                    videoEl.style.objectFit = 'cover';
+                    videoEl.style.border = `2px solid ${color || '#fff'}`;
+                    videoEl.style.boxShadow = '0 2px 4px rgba(0,0,0,0.5)';
+                    videoEl.srcObject = activeRemoteStream;
+                    imgEl.parentElement.insertBefore(videoEl, imgEl);
+                }
+            } else {
+                // If not available, maybe just trigger the menu anyway or do nothing
+                openPlayerActionMenuForId(id, e);
+            }
         });
 
         const callBtn = document.createElement('button');
@@ -1710,13 +1745,7 @@ function addOtherPlayer(playerInfo) {
         peerId: playerInfo.peerId || null, // FIX: Store PeerJS ID for audio calls
         // --- Interpolation Targets ---
         targetPosition: anchorGroup.position.clone(),
-        targetRotation: anchorGroup.rotation.clone(),
-        anims: {
-            mixer: null,
-            actions: {},
-            currentState: null,
-            currentAction: null
-        }
+        targetRotation: anchorGroup.rotation.clone()
     };
 
     createGametag(playerInfo.id, playerInfo.name, playerInfo.color, false, playerInfo.profilePicture);
@@ -1854,7 +1883,6 @@ window.addEventListener('keydown', (e) => {
 
     // Interact trigger
     if (key === 'e') {
-        triggerInteract(playerAnims);
         didInteractThisFrame = true;
     }
 });
@@ -2060,8 +2088,7 @@ document.getElementById('menu-catalog-models').addEventListener('click', () => {
             });
         }
 
-        // Trigger interact animation
-        triggerInteract(playerAnims, contextMenuPoint);
+        // Trigger interact
         didInteractThisFrame = true;
         // Object will appear when server confirms via 'modelAdded'
     });
@@ -2084,7 +2111,6 @@ menuCatalogStructs.onclick = () => {
             });
         }
 
-        triggerInteract(playerAnims, contextMenuPoint);
         didInteractThisFrame = true;
         catalogOverlay.classList.add('hidden'); // Explicitly hide after selection
         closeContextMenu();
@@ -2464,7 +2490,6 @@ window.addEventListener('mousedown', (event) => {
                         color: localUserColor
                     });
                 }
-                triggerInteract(playerAnims, contextMenuPoint);
                 didInteractThisFrame = true;
                 cancelPlacement();
                 event.stopImmediatePropagation();
@@ -2787,9 +2812,6 @@ function updatePlayer(delta) {
         }
 
         playerGroup.rotation.y = Math.atan2(moveX, moveZ);
-        handleAnimationState(playerAnims, 'walk');
-    } else {
-        handleAnimationState(playerAnims, 'idle');
     }
 
     // Camera follow
@@ -2801,7 +2823,7 @@ function updatePlayer(delta) {
 }
 
 let lastBroadcastTime = 0;
-const BROADCAST_INTERVAL = 1000 / 20; // 20Hz
+const BROADCAST_INTERVAL = 1000 / 40; // 40Hz para suavidade de movimento
 
 function broadcastMovement() {
     if (!socket) return;
@@ -2813,7 +2835,6 @@ function broadcastMovement() {
         const moveData = {
             position: { x: playerGroup.position.x, y: playerGroup.position.y, z: playerGroup.position.z },
             rotation: { x: playerGroup.rotation.x, y: playerGroup.rotation.y, z: playerGroup.rotation.z },
-            animation: playerAnims.currentState,
             isJumping: isJumping,
             jumpAlpha: isJumping ? Math.sin((jumpTime / JUMP_DURATION) * Math.PI) : 0,
             didInteract: didInteractThisFrame,
@@ -2890,25 +2911,20 @@ function animate() {
         // Update matrices first
         scene.updateMatrixWorld(true);
 
-        // Update local mixer
-        if (playerAnims && playerAnims.mixer) playerAnims.mixer.update(delta);
-
-        // Update remote players with interpolation (lers/slerp)
-        const LERP_SPEED = 0.2;
+        // Update remote players with time-based interpolation
+        const SMOOTHING_FACTOR = 8.0; // Diminuído para 8.0 para um "deslizamento" mais constante sem "teleporte"
+        const alpha = 1.0 - Math.exp(-SMOOTHING_FACTOR * delta);
+        
         for (const id in remotePlayers) {
             const p = remotePlayers[id];
 
             // Smooth Position
-            p.group.position.lerp(p.targetPosition, LERP_SPEED);
+            p.group.position.lerp(p.targetPosition, alpha);
 
-            // Smooth Rotation (Simple lerp for Y axis is usually enough for characters)
-            p.group.rotation.x = THREE.MathUtils.lerp(p.group.rotation.x, p.targetRotation.x, LERP_SPEED);
-            p.group.rotation.y = THREE.MathUtils.lerp(p.group.rotation.y, p.targetRotation.y, LERP_SPEED);
-            p.group.rotation.z = THREE.MathUtils.lerp(p.group.rotation.z, p.targetRotation.z, LERP_SPEED);
-
-            if (p.anims && p.anims.mixer) {
-                p.anims.mixer.update(delta);
-            }
+            // Smooth Rotation
+            p.group.rotation.x = THREE.MathUtils.lerp(p.group.rotation.x, p.targetRotation.x, alpha);
+            p.group.rotation.y = THREE.MathUtils.lerp(p.group.rotation.y, p.targetRotation.y, alpha);
+            p.group.rotation.z = THREE.MathUtils.lerp(p.group.rotation.z, p.targetRotation.z, alpha);
         }
 
         // Update placement mixers
@@ -3275,7 +3291,6 @@ menuPlaceModule.addEventListener('click', async () => {
             rotation: { x: 0, y: 0, z: 0 }
         });
 
-        triggerInteract(playerAnims, contextMenuPoint);
         didInteractThisFrame = true;
     } catch (err) {
         alert('Erro ao criar módulo interativo: ' + err.message);
@@ -3365,14 +3380,43 @@ const moduleGeneralShortcuts = document.getElementById('module-general-shortcuts
 const moduleGeneralAssets = document.getElementById('module-general-assets');
 const moduleTabBtns = document.querySelectorAll('.module-tab-btn');
 const tabPanes = document.querySelectorAll('.tab-pane');
+const moduleAssistantHistoryEl = document.getElementById('module-assistant-history');
+const moduleAssistantStatusEl = document.getElementById('module-assistant-status');
+const moduleAssistantInput = document.getElementById('module-assistant-input');
+const moduleAssistantSend = document.getElementById('module-assistant-send');
+const moduleAssistantVoice = document.getElementById('module-assistant-voice');
+const moduleAssistantSpeak = document.getElementById('module-assistant-speak');
+const generalAiWrapper = document.getElementById('general-ai-wrapper');
+const generalAiClose = document.getElementById('general-ai-close');
+const generalAiHistoryEl = document.getElementById('general-ai-history');
+const generalAiStatusEl = document.getElementById('general-ai-status');
+const generalAiInput = document.getElementById('general-ai-input');
+const generalAiSend = document.getElementById('general-ai-send');
+const generalAiVoice = document.getElementById('general-ai-voice');
+const generalAiSpeak = document.getElementById('general-ai-speak');
 
 let currentModuleId = null;
 let currentPlacementId = null;
 let currentCourseModuleId = null;
 let currentModulePayload = null;
 let currentModuleRuntimeState = null;
+let moduleAssistantLoading = false;
+let moduleAssistantRecorder = null;
+let moduleAssistantStream = null;
+let moduleAssistantChunks = [];
+let moduleAssistantLastAudio = null;
+const moduleAssistantHistories = new Map();
+let generalAiLoading = false;
+let generalAiRecorder = null;
+let generalAiStream = null;
+let generalAiChunks = [];
+let generalAiLastAudio = null;
+const generalAiHistory = [];
 
-btnCloseSidebar.onclick = () => moduleSidebar.classList.add('hidden');
+btnCloseSidebar.onclick = () => {
+    stopModuleAssistantRecording();
+    moduleSidebar.classList.add('hidden');
+};
 
 function activateModuleTab(tab) {
     moduleTabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
@@ -3382,6 +3426,481 @@ function activateModuleTab(tab) {
 moduleTabBtns.forEach(btn => {
     btn.onclick = () => activateModuleTab(btn.dataset.tab);
 });
+
+function getModuleAssistantHistoryKey() {
+    return currentCourseModuleId || currentModuleId || 'unselected-module';
+}
+
+function getCurrentModuleAssistantHistory() {
+    const key = getModuleAssistantHistoryKey();
+    if (!moduleAssistantHistories.has(key)) {
+        moduleAssistantHistories.set(key, []);
+    }
+    return moduleAssistantHistories.get(key);
+}
+
+function getLastModuleAssistantText() {
+    return [...getCurrentModuleAssistantHistory()].reverse().find((entry) => entry.role === 'assistant' && entry.content)?.content || '';
+}
+
+function stopModuleAssistantRecording() {
+    if (moduleAssistantRecorder && moduleAssistantRecorder.state === 'recording') {
+        moduleAssistantRecorder.stop();
+    }
+    if (moduleAssistantStream) {
+        moduleAssistantStream.getTracks().forEach(track => track.stop());
+        moduleAssistantStream = null;
+    }
+}
+
+function setModuleAssistantStatus(message = '', type = '') {
+    if (!moduleAssistantStatusEl) return;
+    moduleAssistantStatusEl.textContent = message;
+    moduleAssistantStatusEl.className = `module-assistant-status${type ? ` ${type}` : ''}`;
+}
+
+function updateModuleAssistantControls() {
+    if (moduleAssistantSend) {
+        moduleAssistantSend.disabled = moduleAssistantLoading || !currentModuleId;
+        moduleAssistantSend.innerText = moduleAssistantLoading ? 'Sending...' : 'Send';
+    }
+
+    if (moduleAssistantInput) {
+        moduleAssistantInput.disabled = moduleAssistantLoading || !currentModuleId;
+    }
+
+    if (moduleAssistantVoice) {
+        const isRecording = moduleAssistantRecorder && moduleAssistantRecorder.state === 'recording';
+        moduleAssistantVoice.disabled = moduleAssistantLoading || !currentModuleId;
+        moduleAssistantVoice.innerText = isRecording ? 'Stop' : 'Record';
+    }
+
+    if (moduleAssistantSpeak) {
+        moduleAssistantSpeak.disabled = !moduleAssistantLastAudio?.audioBase64 && !getLastModuleAssistantText();
+    }
+}
+
+function renderModuleAssistant() {
+    if (!moduleAssistantHistoryEl) return;
+
+    const history = getCurrentModuleAssistantHistory();
+    if (!history.length) {
+        moduleAssistantHistoryEl.innerHTML = `
+            <div class="module-assistant-empty">
+                Ask a question to start a module-specific AI conversation.
+            </div>
+        `;
+    } else {
+        moduleAssistantHistoryEl.innerHTML = history.map((entry) => {
+            const skippedFiles = Array.isArray(entry.skippedFiles) && entry.skippedFiles.length
+                ? `<div class="module-assistant-skipped">Skipped files: ${entry.skippedFiles.map(escapeWorldHtml).join(', ')}</div>`
+                : '';
+
+            return `
+                <div class="module-assistant-message ${entry.role === 'user' ? 'user' : 'assistant'}">
+                    <span>${entry.role === 'user' ? 'You' : 'AI'}</span>
+                    <p>${escapeWorldHtml(entry.content)}</p>
+                    ${skippedFiles}
+                </div>
+            `;
+        }).join('');
+        moduleAssistantHistoryEl.scrollTop = moduleAssistantHistoryEl.scrollHeight;
+    }
+
+    updateModuleAssistantControls();
+}
+
+async function sendModuleAssistantMessage() {
+    if (!moduleAssistantInput || moduleAssistantLoading || !currentModuleId) return;
+
+    const message = moduleAssistantInput.value.trim();
+    if (!message) return;
+
+    const history = getCurrentModuleAssistantHistory();
+    history.push({ role: 'user', content: message });
+    moduleAssistantInput.value = '';
+    moduleAssistantLoading = true;
+    setModuleAssistantStatus('AI is thinking...', 'loading');
+    renderModuleAssistant();
+
+    try {
+        const response = await fetch(`${AUTH_API}/api/ai/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                message,
+                moduleId: currentModuleId,
+                courseId: window.__courseWorldContext?.courseId || null,
+                courseModuleId: currentCourseModuleId || null,
+                returnAudio: false
+            })
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(result.error || result.message || 'Failed to get an assistant answer.');
+        }
+
+        history.push({
+            role: 'assistant',
+            content: result.answer || 'No answer returned.',
+            skippedFiles: result.skippedFiles
+        });
+        moduleAssistantLastAudio = result.audioBase64 ? result : null;
+        setModuleAssistantStatus('');
+    } catch (error) {
+        history.push({
+            role: 'assistant',
+            content: `Sorry, I could not answer right now. ${error.message}`
+        });
+        setModuleAssistantStatus(error.message, 'error');
+    } finally {
+        moduleAssistantLoading = false;
+        renderModuleAssistant();
+        if (moduleAssistantInput) moduleAssistantInput.focus();
+    }
+}
+
+if (moduleAssistantSend) {
+    moduleAssistantSend.addEventListener('click', sendModuleAssistantMessage);
+}
+
+if (moduleAssistantInput) {
+    moduleAssistantInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendModuleAssistantMessage();
+        }
+    });
+}
+
+async function transcribeModuleAssistantAudio(audioBlob) {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'module-assistant.webm');
+    setModuleAssistantStatus('Transcribing voice...', 'loading');
+    const response = await fetch(`${AUTH_API}/api/ai/transcribe`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` },
+        body: formData
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || 'Failed to transcribe audio.');
+    const text = String(payload.text || '').trim();
+    if (!text) throw new Error('Could not transcribe audio.');
+    if (moduleAssistantInput) moduleAssistantInput.value = text;
+    await sendModuleAssistantMessage();
+}
+
+async function toggleModuleAssistantVoice() {
+    if (moduleAssistantRecorder && moduleAssistantRecorder.state === 'recording') {
+        moduleAssistantRecorder.stop();
+        updateModuleAssistantControls();
+        return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        setModuleAssistantStatus('Voice recording is not available in this browser context.', 'error');
+        return;
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    moduleAssistantStream = stream;
+    moduleAssistantChunks = [];
+    try {
+        moduleAssistantRecorder = new MediaRecorder(stream);
+    } catch (error) {
+        stopModuleAssistantRecording();
+        throw error;
+    }
+    moduleAssistantRecorder.ondataavailable = (event) => {
+        if (event.data?.size) moduleAssistantChunks.push(event.data);
+    };
+    moduleAssistantRecorder.onstop = async () => {
+        if (moduleAssistantStream) {
+            moduleAssistantStream.getTracks().forEach(track => track.stop());
+            moduleAssistantStream = null;
+        }
+        updateModuleAssistantControls();
+        const audioBlob = new Blob(moduleAssistantChunks, { type: moduleAssistantRecorder.mimeType || 'audio/webm' });
+        if (!moduleAssistantChunks.length || !audioBlob.size) {
+            setModuleAssistantStatus('No audio was captured.', 'error');
+            return;
+        }
+        try {
+            await transcribeModuleAssistantAudio(audioBlob);
+        } catch (error) {
+            setModuleAssistantStatus(error.message, 'error');
+        }
+    };
+    moduleAssistantRecorder.start();
+    setModuleAssistantStatus('Recording... click Stop when finished.', 'loading');
+    updateModuleAssistantControls();
+}
+
+async function playModuleAssistantLastAnswer() {
+    if (!moduleAssistantLastAudio?.audioBase64) {
+        const history = getCurrentModuleAssistantHistory();
+        const lastAssistant = [...history].reverse().find((entry) => entry.role === 'assistant' && entry.content);
+        if (!lastAssistant) {
+            setModuleAssistantStatus('No spoken answer is available yet.', 'error');
+            return;
+        }
+        setModuleAssistantStatus('Generating speech...', 'loading');
+        const response = await fetch(`${AUTH_API}/api/ai/tts`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ text: lastAssistant.content })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || 'Failed to generate speech.');
+        moduleAssistantLastAudio = {
+            audioBase64: payload.audio_base64 || payload.audioBase64,
+            audioFormat: payload.audio_format || payload.audioFormat || 'mp3'
+        };
+    }
+    const audio = new Audio(`data:audio/${moduleAssistantLastAudio.audioFormat || 'mp3'};base64,${moduleAssistantLastAudio.audioBase64}`);
+    audio.play().catch((error) => setModuleAssistantStatus(error.message, 'error'));
+    setModuleAssistantStatus('');
+}
+
+if (moduleAssistantVoice) {
+    moduleAssistantVoice.addEventListener('click', () => {
+        toggleModuleAssistantVoice().catch((error) => setModuleAssistantStatus(error.message, 'error'));
+    });
+}
+
+if (moduleAssistantSpeak) {
+    moduleAssistantSpeak.addEventListener('click', () => {
+        playModuleAssistantLastAnswer().catch((error) => setModuleAssistantStatus(error.message, 'error'));
+    });
+}
+
+function stopGeneralAiRecording() {
+    if (generalAiRecorder && generalAiRecorder.state === 'recording') {
+        generalAiRecorder.stop();
+    }
+    if (generalAiStream) {
+        generalAiStream.getTracks().forEach(track => track.stop());
+        generalAiStream = null;
+    }
+}
+
+function setGeneralAiStatus(message = '', type = '') {
+    if (!generalAiStatusEl) return;
+    generalAiStatusEl.textContent = message;
+    generalAiStatusEl.className = `module-assistant-status${type ? ` ${type}` : ''}`;
+}
+
+function getLastGeneralAiText() {
+    return [...generalAiHistory].reverse().find((entry) => entry.role === 'assistant' && entry.content)?.content || '';
+}
+
+function updateGeneralAiControls() {
+    if (generalAiSend) {
+        generalAiSend.disabled = generalAiLoading;
+        generalAiSend.innerText = generalAiLoading ? 'Sending...' : 'Send';
+    }
+    if (generalAiInput) generalAiInput.disabled = generalAiLoading;
+    if (generalAiVoice) {
+        const isRecording = generalAiRecorder && generalAiRecorder.state === 'recording';
+        generalAiVoice.disabled = generalAiLoading;
+        generalAiVoice.innerText = isRecording ? 'Stop' : 'Record';
+    }
+    if (generalAiSpeak) {
+        generalAiSpeak.disabled = !generalAiLastAudio?.audioBase64 && !getLastGeneralAiText();
+    }
+}
+
+function renderGeneralAi() {
+    if (!generalAiHistoryEl) return;
+    if (!generalAiHistory.length) {
+        generalAiHistoryEl.innerHTML = `
+            <div class="module-assistant-empty">
+                Ask the general AI assistant anything about the Training knowledge bases. Voice input is supported with Record.
+            </div>
+        `;
+    } else {
+        generalAiHistoryEl.innerHTML = generalAiHistory.map((entry) => `
+            <div class="module-assistant-message ${entry.role === 'user' ? 'user' : 'assistant'}">
+                <span>${entry.role === 'user' ? 'You' : 'AI'}</span>
+                <p>${escapeWorldHtml(entry.content)}</p>
+            </div>
+        `).join('');
+        generalAiHistoryEl.scrollTop = generalAiHistoryEl.scrollHeight;
+    }
+    updateGeneralAiControls();
+}
+
+function openGeneralAiAssistant() {
+    if (!generalAiWrapper) return;
+    generalAiWrapper.classList.remove('hidden');
+    btnToggleAiAssistant?.classList.add('active');
+    renderGeneralAi();
+    setTimeout(() => generalAiInput?.focus(), 0);
+}
+
+function closeGeneralAiAssistant() {
+    stopGeneralAiRecording();
+    generalAiWrapper?.classList.add('hidden');
+    btnToggleAiAssistant?.classList.remove('active');
+}
+
+async function sendGeneralAiMessage() {
+    if (!generalAiInput || generalAiLoading) return;
+    const message = generalAiInput.value.trim();
+    if (!message) return;
+
+    generalAiHistory.push({ role: 'user', content: message });
+    generalAiInput.value = '';
+    generalAiLoading = true;
+    generalAiLastAudio = null;
+    setGeneralAiStatus('AI is thinking across the selected KBs...', 'loading');
+    renderGeneralAi();
+
+    try {
+        const response = await fetch(`${AUTH_API}/api/ai/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                message,
+                courseId: window.__courseWorldContext?.courseId || null,
+                conversationId: `training-general-ai-${window.__courseWorldContext?.courseId || 'world'}-${localUsername || 'user'}`,
+                returnAudio: false
+            })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || result.message || 'Failed to get an AI answer.');
+
+        generalAiHistory.push({ role: 'assistant', content: result.answer || 'No answer returned.' });
+        generalAiLastAudio = result.audioBase64 ? result : null;
+        setGeneralAiStatus('');
+    } catch (error) {
+        generalAiHistory.push({ role: 'assistant', content: `Sorry, I could not answer right now. ${error.message}` });
+        setGeneralAiStatus(error.message, 'error');
+    } finally {
+        generalAiLoading = false;
+        renderGeneralAi();
+        generalAiInput?.focus();
+    }
+}
+
+async function transcribeGeneralAiAudio(audioBlob) {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'general-ai.webm');
+    setGeneralAiStatus('Transcribing voice...', 'loading');
+    const response = await fetch(`${AUTH_API}/api/ai/transcribe`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` },
+        body: formData
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || 'Failed to transcribe audio.');
+    const text = String(payload.text || '').trim();
+    if (!text) throw new Error('Could not transcribe audio.');
+    if (generalAiInput) generalAiInput.value = text;
+    await sendGeneralAiMessage();
+}
+
+async function toggleGeneralAiVoice() {
+    if (generalAiRecorder && generalAiRecorder.state === 'recording') {
+        generalAiRecorder.stop();
+        updateGeneralAiControls();
+        return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        setGeneralAiStatus('Voice recording is not available in this browser context.', 'error');
+        return;
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    generalAiStream = stream;
+    generalAiChunks = [];
+    try {
+        generalAiRecorder = new MediaRecorder(stream);
+    } catch (error) {
+        stopGeneralAiRecording();
+        throw error;
+    }
+    generalAiRecorder.ondataavailable = (event) => {
+        if (event.data?.size) generalAiChunks.push(event.data);
+    };
+    generalAiRecorder.onstop = async () => {
+        if (generalAiStream) {
+            generalAiStream.getTracks().forEach(track => track.stop());
+            generalAiStream = null;
+        }
+        updateGeneralAiControls();
+        const audioBlob = new Blob(generalAiChunks, { type: generalAiRecorder.mimeType || 'audio/webm' });
+        if (!generalAiChunks.length || !audioBlob.size) {
+            setGeneralAiStatus('No audio was captured.', 'error');
+            return;
+        }
+        try {
+            await transcribeGeneralAiAudio(audioBlob);
+        } catch (error) {
+            setGeneralAiStatus(error.message, 'error');
+        }
+    };
+    generalAiRecorder.start();
+    setGeneralAiStatus('Recording... click Stop when finished.', 'loading');
+    updateGeneralAiControls();
+}
+
+async function playGeneralAiLastAnswer() {
+    if (!generalAiLastAudio?.audioBase64) {
+        const lastAssistant = [...generalAiHistory].reverse().find((entry) => entry.role === 'assistant' && entry.content);
+        if (!lastAssistant) {
+            setGeneralAiStatus('No spoken answer is available yet.', 'error');
+            return;
+        }
+        setGeneralAiStatus('Generating speech...', 'loading');
+        const response = await fetch(`${AUTH_API}/api/ai/tts`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ text: lastAssistant.content })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || 'Failed to generate speech.');
+        generalAiLastAudio = {
+            audioBase64: payload.audio_base64 || payload.audioBase64,
+            audioFormat: payload.audio_format || payload.audioFormat || 'mp3'
+        };
+    }
+    const audio = new Audio(`data:audio/${generalAiLastAudio.audioFormat || 'mp3'};base64,${generalAiLastAudio.audioBase64}`);
+    audio.play().catch((error) => setGeneralAiStatus(error.message, 'error'));
+    setGeneralAiStatus('');
+}
+
+btnToggleAiAssistant?.addEventListener('click', () => {
+    const isHidden = generalAiWrapper?.classList.contains('hidden');
+    if (isHidden) openGeneralAiAssistant();
+    else closeGeneralAiAssistant();
+});
+
+generalAiClose?.addEventListener('click', closeGeneralAiAssistant);
+generalAiSend?.addEventListener('click', sendGeneralAiMessage);
+generalAiInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendGeneralAiMessage();
+    }
+});
+generalAiVoice?.addEventListener('click', () => {
+    toggleGeneralAiVoice().catch((error) => setGeneralAiStatus(error.message, 'error'));
+});
+generalAiSpeak?.addEventListener('click', () => {
+    playGeneralAiLastAnswer().catch((error) => setGeneralAiStatus(error.message, 'error'));
+});
+renderGeneralAi();
 
 async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
     const isOwner = localUserRole === 'MASTER' || localUserRole === 'ADMIN';
@@ -3397,12 +3916,18 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
 
     currentModuleId = moduleId;
     currentPlacementId = placementId;
+    currentCourseModuleId = courseModuleId || null;
+    moduleAssistantLastAudio = null;
+    stopModuleAssistantRecording();
 
     // Reset UI
     moduleTitle.innerText = 'Carregando...';
     moduleDescription.innerText = '';
     if (moduleGeneralShortcuts) moduleGeneralShortcuts.innerHTML = '';
     if (moduleGeneralAssets) moduleGeneralAssets.innerHTML = '';
+    moduleAssistantLoading = false;
+    setModuleAssistantStatus('');
+    renderModuleAssistant();
     document.getElementById('sidebar-preview-banner').classList.remove('active');
     moduleSidebar.classList.remove('hidden');
     // Set default tab
@@ -3423,6 +3948,8 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
 
         if (!response.ok) throw new Error(module.error || 'Erro ao carregar módulo');
 
+        currentModulePayload = module;
+        currentModuleRuntimeState = getActiveCourseRuntimeModule(courseModuleId, moduleId);
         moduleTitle.innerText = module.title;
         moduleDescription.innerText = module.description || 'Sem descrição.';
 
@@ -3556,22 +4083,123 @@ function classifyModuleDocument(doc) {
 }
 
 function trackModuleVideoProgress(videoId) {
-    fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${videoId}/progress`, {
+    return fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${videoId}/progress`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
-    }).catch(() => { });
+    }).catch(() => null);
 }
 
 function trackModuleDocumentDownload(doc) {
-    fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${doc.id}/download`, {
+    return fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${doc.id}/download`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
-    }).catch(() => { });
+    }).catch(() => null);
+}
+
+function getModuleMaterialGroups(module = currentModulePayload) {
+    return {
+        videos: Array.isArray(module?.videos) ? module.videos : [],
+        documents: Array.isArray(module?.documents) ? module.documents : [],
+        quizzes: Array.isArray(module?.quizzes) ? module.quizzes : []
+    };
+}
+
+function getModuleMaterialItems(module = currentModulePayload) {
+    const { videos, documents, quizzes } = getModuleMaterialGroups(module);
+    return [
+        ...videos.map(item => ({ type: 'video', id: item.id, title: item.title || 'Untitled video', viewed: Boolean(item.viewed || item.completed || Number(item.progress || 0) >= 80), source: item })),
+        ...documents.map(item => ({ type: 'document', id: item.id, title: item.title || 'Untitled document', viewed: Boolean(item.viewed), source: item })),
+        ...quizzes.map(item => ({ type: 'quiz', id: item.id, title: item.title || 'Module quiz', viewed: Boolean(item.submitted), bestScore: item.bestScore, source: item }))
+    ];
+}
+
+function refreshModuleProgressSurfaces() {
+    if (!currentModulePayload) return;
+    renderModuleGeneral(currentModulePayload);
+    renderModuleVideos(currentModulePayload.videos || []);
+    renderModuleDocs(currentModulePayload.documents || []);
+    renderModuleQuiz(currentModulePayload.quizzes || []);
+}
+
+async function maybeAutoCompleteCurrentCourseModule() {
+    if (!COURSE_ID_FROM_URL || !currentModuleId || !currentModulePayload) return;
+    const materials = getModuleMaterialItems(currentModulePayload);
+    if (!materials.length || materials.some(item => !item.viewed)) return;
+    currentModuleRuntimeState = getActiveCourseRuntimeModule();
+    if (currentModuleRuntimeState?.completed) return;
+    if (currentModuleRuntimeState && currentModuleRuntimeState.canMarkComplete === false) return;
+
+    try {
+        const response = await fetch(`${AUTH_API}/courses/${COURSE_ID_FROM_URL}/modules/${currentModuleId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
+        });
+        if (!response.ok) return;
+        await refreshCourseWorldRuntime();
+        currentModuleRuntimeState = getActiveCourseRuntimeModule();
+        refreshModuleProgressSurfaces();
+    } catch (error) {
+        console.warn('Could not auto-complete course module:', error);
+    }
+}
+
+function markModuleMaterialViewed(type, id, extra = {}) {
+    if (!currentModulePayload) return;
+    const groups = getModuleMaterialGroups(currentModulePayload);
+    const itemsByType = { video: groups.videos, document: groups.documents, quiz: groups.quizzes };
+    const item = (itemsByType[type] || []).find(entry => Number(entry.id) === Number(id));
+    if (!item) return;
+    item.viewed = true;
+    if (type === 'video') {
+        item.completed = true;
+        item.progress = Math.max(Number(item.progress || 0), 100);
+    }
+    if (type === 'quiz') {
+        item.submitted = true;
+        if (extra.bestScore !== undefined && extra.bestScore !== null) {
+            const nextScore = Number(extra.bestScore);
+            item.bestScore = item.bestScore === null || item.bestScore === undefined ? nextScore : Math.max(Number(item.bestScore || 0), nextScore);
+        }
+    }
+    refreshModuleProgressSurfaces();
+    maybeAutoCompleteCurrentCourseModule();
+}
+
+function buildViewedStatusPill(viewed) {
+    return `<span style="font-size:0.76rem; border-radius:999px; padding:0.24rem 0.55rem; color:${viewed ? '#86efac' : '#94a3b8'}; border:1px solid ${viewed ? 'rgba(52,211,153,0.35)' : 'rgba(148,163,184,0.22)'}; background:${viewed ? 'rgba(16,185,129,0.14)' : 'rgba(148,163,184,0.08)'}; white-space:nowrap;">${viewed ? 'Visualizado' : 'Not viewed'}</span>`;
+}
+
+function buildModuleMaterialProgressSection(module = currentModulePayload) {
+    const items = getModuleMaterialItems(module);
+    if (!items.length) return null;
+    const viewedCount = items.filter(item => item.viewed).length;
+    const section = buildModuleGeneralSection(
+        'Materials / Progress',
+        `${viewedCount}/${items.length} visualized`,
+        items.map((item) => ({
+            label: item.type === 'video' ? 'Video' : item.type === 'document' ? 'Material' : 'Quiz',
+            accent: item.viewed ? '#34d399' : '#94a3b8',
+            title: item.title,
+            caption: `${item.viewed ? '✓ Visualizado' : '○ Not viewed'}${item.type === 'quiz' && item.bestScore !== null && item.bestScore !== undefined ? ` · Best ${Number(item.bestScore).toFixed(1)}%` : ''}`,
+            actionLabel: item.type === 'video' ? 'Open' : item.type === 'document' ? 'Open' : 'Go to quiz',
+            onClick: () => {
+                if (item.type === 'video') openModuleVideoAsset(item.source);
+                else if (item.type === 'document') openModuleDocumentAsset(item.source);
+                else activateModuleTab('quiz');
+            }
+        })),
+        viewedCount === items.length ? 'Complete' : 'In progress',
+        () => {}
+    );
+    section.style.borderColor = viewedCount === items.length ? 'rgba(52,211,153,0.24)' : 'rgba(255,255,255,0.08)';
+    section.style.background = viewedCount === items.length ? 'rgba(16,185,129,0.08)' : 'rgba(15,23,42,0.45)';
+    return section;
 }
 
 function previewModuleImageDocument(doc) {
@@ -3596,25 +4224,30 @@ function openModuleDocumentAsset(doc) {
     const docMeta = classifyModuleDocument(doc);
     if (docMeta.kind === 'img') {
         previewModuleImageDocument(doc);
+        markModuleMaterialViewed('document', doc.id);
+        trackModuleDocumentDownload(doc).then(() => markModuleMaterialViewed('document', doc.id));
         return;
     }
 
     window.open(getModuleDocumentUrl(doc), '_blank', 'noopener');
-    trackModuleDocumentDownload(doc);
+    markModuleMaterialViewed('document', doc.id);
+    trackModuleDocumentDownload(doc).then(() => markModuleMaterialViewed('document', doc.id));
 }
 
 function downloadModuleDocumentAsset(doc) {
     window.downloadSharedAsset(doc.documentId || doc.id, doc.title);
-    trackModuleDocumentDownload(doc);
+    markModuleMaterialViewed('document', doc.id);
+    trackModuleDocumentDownload(doc).then(() => markModuleMaterialViewed('document', doc.id));
 }
 
 function openModuleVideoAsset(video) {
     playModuleVideo(video);
-    trackModuleVideoProgress(video.id);
+    markModuleMaterialViewed('video', video.id);
+    trackModuleVideoProgress(video.id).then(() => markModuleMaterialViewed('video', video.id));
 }
 
 function openModuleForumFromSidebar() {
-    window.open(`${AUTH_API.replace('api', '')}`, '_blank');
+    activateModuleTab('forum');
 }
 
 function openModuleReportsFromSidebar() {
@@ -3739,6 +4372,8 @@ function renderModuleGeneral(module) {
         });
 
     const sections = [];
+    const progressSection = buildModuleMaterialProgressSection(module);
+    if (progressSection) sections.push(progressSection);
 
     if (videos.length) {
         sections.push(buildModuleGeneralSection(
@@ -3868,6 +4503,10 @@ function renderModuleVideos(videos) {
         titleTop.style.fontSize = '1.1rem';
         titleTop.style.color = '#fff';
 
+        const videoViewed = Boolean(v.viewed || v.completed || Number(v.progress || 0) >= 80);
+        const statusPill = document.createElement('div');
+        statusPill.innerHTML = buildViewedStatusPill(videoViewed);
+
         const thumb = document.createElement('div');
         thumb.style.width = '100%';
         thumb.style.height = '200px'; // Slightly taller
@@ -3922,19 +4561,10 @@ function renderModuleVideos(videos) {
         thumb.appendChild(playIcon);
 
         card.appendChild(titleTop);
+        card.appendChild(statusPill);
         card.appendChild(thumb);
 
-        card.onclick = () => {
-            playModuleVideo(v);
-            fetch(`${AUTH_API}/modules/${currentModuleId}/videos/${v.id}/progress`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
-            }).catch(()=>{});
-        };
+        card.onclick = () => openModuleVideoAsset(v);
         
         grid.appendChild(card);
     });
@@ -4049,17 +4679,11 @@ function renderModuleDocs(docs) {
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="color: #ff4444; font-weight:bold;">📄 PDF</span>
                     <span>${d.title}</span>
+                    ${buildViewedStatusPill(Boolean(d.viewed))}
                 </div>
                 <button class="btn-sm" style="background: var(--primary); color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Download</button>
             `;
-            li.querySelector('button').onclick = () => {
-                window.downloadSharedAsset(d.documentId || d.id, d.title);
-                fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${d.id}/download`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-                    body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
-                });
-            };
+            li.querySelector('button').onclick = () => downloadModuleDocumentAsset(d);
             pdfList.appendChild(li);
         } else if (isWord) {
             const li = document.createElement('li');
@@ -4073,17 +4697,11 @@ function renderModuleDocs(docs) {
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="color: #4488ff; font-weight:bold;">📝 Word</span>
                     <span>${d.title}</span>
+                    ${buildViewedStatusPill(Boolean(d.viewed))}
                 </div>
                 <button class="btn-sm" style="background: var(--primary); color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;">Download</button>
             `;
-            li.querySelector('button').onclick = () => {
-                window.downloadSharedAsset(d.documentId || d.id, d.title);
-                fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${d.id}/download`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-                    body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
-                });
-            };
+            li.querySelector('button').onclick = () => downloadModuleDocumentAsset(d);
             wordList.appendChild(li);
         } else if (isImg) {
             const card = document.createElement('div');
@@ -4120,10 +4738,17 @@ function renderModuleDocs(docs) {
             name.style.textOverflow = 'ellipsis';
             name.innerText = d.title;
 
+            const status = document.createElement('div');
+            status.style.marginTop = '0.35rem';
+            status.style.textAlign = 'center';
+            status.innerHTML = buildViewedStatusPill(Boolean(d.viewed));
             card.appendChild(thumb);
             card.appendChild(name);
+            card.appendChild(status);
 
             card.onclick = () => {
+                markModuleMaterialViewed('document', d.id);
+                trackModuleDocumentDownload(d).then(() => markModuleMaterialViewed('document', d.id));
                 previewContent.innerHTML = '';
                 const fullImg = document.createElement('img');
                 fullImg.src = `${AUTH_API}/api/documents/download/${d.documentId || d.id}`;
@@ -4217,6 +4842,9 @@ function renderModuleQuiz(quizzes) {
                     });
                     const result = await res.json();
                     if (!res.ok) throw new Error(result.error || 'Erro ao enviar');
+                    markModuleMaterialViewed('quiz', quiz.id, { bestScore: result.score });
+                    updateRuntimeModuleFromQuizSubmission(result.score);
+                    await refreshCourseWorldRuntime();
                     alert(`Quiz "${quiz.title}" enviado! Sua nota parcial: ${result.score.toFixed(1)}%`);
                 } catch (err) {
                     alert('Erro ao enviar quiz: ' + err.message);
@@ -4231,16 +4859,200 @@ function renderModuleQuiz(quizzes) {
     });
 }
 
-function renderModuleForum(moduleId) {
-    const container = document.getElementById('module-forum-container');
-    if (!container) return;
+function buildForumQueryString() {
+    const params = new URLSearchParams();
+    if (COURSE_ID_FROM_URL) params.set('courseId', COURSE_ID_FROM_URL);
+    return params.toString() ? `?${params.toString()}` : '';
+}
+
+async function fetchModuleForumThreads(moduleId) {
+    const response = await fetch(`${AUTH_API}/modules/${moduleId}/forum/threads${buildForumQueryString()}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const payload = await response.json().catch(() => []);
+    if (!response.ok) throw new Error(payload.error || 'Failed to load forum threads.');
+    return Array.isArray(payload) ? payload : [];
+}
+
+function renderForumThreadList(container, moduleId, threads) {
+    const threadList = threads.length
+        ? threads.map((thread) => `
+            <button class="forum-thread-card" type="button" onclick="openModuleForumThread(${Number(thread.id)})">
+                <div>
+                    <strong>${escapeWorldHtml(thread.title || 'Untitled discussion')}</strong>
+                    <p>${escapeWorldHtml(thread.content || '').slice(0, 140)}${String(thread.content || '').length > 140 ? '…' : ''}</p>
+                    <span>${escapeWorldHtml(thread.user?.username || 'User')} • ${Number(thread._count?.replies || 0)} repl${Number(thread._count?.replies || 0) === 1 ? 'y' : 'ies'}</span>
+                </div>
+            </button>
+        `).join('')
+        : '<div class="forum-empty-state">No discussions yet. Start the first one for this module.</div>';
+
     container.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px;">
-            <p style="color: #94a3b8; margin-bottom: 20px;">Participe das discussões deste módulo.</p>
-            <button class="upload-btn" onclick="window.open('${AUTH_API.replace('api', '')}', '_blank')">Abrir Fórum</button>
+        <div class="module-forum-panel">
+            <div class="forum-header-row">
+                <div>
+                    <h3>Module Forum</h3>
+                    <p>Discuss this module with learners and tutors.</p>
+                </div>
+                <button class="upload-btn forum-new-thread-btn" type="button" onclick="showModuleForumNewThread(${Number(moduleId)})">+ New discussion</button>
+            </div>
+            <div id="module-forum-compose" class="forum-compose hidden"></div>
+            <div class="forum-thread-list">${threadList}</div>
         </div>
     `;
 }
+
+async function renderModuleForum(moduleId) {
+    const container = document.getElementById('module-forum-container');
+    if (!container) return;
+    if (!moduleId) {
+        container.innerHTML = '<div class="forum-empty-state">Open a module to view its forum.</div>';
+        return;
+    }
+
+    container.innerHTML = '<div class="forum-empty-state"><i class="fas fa-spinner fa-spin"></i> Loading forum...</div>';
+    try {
+        const threads = await fetchModuleForumThreads(moduleId);
+        renderForumThreadList(container, moduleId, threads);
+    } catch (error) {
+        container.innerHTML = `
+            <div class="forum-empty-state forum-error-state">
+                <strong>Forum unavailable</strong>
+                <p>${escapeWorldHtml(error.message)}</p>
+                <button class="upload-btn" type="button" onclick="renderModuleForum(${Number(moduleId)})">Try again</button>
+            </div>
+        `;
+    }
+}
+
+function showModuleForumNewThread(moduleId = currentModuleId) {
+    const compose = document.getElementById('module-forum-compose');
+    if (!compose) return;
+    compose.classList.remove('hidden');
+    compose.innerHTML = `
+        <div class="forum-compose-card">
+            <label>Discussion title</label>
+            <input id="forum-thread-title" type="text" placeholder="What should we discuss?">
+            <label>Message</label>
+            <textarea id="forum-thread-content" rows="4" placeholder="Write the first message..."></textarea>
+            <div class="forum-compose-actions">
+                <button class="upload-btn" type="button" onclick="createModuleForumThread(${Number(moduleId)})">Post discussion</button>
+                <button class="upload-btn forum-secondary-btn" type="button" onclick="document.getElementById('module-forum-compose').classList.add('hidden')">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.getElementById('forum-thread-title')?.focus();
+}
+
+async function createModuleForumThread(moduleId = currentModuleId) {
+    const titleInput = document.getElementById('forum-thread-title');
+    const contentInput = document.getElementById('forum-thread-content');
+    const title = titleInput?.value.trim();
+    const content = contentInput?.value.trim();
+    if (!title || !content) {
+        alert('Please enter a title and message.');
+        return;
+    }
+
+    const response = await fetch(`${AUTH_API}/modules/${moduleId}/forum/threads`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ title, content, courseId: COURSE_ID_FROM_URL || undefined })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        alert(payload.error || 'Failed to create discussion.');
+        return;
+    }
+
+    await renderModuleForum(moduleId);
+    await openModuleForumThread(payload.id);
+}
+
+async function openModuleForumThread(threadId) {
+    const container = document.getElementById('module-forum-container');
+    if (!container) return;
+    container.innerHTML = '<div class="forum-empty-state"><i class="fas fa-spinner fa-spin"></i> Loading discussion...</div>';
+
+    try {
+        const response = await fetch(`${AUTH_API}/forum/threads/${threadId}${buildForumQueryString()}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const thread = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(thread.error || 'Failed to load discussion.');
+
+        const replies = (thread.replies || []).map((reply) => `
+            <div class="forum-reply-card">
+                <strong>${escapeWorldHtml(reply.user?.username || 'User')}</strong>
+                <p>${escapeWorldHtml(reply.content || '')}</p>
+            </div>
+        `).join('');
+
+        container.innerHTML = `
+            <div class="module-forum-panel">
+                <button class="forum-back-btn" type="button" onclick="renderModuleForum(${Number(thread.moduleId || currentModuleId)})">← Back to discussions</button>
+                <article class="forum-thread-detail">
+                    <h3>${escapeWorldHtml(thread.title || 'Discussion')}</h3>
+                    <span>${escapeWorldHtml(thread.user?.username || 'User')}</span>
+                    <p>${escapeWorldHtml(thread.content || '')}</p>
+                </article>
+                <div class="forum-replies-list">
+                    <h4>Replies</h4>
+                    ${replies || '<div class="forum-empty-state">No replies yet.</div>'}
+                </div>
+                <div class="forum-compose-card">
+                    <label>Add a reply</label>
+                    <textarea id="forum-reply-content" rows="3" placeholder="Write a reply..."></textarea>
+                    <div class="forum-compose-actions">
+                        <button class="upload-btn" type="button" onclick="createModuleForumReply(${Number(thread.id)})">Post reply</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        container.innerHTML = `
+            <div class="forum-empty-state forum-error-state">
+                <strong>Could not load discussion</strong>
+                <p>${escapeWorldHtml(error.message)}</p>
+                <button class="upload-btn" type="button" onclick="renderModuleForum(${Number(currentModuleId)})">Back to forum</button>
+            </div>
+        `;
+    }
+}
+
+async function createModuleForumReply(threadId) {
+    const textarea = document.getElementById('forum-reply-content');
+    const content = textarea?.value.trim();
+    if (!content) {
+        alert('Please write a reply first.');
+        return;
+    }
+
+    const response = await fetch(`${AUTH_API}/forum/threads/${threadId}/replies`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ content, courseId: COURSE_ID_FROM_URL || undefined })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        alert(payload.error || 'Failed to post reply.');
+        return;
+    }
+
+    await openModuleForumThread(threadId);
+}
+
+window.renderModuleForum = renderModuleForum;
+window.showModuleForumNewThread = showModuleForumNewThread;
+window.createModuleForumThread = createModuleForumThread;
+window.openModuleForumThread = openModuleForumThread;
+window.createModuleForumReply = createModuleForumReply;
 
 function renderModuleReports(module) {
     const container = document.getElementById('module-reports-container');
@@ -4349,6 +5161,9 @@ async function openModuleSidebarLegacy(placementId, moduleId, courseModuleId = n
     moduleDescription.innerText = '';
     if (moduleGeneralShortcuts) moduleGeneralShortcuts.innerHTML = '';
     if (moduleGeneralAssets) moduleGeneralAssets.innerHTML = '';
+    moduleAssistantLoading = false;
+    setModuleAssistantStatus('');
+    renderModuleAssistant();
     document.getElementById('sidebar-preview-banner').classList.remove('active');
     moduleSidebar.classList.remove('hidden');
     activateModuleTab('general');
@@ -4660,6 +5475,7 @@ function setupCallListeners(call) {
 
         if (hasVideo) {
             videoContainer.classList.remove('hidden');
+            activeRemoteStream = remoteStream;
             remoteVideo.srcObject = remoteStream;
             remoteVideo.play().catch(e => console.warn(e));
         } else {
@@ -4722,6 +5538,7 @@ function resetAudioUI() {
 
     remoteAudio.srcObject = null;
     remoteVideo.srcObject = null;
+    activeRemoteStream = null;
 
     // Stop local video track but keep audio for future calls if needed
     // or just leave it if we want users to "stay ready"
@@ -4778,6 +5595,7 @@ btnCamera.onclick = async () => {
                 localVideo.srcObject = localStream;
                 btnCamera.classList.add('active');
                 videoContainer.classList.remove('hidden');
+                if (socket) socket.emit('setStreamType', { isScreenShare: false });
 
                 if (currentCall && currentCall.peerConnection) {
                     const senders = currentCall.peerConnection.getSenders();
@@ -4800,6 +5618,176 @@ btnCamera.onclick = async () => {
         if (!remoteHasVideo) videoContainer.classList.add('hidden');
     }
 };
+
+// Screen Sharing Logic
+let screenStream = null;
+
+btnScreen.onclick = async () => {
+    if (!screenStream) {
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+            const newTrack = screenStream.getVideoTracks()[0];
+
+            newTrack.onended = () => {
+                stopScreenShare();
+            };
+
+            // Switch track
+            const currentVideoTrack = localStream.getVideoTracks()[0];
+            if (currentVideoTrack) {
+                localStream.removeTrack(currentVideoTrack);
+                currentVideoTrack.enabled = false; // Disable camera visually
+            }
+            localStream.addTrack(newTrack);
+            localVideo.srcObject = localStream;
+            btnScreen.classList.add('active');
+            btnCamera.classList.remove('active');
+            videoContainer.classList.remove('hidden');
+            if (socket) socket.emit('setStreamType', { isScreenShare: true });
+
+            if (currentCall && currentCall.peerConnection) {
+                const senders = currentCall.peerConnection.getSenders();
+                const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                if (videoSender) {
+                    videoSender.replaceTrack(newTrack);
+                } else {
+                    currentCall.peerConnection.addTrack(newTrack, localStream);
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    } else {
+        stopScreenShare();
+    }
+};
+
+async function stopScreenShare() {
+    if (screenStream) {
+        screenStream.getTracks().forEach(t => t.stop());
+        screenStream = null;
+    }
+    btnScreen.classList.remove('active');
+    if (socket) socket.emit('setStreamType', { isScreenShare: false });
+    
+    // Remove screen track
+    const currentVideoTrack = localStream.getVideoTracks()[0];
+    if (currentVideoTrack) {
+        localStream.removeTrack(currentVideoTrack);
+    }
+    
+    // Try to restore the camera automatically
+    try {
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newTrack = tempStream.getVideoTracks()[0];
+        localStream.addTrack(newTrack);
+        localVideo.srcObject = localStream;
+        btnCamera.classList.add('active');
+        videoContainer.classList.remove('hidden');
+        
+        if (currentCall && currentCall.peerConnection) {
+            const senders = currentCall.peerConnection.getSenders();
+            const sender = senders.find(s => s.track && s.track.kind === 'video');
+            if (sender) {
+                sender.replaceTrack(newTrack);
+            }
+        }
+    } catch (err) {
+        console.warn('Could not restore camera after screen share', err);
+        videoContainer.classList.add('hidden');
+    }
+    
+    // Reset any expanded state
+    audioCallLayer.classList.remove('expanded');
+    audioCallLayer.classList.remove('expanded-screen');
+    btnExpand.innerText = '⛶';
+    const column = document.getElementById('left-ui-column');
+    if (column) column.style.zIndex = '1100';
+    
+    // Call the camera logic to re-enable it if needed, or just let user click camera again
+    // For now, let's just leave it blank or simulate camera click to turn it back on
+    btnCamera.classList.remove('active');
+    localVideo.srcObject = localStream;
+    
+    if (currentCall && currentCall.peerConnection) {
+        const senders = currentCall.peerConnection.getSenders();
+        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+        if (videoSender) {
+            // Replace with dummy or stop video for remote
+             const canvas = document.createElement('canvas');
+             canvas.width = 1; canvas.height = 1;
+             const dummyStream = canvas.captureStream();
+             videoSender.replaceTrack(dummyStream.getVideoTracks()[0]);
+        }
+    }
+}
+
+// Expand Video UI Logic
+btnExpand.onclick = () => {
+    // Check if the local user is sharing OR if the remote peer is sharing
+    let isScreenShare = false;
+    
+    if (screenStream) {
+        // If I am sharing my screen, I want to expand my own screen share fully
+        isScreenShare = true;
+    } else if (currentCall) {
+        const peerId = currentCall.peer;
+        const remotePlayer = Object.values(remotePlayers).find(p => p.peerId === peerId);
+        if (remotePlayer && remotePlayer.isScreenShare) {
+            isScreenShare = true;
+        }
+    }
+
+    const column = document.getElementById('left-ui-column');
+    let isExpandedNow = false;
+
+    if (isScreenShare) {
+        isExpandedNow = audioCallLayer.classList.toggle('expanded-screen');
+        audioCallLayer.classList.remove('expanded'); // ensure webcam expand is off
+        btnExpand.innerText = isExpandedNow ? '🗗' : '⛶';
+    } else {
+        isExpandedNow = audioCallLayer.classList.toggle('expanded');
+        audioCallLayer.classList.remove('expanded-screen'); // ensure screen expand is off
+        btnExpand.innerText = isExpandedNow ? '🗗' : '⛶';
+    }
+
+    // Elevate the parent container z-index to overlap course headers (z-index 1200+)
+    if (column) {
+        column.style.zIndex = isExpandedNow ? '9999' : '1100';
+    }
+};
+
+// Sidebar Toggle Logic
+if (btnTogglePlayers) {
+    btnTogglePlayers.onclick = () => {
+        const isHidden = playerListContainer.classList.toggle('hidden');
+        btnTogglePlayers.classList.toggle('active', !isHidden);
+    };
+}
+
+if (btnToggleChat) {
+    btnToggleChat.onclick = () => {
+        const isHidden = chatHistoryContainer.classList.toggle('hidden');
+        document.getElementById('chat-input-container').classList.toggle('hidden', isHidden);
+        btnToggleChat.classList.toggle('active', !isHidden);
+    };
+}
+
+// Theme Toggle Logic
+if (btnToggleTheme) {
+    btnToggleTheme.onclick = () => {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        if (isLight) {
+            document.documentElement.removeAttribute('data-theme');
+            btnToggleTheme.innerText = '☀️';
+            btnToggleTheme.classList.remove('active');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+            btnToggleTheme.innerText = '🌙';
+            btnToggleTheme.classList.add('active');
+        }
+    };
+}
 
 // --- Player Interaction Menu & Asset Modal ---
 
