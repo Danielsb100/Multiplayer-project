@@ -2267,6 +2267,77 @@ body.course-world-mode #audio-call-layer {
     font-size: 0.85rem;
 }
 
+#world-ai-tips-card {
+    top: 12rem;
+}
+
+#world-ai-tips-card .close-btn {
+    background: transparent;
+    border: 0;
+    color: var(--text-secondary);
+    font-size: 1.3rem;
+    cursor: pointer;
+}
+
+.world-ai-tips-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.85rem;
+}
+
+#world-ai-tips-refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 34px;
+    padding: 0.45rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid rgba(96, 165, 250, 0.35);
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(14, 165, 233, 0.14));
+    color: #dbeafe;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+#world-ai-tips-refresh::before {
+    content: '↻';
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+#world-ai-tips-refresh:hover {
+    transform: translateY(-1px);
+    border-color: rgba(147, 197, 253, 0.62);
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.32), rgba(14, 165, 233, 0.2));
+    box-shadow: 0 14px 30px rgba(37, 99, 235, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+#world-ai-tips-refresh:active {
+    transform: translateY(0);
+}
+
+.world-ai-tip-meta {
+    display: inline-block;
+    margin-top: 0.35rem;
+    font-size: 0.72rem;
+    color: #93c5fd;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+@media (max-width: 900px) {
+    #world-ai-tips-card {
+        top: auto;
+        bottom: 1rem;
+    }
+}
+
 @media (max-width: 900px) {
     .world-operations-card {
         top: auto;

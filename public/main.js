@@ -247,6 +247,7 @@ const btnReject = document.getElementById('btn-reject');
 
 // Sidebar Elements
 const btnToggleAiAssistant = document.getElementById('btn-toggle-ai-assistant');
+const btnToggleAiTips = document.getElementById('btn-toggle-ai-tips');
 const btnTogglePlayers = document.getElementById('btn-toggle-players');
 const btnToggleChat = document.getElementById('btn-toggle-chat');
 const btnToggleTheme = document.getElementById('btn-toggle-theme');
@@ -263,6 +264,12 @@ const worldOperationsUnread = document.getElementById('world-operations-unread')
 const worldOperationsUrgent = document.getElementById('world-operations-urgent');
 const worldOperationsList = document.getElementById('world-operations-list');
 const worldOperationsLink = document.getElementById('world-operations-link');
+const worldAiTipsCard = document.getElementById('world-ai-tips-card');
+const worldAiTipsList = document.getElementById('world-ai-tips-list');
+const worldAiTipsTotal = document.getElementById('world-ai-tips-total');
+const worldAiTipsAttention = document.getElementById('world-ai-tips-attention');
+const worldAiTipsClose = document.getElementById('world-ai-tips-close');
+const worldAiTipsRefresh = document.getElementById('world-ai-tips-refresh');
 let worldOperationsRefreshTimer = null;
 
 function isOverUI(event) {
@@ -321,16 +328,78 @@ async function refreshWorldOperationsSummary() {
                 Authorization: `Bearer ${authToken}`
             }
         });
-
-        const result = await response.json();
-        if (!response.ok) {
-            throw new Error(result.error || 'Failed to load operational summary');
-        }
-
-        renderWorldOperationsSummary(result);
+        if (!response.ok) return;
+        const summary = await response.json();
+        renderWorldOperationsSummary(summary);
     } catch (error) {
-        console.error('Failed to refresh world operations summary:', error);
+        console.warn('Could not load world operations summary:', error);
     }
+}
+
+function renderWorldAiTips(payload = {}) {
+    if (!worldAiTipsList) return;
+    const tips = Array.isArray(payload.tips) ? payload.tips : [];
+    const counts = payload.severityCounts || {};
+    if (worldAiTipsTotal) worldAiTipsTotal.textContent = `${tips.length} tip${tips.length === 1 ? '' : 's'}`;
+    if (worldAiTipsAttention) worldAiTipsAttention.textContent = `${(counts.WARNING || 0) + (counts.CRITICAL || 0)} attention`;
+
+    if (!tips.length) {
+        worldAiTipsList.innerHTML = '<li class="world-operations-empty">No AI tips right now. Keep studying and this card will surface signals.</li>';
+        return;
+    }
+
+    worldAiTipsList.innerHTML = tips.slice(0, 6).map((tip) => `
+        <li class="world-operations-item">
+            <strong>${escapeWorldHtml(tip.title || 'AI tip')}</strong>
+            <span>${escapeWorldHtml(tip.message || '')}</span>
+            <em class="world-ai-tip-meta">${escapeWorldHtml(tip.severity || 'INFO')} · ${escapeWorldHtml(tip.scope || 'COURSE')}</em>
+        </li>
+    `).join('');
+}
+
+async function refreshWorldAiTips({ showLoading = false, refresh = true } = {}) {
+    if (!authToken || !AUTH_API || !worldAiTipsList) return;
+    const params = new URLSearchParams({ refresh: refresh ? 'true' : 'false' });
+    if (COURSE_ID_FROM_URL) params.set('courseId', COURSE_ID_FROM_URL);
+    if (currentModuleId) params.set('moduleId', currentModuleId);
+
+    try {
+        if (showLoading) worldAiTipsList.innerHTML = '<li class="world-operations-empty">Refreshing AI tips...</li>';
+        const response = await fetch(`${AUTH_API}/api/ai-tips/me?${params.toString()}`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || 'Failed to load AI tips.');
+        renderWorldAiTips(payload);
+    } catch (error) {
+        console.warn('Could not load world AI tips:', error);
+        worldAiTipsList.innerHTML = '<li class="world-operations-empty">Could not load AI tips yet.</li>';
+    }
+}
+
+function openWorldAiTips() {
+    if (!worldAiTipsCard) return;
+    worldAiTipsCard.classList.remove('hidden');
+    btnToggleAiTips?.classList.add('active');
+    refreshWorldAiTips({ showLoading: true, refresh: true });
+}
+
+function closeWorldAiTips() {
+    worldAiTipsCard?.classList.add('hidden');
+    btnToggleAiTips?.classList.remove('active');
+}
+
+btnToggleAiTips?.addEventListener('click', () => {
+    const hidden = worldAiTipsCard?.classList.contains('hidden');
+    if (hidden) openWorldAiTips();
+    else closeWorldAiTips();
+});
+worldAiTipsClose?.addEventListener('click', closeWorldAiTips);
+worldAiTipsRefresh?.addEventListener('click', () => refreshWorldAiTips({ showLoading: true, refresh: true }));
+
+async function refreshVisibleWorldAiTips() {
+    if (!worldAiTipsCard || worldAiTipsCard.classList.contains('hidden')) return;
+    await refreshWorldAiTips({ refresh: true });
 }
 
 
@@ -3973,8 +4042,9 @@ async function openModuleSidebar(placementId, moduleId, courseModuleId = null) {
             },
             body: JSON.stringify({
                 source: 'MULTIPLAYER_WORLD',
-                sceneId: 'level1',
-                placementId: placementId
+                sceneId: COURSE_ID_FROM_URL ? `course-${COURSE_ID_FROM_URL}` : 'level1',
+                placementId: placementId,
+                courseId: COURSE_ID_FROM_URL || undefined
             })
         });
 
@@ -4089,7 +4159,7 @@ function trackModuleVideoProgress(videoId) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD' })
+        body: JSON.stringify({ progress: 100, completed: true, source: 'MULTIPLAYER_WORLD', courseId: COURSE_ID_FROM_URL || undefined })
     }).catch(() => null);
 }
 
@@ -4097,7 +4167,7 @@ function trackModuleDocumentDownload(doc) {
     return fetch(`${AUTH_API}/modules/${currentModuleId}/documents/${doc.id}/download`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({ source: 'MULTIPLAYER_WORLD' })
+        body: JSON.stringify({ source: 'MULTIPLAYER_WORLD', courseId: COURSE_ID_FROM_URL || undefined })
     }).catch(() => null);
 }
 
@@ -4168,6 +4238,7 @@ function markModuleMaterialViewed(type, id, extra = {}) {
         }
     }
     refreshModuleProgressSurfaces();
+    refreshVisibleWorldAiTips();
     maybeAutoCompleteCurrentCourseModule();
 }
 
