@@ -2331,6 +2331,116 @@ body.course-world-mode #audio-call-layer {
     letter-spacing: 0.04em;
 }
 
+.world-ai-tip-item {
+    cursor: pointer;
+    transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.world-ai-tip-item:hover,
+.world-ai-tip-item:focus-visible {
+    transform: translateY(-1px);
+    border-color: rgba(147, 197, 253, 0.38);
+    background: rgba(59, 130, 246, 0.1);
+    outline: none;
+}
+
+.world-ai-tip-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 6000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(2, 6, 23, 0.62);
+    backdrop-filter: blur(14px);
+}
+
+.world-ai-tip-modal.hidden {
+    display: none;
+}
+
+.world-ai-tip-dialog {
+    width: min(720px, calc(100vw - 2rem));
+    max-height: min(82vh, 760px);
+    overflow: auto;
+    padding: 1.25rem;
+    border-radius: 24px;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(147, 197, 253, 0.18);
+    box-shadow: 0 28px 90px rgba(2, 6, 23, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.world-ai-tip-dialog-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.world-ai-tip-dialog-header h3 {
+    margin: 0.25rem 0 0;
+    font-size: 1.25rem;
+}
+
+.world-ai-tip-dialog .close-btn {
+    background: transparent;
+    border: 0;
+    color: var(--text-secondary);
+    font-size: 1.6rem;
+    cursor: pointer;
+}
+
+.world-ai-tip-dialog-summary {
+    margin: 1rem 0;
+    color: var(--text-primary);
+    font-size: 0.98rem;
+    line-height: 1.55;
+}
+
+.world-ai-tip-dialog-reason {
+    margin-bottom: 1rem;
+    padding: 0.8rem 0.9rem;
+    border-radius: 14px;
+    background: rgba(59, 130, 246, 0.1);
+    color: #bfdbfe;
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.world-ai-tip-dialog-section {
+    margin-top: 1rem;
+}
+
+.world-ai-tip-dialog-section h4 {
+    margin: 0 0 0.45rem;
+    color: #dbeafe;
+    font-size: 0.86rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.world-ai-tip-dialog-section ul {
+    margin: 0;
+    padding-left: 1.15rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    font-size: 0.9rem;
+}
+
+.world-ai-tip-dialog-section li + li {
+    margin-top: 0.45rem;
+}
+
+.world-ai-tip-dialog-section.muted {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 0.9rem;
+}
+
+.world-ai-tip-dialog-section.muted li {
+    color: rgba(226, 232, 240, 0.74);
+}
+
 @media (max-width: 900px) {
     #world-ai-tips-card {
         top: auto;

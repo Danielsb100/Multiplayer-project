@@ -270,6 +270,16 @@ const worldAiTipsTotal = document.getElementById('world-ai-tips-total');
 const worldAiTipsAttention = document.getElementById('world-ai-tips-attention');
 const worldAiTipsClose = document.getElementById('world-ai-tips-close');
 const worldAiTipsRefresh = document.getElementById('world-ai-tips-refresh');
+const worldAiTipModal = document.getElementById('world-ai-tip-modal');
+const worldAiTipModalClose = document.getElementById('world-ai-tip-modal-close');
+const worldAiTipModalTitle = document.getElementById('world-ai-tip-modal-title');
+const worldAiTipModalMeta = document.getElementById('world-ai-tip-modal-meta');
+const worldAiTipModalSummary = document.getElementById('world-ai-tip-modal-summary');
+const worldAiTipModalReason = document.getElementById('world-ai-tip-modal-reason');
+const worldAiTipModalFocus = document.getElementById('world-ai-tip-modal-focus');
+const worldAiTipModalSteps = document.getElementById('world-ai-tip-modal-steps');
+const worldAiTipModalDiagnostics = document.getElementById('world-ai-tip-modal-diagnostics');
+let currentWorldAiTips = [];
 let worldOperationsRefreshTimer = null;
 
 function isOverUI(event) {
@@ -336,6 +346,47 @@ async function refreshWorldOperationsSummary() {
     }
 }
 
+function renderWorldAiTipSection(title, items = []) {
+    const filtered = (Array.isArray(items) ? items : []).map((item) => String(item || '').trim()).filter(Boolean);
+    if (!filtered.length) return '';
+    return `
+        <h4>${escapeWorldHtml(title)}</h4>
+        <ul>${filtered.map((item) => `<li>${escapeWorldHtml(item)}</li>`).join('')}</ul>
+    `;
+}
+
+function closeWorldAiTipModal() {
+    worldAiTipModal?.classList.add('hidden');
+}
+
+function openWorldAiTipModal(index) {
+    const tip = currentWorldAiTips[index];
+    if (!tip || !worldAiTipModal) return;
+    const metadata = tip.metadata || {};
+    if (worldAiTipModalTitle) worldAiTipModalTitle.textContent = tip.title || 'AI tip';
+    if (worldAiTipModalMeta) worldAiTipModalMeta.textContent = `${tip.severity || 'INFO'} · ${tip.scope || 'COURSE'}${metadata.llmGenerated ? ' · LLM generated' : ''}`;
+    if (worldAiTipModalSummary) worldAiTipModalSummary.textContent = tip.message || '';
+    if (worldAiTipModalReason) {
+        worldAiTipModalReason.textContent = tip.reason || '';
+        worldAiTipModalReason.classList.toggle('hidden', !tip.reason);
+    }
+    if (worldAiTipModalFocus) {
+        worldAiTipModalFocus.innerHTML = renderWorldAiTipSection('Focus areas', metadata.focusAreas || []);
+    }
+    if (worldAiTipModalSteps) {
+        worldAiTipModalSteps.innerHTML = renderWorldAiTipSection('Next steps', metadata.nextSteps || []);
+    }
+    if (worldAiTipModalDiagnostics) {
+        const diagnostics = (metadata.wrongQuestions || []).map((item) => {
+            const selected = item.selectedOption ? ` You answered: ${item.selectedOption}.` : '';
+            const correct = item.correctAnswer ? ` Correct answer: ${item.correctAnswer}.` : '';
+            return `${item.question || 'Missed question'}.${selected}${correct}`;
+        });
+        worldAiTipModalDiagnostics.innerHTML = renderWorldAiTipSection('Diagnostics', diagnostics);
+    }
+    worldAiTipModal.classList.remove('hidden');
+}
+
 function renderWorldAiTips(payload = {}) {
     if (!worldAiTipsList) return;
     const tips = Array.isArray(payload.tips) ? payload.tips : [];
@@ -344,15 +395,17 @@ function renderWorldAiTips(payload = {}) {
     if (worldAiTipsAttention) worldAiTipsAttention.textContent = `${(counts.WARNING || 0) + (counts.CRITICAL || 0)} attention`;
 
     if (!tips.length) {
+        currentWorldAiTips = [];
         worldAiTipsList.innerHTML = '<li class="world-operations-empty">No AI tips right now. Keep studying and this card will surface signals.</li>';
         return;
     }
 
-    worldAiTipsList.innerHTML = tips.slice(0, 6).map((tip) => `
-        <li class="world-operations-item">
+    currentWorldAiTips = tips.slice(0, 6);
+    worldAiTipsList.innerHTML = currentWorldAiTips.map((tip, index) => `
+        <li class="world-operations-item world-ai-tip-item" tabindex="0" role="button" data-ai-tip-index="${index}">
             <strong>${escapeWorldHtml(tip.title || 'AI tip')}</strong>
             <span>${escapeWorldHtml(tip.message || '')}</span>
-            <em class="world-ai-tip-meta">${escapeWorldHtml(tip.severity || 'INFO')} · ${escapeWorldHtml(tip.scope || 'COURSE')}</em>
+            <em class="world-ai-tip-meta">${escapeWorldHtml(tip.severity || 'INFO')} · ${escapeWorldHtml(tip.scope || 'COURSE')} · View details</em>
         </li>
     `).join('');
 }
@@ -396,6 +449,25 @@ btnToggleAiTips?.addEventListener('click', () => {
 });
 worldAiTipsClose?.addEventListener('click', closeWorldAiTips);
 worldAiTipsRefresh?.addEventListener('click', () => refreshWorldAiTips({ showLoading: true, refresh: true }));
+worldAiTipsList?.addEventListener('click', (event) => {
+    const item = event.target.closest('[data-ai-tip-index]');
+    if (!item) return;
+    openWorldAiTipModal(Number(item.dataset.aiTipIndex));
+});
+worldAiTipsList?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const item = event.target.closest('[data-ai-tip-index]');
+    if (!item) return;
+    event.preventDefault();
+    openWorldAiTipModal(Number(item.dataset.aiTipIndex));
+});
+worldAiTipModalClose?.addEventListener('click', closeWorldAiTipModal);
+worldAiTipModal?.addEventListener('click', (event) => {
+    if (event.target === worldAiTipModal) closeWorldAiTipModal();
+});
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && worldAiTipModal && !worldAiTipModal.classList.contains('hidden')) closeWorldAiTipModal();
+});
 
 async function refreshVisibleWorldAiTips() {
     if (!worldAiTipsCard || worldAiTipsCard.classList.contains('hidden')) return;
